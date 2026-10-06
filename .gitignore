@@ -1,0 +1,9 @@
+# 系統檔
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 保險：任何層級的依賴與本機環境變數都不進 repo（web/.gitignore 另有更細的規則）
+node_modules/
+.env.local
+.env.*.local

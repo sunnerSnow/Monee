@@ -1,0 +1,157 @@
+/* ==========================================================================
+   Monee Design Tokens
+   定案：2026-10-06　視覺參考：recruit.postas.co.jp　範例畫面：monee-home-luxe.html
+
+   用法
+   1. 在 <html> 設 data-theme="light" 或 "dark"，由 App 依使用者設定或系統偏好切換。
+   2. 字體請在 HTML <head> 用 <link> 載入（比 @import 快）：
+      https://fonts.googleapis.com/css2?family=Lexend+Exa:wght@200;300;400&family=Noto+Sans+TC:wght@400;500&display=swap
+   3. 元件只引用語意 token（--text、--surface…），不要直接寫色碼。
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* ---- 品牌 ---- */
+  --yellow: #FED900;            /* 招牌黃：今日卡片色塊、目前分頁、收入圖示、首選操作 */
+  --ink: #1A1A1E;               /* 黃色底上的字與圖示，深淺模式都固定 */
+
+  /* ---- 表面 ---- */
+  --bg: #FCF7D9;                /* 頁面底色（奶油黃） */
+  --surface: #FFFFFF;           /* 卡片、導覽列、面板 */
+  --fill: #F0F0F0;              /* 圖示底、進度軌、支出小卡 */
+  --cream: #F8ECA7;             /* 收入小卡 */
+
+  /* ---- 文字 ---- */
+  --text: #1A1A1E;              /* 主要文字、預設進度 */
+  --text-2: #626263;            /* 說明文字、次要資訊 */
+
+  /* ---- 線條 ---- */
+  --line: #E7E7E7;              /* 1px 細框、分隔線 */
+  --line-strong: #D5D7DA;       /* 面板把手、色票邊框 */
+  --dash: #B5B7BA;              /* 虛線：轉帳圖示、空狀態框 */
+
+  /* ---- 操作 ---- */
+  --primary: #1A1A1E;           /* 主要按鈕底色 */
+  --on-primary: #FFFFFF;        /* 主要按鈕文字 */
+  --fab-bg: #1A1A1E;            /* ＋ 按鈕底色 */
+  --fab-fg: #FED900;            /* ＋ 按鈕圖示 */
+
+  /* ---- 狀態 ---- */
+  --warn: #D9620A;              /* 快用完了：進度條 */
+  --warn-text: #A84A00;         /* 快用完了：標籤文字 */
+  --warn-tint: #FDE9D7;         /* 快用完了：標籤底色 */
+  --alert: #B3261E;             /* 超支：進度條、文字 */
+  --alert-tint: #FCE8E6;        /* 超支：標籤底色 */
+  --gain: #1E6B3A;              /* 綠色漲跌（使用者選「綠漲紅跌」時） */
+  --gain-tint: #E6F2EA;
+
+  /* ---- 疊層與陰影 ---- */
+  --scrim: rgba(26, 26, 30, .4);
+  --hover: rgba(26, 26, 30, .03);
+  --nav-shadow: 0 10px 28px -14px rgba(26, 26, 30, .25);
+  --fab-shadow: 0 10px 22px -8px rgba(26, 26, 30, .55);
+
+  /* ---- 字體 ---- */
+  --font-num: 'Lexend Exa', 'Noto Sans TC', sans-serif;   /* 金額、數字、英文標籤 */
+  --font-body: 'Noto Sans TC', system-ui, sans-serif;     /* 中文與一般文字 */
+  --fw-thin: 200;
+  --fw-light: 300;
+  --fw-regular: 400;
+  --fw-medium: 500;             /* 全站最高字重 */
+
+  --fs-display-xl: 40px;        /* 今日花費 */
+  --fs-display-l: 32px;         /* 本月結餘 */
+  --fs-display-m: 28px;         /* 淨資產 */
+  --fs-title-l: 22px;           /* 頁面標題 */
+  --fs-title-m: 20px;           /* 面板標題、卡片大標 */
+  --fs-title-s: 16px;           /* 區塊標題 */
+  --fs-body: 15px;              /* 列表標題、一般內文 */
+  --fs-body-s: 13px;            /* 說明句、標籤、連結 */
+  --fs-caption: 12px;           /* 日期、群組標題、英文小標（最小字級） */
+
+  --tracking-num: 0;
+  --tracking-body: .04em;
+  --tracking-caption: .1em;
+  --tracking-title: .14em;
+
+  /* ---- 間距（4px 格線） ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --gutter: 20px;               /* 頁面左右邊距 */
+
+  /* ---- 圓角 ---- */
+  --radius-xs: 12px;            /* 列表圖示底 */
+  --radius-sm: 14px;            /* 收支小卡、大圖示底 */
+  --radius-md: 18px;            /* 面板選項卡 */
+  --radius-lg: 20px;            /* 一般卡片 */
+  --radius-xl: 24px;            /* 今日卡片、底部導覽 */
+  --radius-2xl: 28px;           /* 底部面板上緣 */
+  --radius-pill: 999px;         /* 按鈕、標籤、篩選 */
+
+  /* ---- 尺寸 ---- */
+  --touch: 44px;                /* 最小可點範圍 */
+  --row-h: 64px;                /* 列表列高 */
+  --icon-chip: 40px;
+  --fab: 58px;
+  --nav-h: 68px;
+  --bar-h: 6px;                 /* 進度條粗細 */
+
+  /* ---- 動態 ---- */
+  --ease-out: cubic-bezier(.165, .84, .44, 1);   /* 進場 */
+  --ease-in: cubic-bezier(.4, 0, 1, 1);          /* 退場 */
+  --dur-press: 160ms;
+  --dur-fade: 180ms;
+  --dur-exit: 220ms;
+  --dur-enter: 320ms;
+}
+
+/* 深色：底色沿用 POSTAS 的 --color-blacker / --color-black，招牌黃保留，主要按鈕反轉成黃底黑字 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0E0E0F;
+  --surface: #1A1A1E;
+  --fill: #26262B;
+  --cream: #3A3418;
+
+  --text: #F5F3EA;
+  --text-2: #A8AAAE;
+
+  --line: #2E2E33;
+  --line-strong: #45464C;
+  --dash: #55575C;
+
+  --primary: #FED900;
+  --on-primary: #1A1A1E;
+  --fab-bg: #FED900;
+  --fab-fg: #1A1A1E;
+
+  --warn: #F08A3C;
+  --warn-text: #FFB27A;
+  --warn-tint: #3D2614;
+  --alert: #FF6B5E;
+  --alert-tint: #3D1A17;
+  --gain: #7FD49B;
+  --gain-tint: #173222;
+
+  --scrim: rgba(0, 0, 0, .6);
+  --hover: rgba(255, 255, 255, .04);
+  --nav-shadow: 0 10px 28px -14px rgba(0, 0, 0, .7);
+  --fab-shadow: 0 10px 24px -10px rgba(254, 217, 0, .35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 0ms;
+    --dur-fade: 0ms;
+    --dur-exit: 0ms;
+    --dur-enter: 0ms;
+  }
+}

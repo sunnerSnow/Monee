@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monee 互動原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend+Exa:wght@200;300;400&family=Noto+Sans+TC:wght@400;500&display=swap">
+<link rel="stylesheet" href="../design-system/monee/tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <main class="scroll" id="scroll" aria-label="Monee 首頁"></main>
+  <nav class="nav" id="nav" aria-label="主選單"></nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <button type="button" class="scrim" data-action="close-sheet" tabindex="-1" aria-label="關閉面板"></button>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" inert></section>
+</div>
+
+<aside class="panel" aria-labelledby="panel-title">
+  <h1 id="panel-title"><span class="en">Monee</span>互動原型</h1>
+  <p class="panel-sub">Phase 1 核心頁面・390px 行動版</p>
+
+  <fieldset class="field-set">
+    <legend>情境（會重設資料）</legend>
+    <div class="seg">
+      <label><input type="radio" name="scenario" value="onTrack" checked><span>日常</span></label>
+      <label><input type="radio" name="scenario" value="tight"><span>快用完了</span></label>
+      <label><input type="radio" name="scenario" value="over"><span>超出預算</span></label>
+      <label><input type="radio" name="scenario" value="empty"><span>新使用者</span></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="field-set">
+    <legend>外觀</legend>
+    <div class="seg">
+      <label><input type="radio" name="theme" value="light" checked><span>淺色</span></label>
+      <label><input type="radio" name="theme" value="dark"><span>深色</span></label>
+      <label><input type="radio" name="theme" value="system"><span>跟隨系統</span></label>
+    </div>
+  </fieldset>
+
+  <section aria-labelledby="try-title">
+    <h2 id="try-title">可以試試</h2>
+    <ul>
+      <li>底部導覽切換首頁、明細、資產、報表；右上角頭像進「我的」</li>
+      <li>點 ＋ 用說一句、拍收據或手動輸入記一筆，記完首頁數字會跟著變</li>
+      <li>在「資產」點任一帳戶，試試校準餘額</li>
+      <li>在「明細」搜尋或篩選；在「報表」把滑鼠移到直條上看數字</li>
+      <li>右上角眼睛可以隱藏所有金額</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="doc-title">
+    <h2 id="doc-title">設計規範</h2>
+    <ul>
+      <li><a href="../design-system/monee/styleguide.html">styleguide.html</a>：視覺規範頁</li>
+      <li><a href="../design-system/monee/MASTER.md">MASTER.md</a>：規範文件</li>
+      <li><a href="../design-system/monee/tokens.css">tokens.css</a>：色碼與尺寸變數</li>
+    </ul>
+  </section>
+</aside>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { reconcileDiff } from './budget';
+import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
+import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
+import { demo, isDemo } from './demo';
+import { createClient } from './supabase/client';
+import type { Account, NewAccount, NewTransaction, PnlColor, Profile, Transaction } from './types';
+
+/** 首頁、明細與報表需要的歷史月數（含當月） */
+export const HISTORY_MONTHS = 6;
+
+const keys = {
+  accounts: ['accounts'],
+  transactions: ['transactions'],
+  profile: ['profile'],
+  user: ['user'],
+} satisfies Record<string, QueryKey>;
+
+interface AccountRow {
+  id: string;
+  name: string;
+  type: Account['type'];
+  currency: string;
+  opening_balance: number | string;
+  current_balance: number | string;
+  icon: string | null;
+  investment_snapshot: Account['investmentSnapshot'];
+  last_reconciled_at: string | null;
+}
+
+interface TransactionRow {
+  id: string;
+  date: string;
+  time: string | null;
+  type: Transaction['type'];
+  amount: number | string;
+  category_id: string;
+  source_account_id: string;
+  target_account_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+const toAccount = (r: AccountRow): Account => ({
+  id: r.id,
+  name: r.name,
+  type: r.type,
+  currency: r.currency,
+  currentBalance: Number(r.current_balance),
+  openingBalance: Number(r.opening_balance),
+  icon: r.icon,
+  investmentSnapshot: r.investment_snapshot,
+  lastReconciledAt: r.last_reconciled_at,
+});
+
+const toTransaction = (r: TransactionRow): Transaction => ({
+  id: r.id,
+  date: r.date,
+  time: r.time ? r.time.slice(0, 5) : null,
+  type: r.type,
+  amount: Number(r.amount),
+  categoryId: r.category_id,
+  sourceAccountId: r.source_account_id,
+  targetAccountId: r.target_account_id,
+  note: r.note,
+  createdAt: r.created_at,
+});
+
+/** Supabase 查詢回傳 { data, error }，有錯就丟出，讓 React Query 接手錯誤狀態 */
+async function unwrap<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+// ---------- 讀取 ----------
+
+export function useAccounts() {
+  return useQuery({
+    queryKey: keys.accounts,
+    queryFn: async () => {
+      if (isDemo) return demo.accounts();
+      const rows = await unwrap<AccountRow[]>(
+        createClient().from('account_balances').select('*').eq('archived', false).order('sort_order').order('created_at'),
+      );
+      return rows.map(toAccount);
+    },
+  });
+}
+
+export function useTransactions() {
+  return useQuery({
+    queryKey: keys.transactions,
+    queryFn: async () => {
+      if (isDemo) return demo.transactions();
+      const since = monthStart(shiftMonth(monthKeyOf(new Date()), -(HISTORY_MONTHS - 1)));
+      const rows = await unwrap<TransactionRow[]>(
+        createClient()
+          .from('transactions')
+          .select('*')
+          .gte('date', since)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false }),
+      );
+      return rows.map(toTransaction);
+    },
+  });
+}
+
+export function useProfile() {
+  return useQuery({
+    queryKey: keys.profile,
+    queryFn: async (): Promise<Profile> => {
+      if (isDemo) return demo.profile();
+      const row = await unwrap<{ monthly_budget: number | string | null; pnl_color: PnlColor } | null>(
+        createClient().from('profiles').select('monthly_budget, pnl_color').maybeSingle(),
+      );
+      return {
+        monthlyBudget: row?.monthly_budget != null ? Number(row.monthly_budget) : null,
+        pnlColor: row?.pnl_color ?? 'red_up',
+      };
+    },
+  });
+}
+
+export function useUser() {
+  return useQuery({
+    queryKey: keys.user,
+    queryFn: async () => {
+      if (isDemo) return { email: 'demo@monee.app' };
+      const { data } = await createClient().auth.getUser();
+      return data.user;
+    },
+  });
+}
+
+// ---------- 寫入 ----------
+
+function useInvalidate() {
+  const queryClient = useQueryClient();
+  return (...list: QueryKey[]) => Promise.all(list.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+}
+
+export function useAddTransaction() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (t: NewTransaction) => {
+      if (isDemo) return demo.addTransaction(t);
+      const row = await unwrap<{ id: string }>(
+        createClient()
+          .from('transactions')
+          .insert({
+            date: t.date,
+            time: t.time,
+            type: t.type,
+            amount: t.amount,
+            category_id: t.categoryId,
+            source_account_id: t.sourceAccountId,
+            target_account_id: t.type === 'TRANSFER' ? t.targetAccountId : null,
+            note: t.note,
+          })
+          .select('id')
+          .single(),
+      );
+      return row.id;
+    },
+    onSuccess: () => invalidate(keys.transactions, keys.accounts),
+  });
+}
+
+export function useAddAccount() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (a: NewAccount) => {
+      if (isDemo) return demo.addAccount(a);
+      const row = await unwrap<{ id: string }>(
+        createClient()
+          .from('accounts')
+          .insert({ name: a.name, type: a.type, opening_balance: a.openingBalance })
+          .select('id')
+          .single(),
+      );
+      return row.id;
+    },
+    onSuccess: () => invalidate(keys.accounts),
+  });
+}
+
+/** 校準：有差額就補一筆「未記錄雜項／收入」，並記下校準時間 */
+export function useReconcile() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ account, input }: { account: Account; input: number }) => {
+      if (isDemo) return demo.reconcile(account, input);
+      const supabase = createClient();
+      const diff = reconcileDiff(account, input);
+      const now = new Date();
+      if (diff !== 0) {
+        const expense = diff < 0;
+        await unwrap(
+          supabase
+            .from('transactions')
+            .insert({
+              date: toISODate(now),
+              time: toTime(now),
+              type: expense ? 'EXPENSE' : 'INCOME',
+              amount: Math.abs(diff),
+              category_id: expense ? RECONCILE_EXPENSE_CATEGORY : RECONCILE_INCOME_CATEGORY,
+              source_account_id: account.id,
+              note: expense ? '未記錄雜項' : '未記錄收入',
+            })
+            .select('id')
+            .single(),
+        );
+      }
+      await unwrap(supabase.from('accounts').update({ last_reconciled_at: now.toISOString() }).eq('id', account.id).select('id'));
+      return diff;
+    },
+    onSuccess: () => invalidate(keys.transactions, keys.accounts),
+  });
+}
+
+export function useUpdateProfile() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (patch: Partial<Profile>) => {
+      if (isDemo) return demo.updateProfile(patch);
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) throw new Error('登入已過期，請重新登入');
+      const values: Record<string, unknown> = { user_id: data.user.id };
+      if ('monthlyBudget' in patch) values.monthly_budget = patch.monthlyBudget;
+      if (patch.pnlColor) values.pnl_color = patch.pnlColor;
+      await unwrap(supabase.from('profiles').upsert(values).select('user_id'));
+    },
+    onSuccess: () => invalidate(keys.profile),
+  });
+}

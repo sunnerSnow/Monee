@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monee 首頁設計稿・質感版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend+Exa:wght@200;300;400&family=Noto+Sans+TC:wght@400;500&display=swap">
+<style>
+:root {
+  /* recruit.postas.co.jp 原色（取自其 CSS 變數） */
+  --bg: #FCF7D9;          /* 奶油黃（原為 POSTAS 的 --color-lighter #F7FBFC） */
+  --surface: #FFFFFF;     /* --color-white */
+  --text: #1A1A1E;        /* --color-black */
+  --text-2: #626263;      /* --color-gray-darker */
+  --fill: #F0F0F0;        /* --color-light */
+  --line: #E7E7E7;        /* --color-gray-light */
+  --yellow: #FED900;      /* --color-yellow-dark */
+  --cream: #F8ECA7;       /* --color-cream */
+
+  /* 延伸色：POSTAS 沒有提醒、警示與漲跌色，另外補 */
+  --warn: #D9620A;
+  --warn-text: #A84A00;
+  --warn-tint: #FDE9D7;
+  --alert: #B3261E;
+  --alert-tint: #FCE8E6;
+  --gain: #1E6B3A;
+  --gain-tint: #E6F2EA;
+  --desk: #E8EDEF;
+
+  /* 會隨深淺模式變化的角色色 */
+  color-scheme: light;
+  --ink: #1A1A1E;              /* 黃色底上的字與圖示，兩種模式都固定深色 */
+  --line-strong: #D5D7DA;
+  --dash: #B5B7BA;
+  --primary: #1A1A1E;
+  --on-primary: #FFFFFF;
+  --fab-bg: #1A1A1E;
+  --fab-fg: #FED900;
+  --fab-shadow: 0 10px 22px -8px rgba(26, 26, 30, .55);
+  --nav-shadow: 0 10px 28px -14px rgba(26, 26, 30, .25);
+  --scrim: rgba(26, 26, 30, .4);
+  --hover: rgba(26, 26, 30, .03);
+  --bezel: #1A1A1E;
+
+  /* 數字與英文用寬體細字，替代 POSTAS 的付費字體 area-inktrap-extended */
+  --font-num: 'Lexend Exa', 'Noto Sans TC', sans-serif;
+  --font-body: 'Noto Sans TC', system-ui, sans-serif;
+}
+
+/* 深色模式：底色沿用 POSTAS 的 --color-blacker / --color-black，招牌黃保留，主要按鈕反轉成黃底黑字 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E0E0F;
+  --surface: #1A1A1E;
+  --text: #F5F3EA;
+  --text-2: #A8AAAE;
+  --fill: #26262B;
+  --line: #2E2E33;
+  --line-strong: #45464C;
+  --dash: #55575C;
+  --cream: #3A3418;
+  --warn: #F08A3C;
+  --warn-text: #FFB27A;
+  --warn-tint: #3D2614;
+  --alert: #FF6B5E;
+  --alert-tint: #3D1A17;
+  --gain: #7FD49B;
+  --gain-tint: #173222;
+  --primary: #FED900;
+  --on-primary: #1A1A1E;
+  --fab-bg: #FED900;
+  --fab-fg: #1A1A1E;
+  --fab-shadow: 0 10px 24px -10px rgba(254, 217, 0, .35);
+  --nav-shadow: 0 10px 28px -14px rgba(0, 0, 0, .7);
+  --scrim: rgba(0, 0, 0, .6);
+  --hover: rgba(255, 255, 255, .04);
+  --bezel: #3A3A40;
+  --desk: #1C1D20;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 56px;
+  padding: 48px 24px;
+  background: var(--desk);
+  font-family: var(--font-body); font-weight: 400; color: var(--text);
+  letter-spacing: .04em; font-feature-settings: "palt";
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; letter-spacing: inherit; }
+
+.press { transition: transform 160ms cubic-bezier(.165, .84, .44, 1), background-color 160ms ease-out; }
+.press:active { transform: scale(.98); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+/* ---------- 手機框 ---------- */
+.phone {
+  position: relative; flex: none;
+  width: 390px; height: min(844px, calc(100vh - 96px)); min-height: 640px;
+  border-radius: 40px; overflow: hidden;
+  background: var(--bg);
+  box-shadow: 0 0 0 10px var(--bezel), 0 30px 60px -24px rgba(0, 0, 0, .45);
+}
+.scroll {
+  height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  display: flex; flex-direction: column; gap: 20px;
+  padding: max(18px, env(safe-area-inset-top)) 20px 128px;
+}
+.scroll::-webkit-scrollbar { display: none; }
+.scroll > * { flex: none; }
+
+.caption { font-size: 12px; color: var(--text-2); letter-spacing: .1em; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; }
+.h-sec { margin: 0; display: flex; align-items: baseline; gap: 10px; font-size: 16px; font-weight: 500; letter-spacing: .14em; }
+.h-sec .en { font-family: var(--font-num); font-size: 12px; font-weight: 300; letter-spacing: .06em; color: var(--text-2); }
+
+/* 頂部 */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+.greet { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.greet h1 { margin: 0; font-size: 22px; font-weight: 500; line-height: 1.3; letter-spacing: .14em; }
+.top-actions { display: flex; gap: 8px; }
+.icon-btn {
+  flex: none; width: 44px; height: 44px; padding: 0; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none;
+}
+.icon-btn.avatar { border-color: transparent; background: var(--fill); }
+
+/* 今日卡片：白底 + 右上招牌黃圓塊，吉祥物站在下方細線上 */
+.hero { position: relative; overflow: hidden; border-radius: 24px; background: var(--surface); border: 1px solid var(--line); }
+.hero-blob { position: absolute; top: -84px; right: -90px; width: 240px; height: 240px; border-radius: 50%; background: var(--yellow); }
+.hero-top { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 152px; padding: 22px 22px 18px; }
+.hero-label { position: relative; margin: 0; font-size: 13px; font-weight: 400; letter-spacing: .18em; color: var(--text-2); }
+.hero-amount { position: relative; margin: 0; font-family: var(--font-num); font-size: 40px; font-weight: 300; line-height: 1.15; letter-spacing: -.01em; }
+.hero-amount small, .big small, .net-v small { font-size: .5em; font-weight: 300; vertical-align: .72em; margin-right: 4px; }
+.hero-mood, .hero-text { position: relative; margin: 0; padding-right: 130px; font-size: 13px; line-height: 1.8; }
+.hero-title { position: relative; margin: 0; padding-right: 130px; font-size: 20px; font-weight: 500; line-height: 1.5; letter-spacing: .12em; }
+.chick { position: absolute; right: 6px; bottom: 0; width: 124px; height: auto; pointer-events: none; user-select: none; }
+.hero-bottom { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 22px 18px; border-top: 1px solid var(--line); background: var(--surface); }
+.bar { height: 6px; border-radius: 999px; background: var(--fill); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 999px; }
+.hero-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-2); }
+.chip { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--text); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.chip.warn { border-color: transparent; background: var(--warn-tint); color: var(--warn-text); }
+.chip.over { border-color: transparent; background: var(--alert-tint); color: var(--alert); }
+.cta {
+  min-height: 52px; border: 0; border-radius: 999px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--primary); color: var(--on-primary); font-size: 15px; font-weight: 500; letter-spacing: .14em;
+}
+
+/* 本月卡片 */
+.month { display: flex; flex-direction: column; gap: 16px; padding: 22px; }
+.month-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.big { margin: 0; font-family: var(--font-num); font-size: 32px; font-weight: 300; line-height: 1.15; letter-spacing: -.01em; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--fill); }
+.stat .k { font-size: 12px; color: var(--text-2); letter-spacing: .1em; }
+.stat .v { font-family: var(--font-num); font-size: 16px; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.stat.in { background: var(--cream); }
+.budget { display: flex; flex-direction: column; gap: 8px; }
+.budget-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-2); letter-spacing: .08em; }
+.track { position: relative; margin-top: 20px; height: 6px; border-radius: 999px; background: var(--fill); }
+.track > i { display: block; height: 100%; border-radius: 999px; background: var(--text); }
+.today-mark { position: absolute; top: -5px; width: 2px; height: 16px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.today-mark span { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 12px; white-space: nowrap; }
+.pace { margin: 2px 0 0; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.pace.warn { color: var(--alert); }
+.footnote { margin: 0; display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-2); }
+
+/* 列表 */
+.sec { display: flex; flex-direction: column; gap: 10px; }
+.sec-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.more { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px; font-size: 13px; color: var(--text); text-decoration: none; letter-spacing: .08em; }
+.list-card { padding: 4px 0; }
+.list { list-style: none; margin: 0; padding: 0; }
+.group-head { display: flex; justify-content: space-between; gap: 8px; padding: 14px 20px 4px; font-size: 12px; color: var(--text-2); letter-spacing: .08em; }
+.row-btn {
+  width: 100%; min-height: 64px; padding: 10px 20px; border: 0; background: transparent;
+  display: flex; align-items: center; gap: 14px; text-align: left; cursor: pointer; color: inherit; text-decoration: none;
+}
+.row-btn.tall { min-height: 72px; }
+@media (hover: hover) { .row-btn:hover { background: var(--hover); } }
+.ico { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--fill); color: var(--text); display: flex; align-items: center; justify-content: center; }
+.ico.in { background: var(--yellow); color: var(--ink); }
+.ico.tr { background: transparent; border: 1px dashed var(--dash); color: var(--text-2); }
+.txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t1 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t2 { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .06em; }
+.with-icon { display: flex; align-items: center; gap: 4px; }
+.with-icon svg { color: var(--text-2); }
+.amt { flex: none; font-family: var(--font-num); font-size: 15px; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.amt.tr { color: var(--text-2); }
+.amt-col { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.pnl { padding: 2px 8px; border-radius: 999px; font-family: var(--font-num); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; white-space: nowrap; }
+.pnl.red { background: var(--alert-tint); color: var(--alert); }
+.pnl.green { background: var(--gain-tint); color: var(--gain); }
+.net { display: flex; flex-direction: column; gap: 4px; padding: 16px 20px 8px; }
+.net-v { font-family: var(--font-num); font-size: 28px; font-weight: 300; line-height: 1.2; letter-spacing: -.01em; }
+
+/* 新使用者 */
+.setup { padding: 18px 0 6px; }
+.setup-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 20px 6px; }
+.steps { list-style: none; margin: 0; padding: 0; }
+.step { min-height: 60px; display: flex; align-items: center; gap: 14px; padding: 8px 20px; color: inherit; text-decoration: none; }
+.step-dot {
+  flex: none; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--text);
+  display: flex; align-items: center; justify-content: center; font-family: var(--font-num); font-size: 12px; letter-spacing: 0;
+}
+.step.done .step-dot { border-color: transparent; background: var(--yellow); color: var(--ink); }
+.step.done .t1 { color: var(--text-2); text-decoration: line-through; }
+.step .chev { flex: none; color: var(--text-2); }
+.empty-box { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border-radius: 20px; border: 1px dashed var(--dash); }
+.empty-box p { margin: 0; }
+.empty-box .e1 { font-size: 15px; font-weight: 500; }
+.empty-box .e2 { font-size: 13px; line-height: 1.8; color: var(--text-2); }
+
+/* 底部導覽 */
+.nav {
+  position: absolute; z-index: 5; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom)); height: 68px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; padding: 0 6px;
+  border-radius: 24px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--nav-shadow);
+}
+.tab {
+  height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  color: var(--text-2); font-size: 12px; letter-spacing: .08em; text-decoration: none;
+}
+.tab-ico { width: 48px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; }
+.tab[aria-current="page"] { color: var(--text); font-weight: 500; }
+.tab[aria-current="page"] .tab-ico { background: var(--yellow); color: var(--ink); }
+.fab-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; letter-spacing: .08em; }
+.fab {
+  width: 58px; height: 58px; margin-top: -30px; padding: 0; border-radius: 999px; cursor: pointer;
+  border: 4px solid var(--surface); background: var(--fab-bg); color: var(--fab-fg);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--fab-shadow);
+}
+
+/* 記一筆面板 */
+.scrim {
+  position: absolute; inset: 0; z-index: 10; width: 100%; padding: 0; border: 0; cursor: pointer;
+  background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity 220ms ease-out;
+}
+.sheet {
+  position: absolute; z-index: 11; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 10px 20px calc(32px + env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0; background: var(--bg);
+  transform: translateY(105%); visibility: hidden;
+  transition: transform 220ms cubic-bezier(.4, 0, 1, 1), visibility 0s linear 220ms;
+}
+.phone.open .scrim { opacity: 1; pointer-events: auto; }
+.phone.open .sheet { transform: none; visibility: visible; transition: transform 320ms cubic-bezier(.165, .84, .44, 1), visibility 0s; }
+.handle { align-self: center; width: 36px; height: 4px; border-radius: 999px; background: var(--line-strong); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheet-head h2 { margin: 0; display: flex; align-items: baseline; gap: 10px; font-size: 20px; font-weight: 500; line-height: 1.3; letter-spacing: .14em; }
+.sheet-head h2 .en { font-family: var(--font-num); font-size: 12px; font-weight: 300; letter-spacing: .06em; color: var(--text-2); }
+.sheet-head p { margin: 4px 0 0; }
+.opts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.opt {
+  width: 100%; min-height: 80px; padding: 16px; border-radius: 18px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.opt .ico { width: 48px; height: 48px; border-radius: 14px; }
+.opt .t1 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; letter-spacing: .1em; }
+.opt .chev { flex: none; color: var(--text-2); }
+.opt.featured { background: var(--yellow); border-color: transparent; color: var(--ink); }
+.opt.featured .t2, .opt.featured .chev { color: var(--ink); }
+.ico.mic { background: var(--ink); color: var(--yellow); }
+.opt.featured .badge { background: var(--ink); color: #FFFFFF; }
+.badge { padding: 1px 7px; border-radius: 999px; background: var(--text); color: var(--surface); font-family: var(--font-num); font-size: 11px; font-weight: 400; letter-spacing: .08em; }
+.quick-wrap { display: flex; flex-direction: column; gap: 10px; }
+.quick-wrap h3 { margin: 0; font-weight: 400; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.qchip {
+  min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); font-size: 13px;
+}
+.qchip svg { color: var(--text-2); }
+.qchip .num { font-size: 13px; }
+
+.toast {
+  position: absolute; z-index: 20; left: 50%; bottom: 108px; transform: translate(-50%, 12px);
+  max-width: calc(100% - 40px); padding: 10px 18px; border-radius: 999px;
+  background: var(--text); color: var(--surface); font-size: 13px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- 右側控制面板 ---------- */
+.panel {
+  flex: none; width: 320px; padding: 26px;
+  display: flex; flex-direction: column; gap: 24px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 24px;
+}
+.panel h1 { margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 18px; font-weight: 500; letter-spacing: .14em; }
+.panel h1 .en { font-family: var(--font-num); font-size: 26px; font-weight: 200; letter-spacing: 0; }
+.panel-sub { margin: -14px 0 0; font-size: 13px; color: var(--text-2); }
+.field { margin: 0; padding: 0; border: 0; min-width: 0; }
+.field legend, .panel h2 { padding: 0; margin: 0 0 10px; font-size: 12px; font-weight: 400; color: var(--text-2); letter-spacing: .12em; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.seg span {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); font-size: 13px;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+.seg input:checked + span { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.seg input:focus-visible + span { outline: 2px solid var(--text); outline-offset: 3px; }
+.swatches { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.swatches li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 12px; font-size: 13px; }
+.sw { width: 26px; height: 26px; border-radius: 999px; border: 1px solid var(--line-strong); }
+.swatches.sw-dark { display: none; }
+:root[data-theme="dark"] .swatches.sw-light { display: none; }
+:root[data-theme="dark"] .swatches.sw-dark { display: flex; }
+.swatches code { font-family: var(--font-num); font-size: 11px; color: var(--text-2); letter-spacing: 0; }
+.panel-note { margin: 0; font-size: 12px; line-height: 1.9; color: var(--text-2); }
+
+@media (max-width: 480px) {
+  body { display: block; padding: 0; }
+  .phone { width: 100%; height: 100dvh; min-height: 0; border-radius: 0; box-shadow: none; }
+  .panel { width: auto; border-radius: 0; border-width: 1px 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .press, .scrim, .sheet, .phone.open .sheet, .toast, .seg span { transition: none; }
+  .press:active { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <main class="scroll" id="scroll" aria-label="Monee 首頁"></main>
+  <nav class="nav" id="nav" aria-label="主選單"></nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <button type="button" class="scrim" data-action="close-sheet" tabindex="-1" aria-label="關閉記一筆"></button>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" inert></section>
+</div>
+
+<aside class="panel" aria-labelledby="panel-title">
+  <h1 id="panel-title"><span class="en">Monee</span>首頁設計稿・質感版</h1>
+  <p class="panel-sub">配色與字感參考 recruit.postas.co.jp</p>
+
+  <fieldset class="field">
+    <legend>外觀</legend>
+    <div class="seg">
+      <label><input type="radio" name="theme" value="light" checked><span>淺色</span></label>
+      <label><input type="radio" name="theme" value="dark"><span>深色</span></label>
+      <label><input type="radio" name="theme" value="system"><span>跟隨系統</span></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="field">
+    <legend>情境</legend>
+    <div class="seg">
+      <label><input type="radio" name="scenario" value="onTrack" checked><span>日常</span></label>
+      <label><input type="radio" name="scenario" value="tight"><span>快用完了</span></label>
+      <label><input type="radio" name="scenario" value="over"><span>超出預算</span></label>
+      <label><input type="radio" name="scenario" value="empty"><span>新使用者</span></label>
+    </div>
+  </fieldset>
+
+  <fieldset class="field">
+    <legend>投資漲跌配色</legend>
+    <div class="seg">
+      <label><input type="radio" name="pnl" value="red" checked><span>紅漲綠跌（台股）</span></label>
+      <label><input type="radio" name="pnl" value="green"><span>綠漲紅跌</span></label>
+    </div>
+  </fieldset>
+
+  <section aria-labelledby="swatch-title">
+    <h2 id="swatch-title">色票</h2>
+    <ul class="swatches sw-dark">
+      <li><span class="sw" style="background:#0E0E0F"></span><span>近黑・頁面底色</span><code>#0E0E0F</code></li>
+      <li><span class="sw" style="background:#1A1A1E"></span><span>墨黑・卡片</span><code>#1A1A1E</code></li>
+      <li><span class="sw" style="background:#F5F3EA"></span><span>米白・主要文字</span><code>#F5F3EA</code></li>
+      <li><span class="sw" style="background:#A8AAAE"></span><span>灰・說明文字</span><code>#A8AAAE</code></li>
+      <li><span class="sw" style="background:#26262B"></span><span>深灰・圖示底、進度軌</span><code>#26262B</code></li>
+      <li><span class="sw" style="background:#FED900"></span><span>招牌黃・＋、主要按鈕、色塊</span><code>#FED900</code></li>
+      <li><span class="sw" style="background:#3A3418"></span><span>暗奶油・收入底色</span><code>#3A3418</code></li>
+      <li><span class="sw" style="background:#F08A3C"></span><span>亮橘・快用完了</span><code>#F08A3C</code></li>
+      <li><span class="sw" style="background:#FF6B5E"></span><span>珊瑚紅・超支</span><code>#FF6B5E</code></li>
+    </ul>
+    <ul class="swatches sw-light">
+      <li><span class="sw" style="background:#FCF7D9"></span><span>奶油黃・頁面底色</span><code>#FCF7D9</code></li>
+      <li><span class="sw" style="background:#FFFFFF"></span><span>白・卡片</span><code>#FFFFFF</code></li>
+      <li><span class="sw" style="background:#1A1A1E"></span><span>墨黑・文字、按鈕、進度</span><code>#1A1A1E</code></li>
+      <li><span class="sw" style="background:#FED900"></span><span>招牌黃・色塊、＋、目前分頁</span><code>#FED900</code></li>
+      <li><span class="sw" style="background:#F8ECA7"></span><span>奶油黃・收入、提醒</span><code>#F8ECA7</code></li>
+      <li><span class="sw" style="background:#626263"></span><span>深灰・說明文字</span><code>#626263</code></li>
+      <li><span class="sw" style="background:#F0F0F0"></span><span>淺灰・圖示底、進度軌</span><code>#F0F0F0</code></li>
+      <li><span class="sw" style="background:#E7E7E7"></span><span>線灰・細線</span><code>#E7E7E7</code></li>
+      <li><span class="sw" style="background:#D9620A"></span><span>橘・快用完了（另補）</span><code>#D9620A</code></li>
+      <li><span class="sw" style="background:#B3261E"></span><span>警示紅・超支（另補）</span><code>#B3261E</code></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="font-title">
+    <h2 id="font-title">字體</h2>
+    <p class="panel-note">數字與英文：Lexend Exa 200–400，寬體細字，替代 POSTAS 使用的付費字體 area-inktrap-extended。<br>中文：Noto Sans TC 400–500，字距 0.04em 起，標題加寬到 0.14em。</p>
+  </section>
+  <p class="panel-note">點右上角眼睛可隱藏金額，點下方 ＋ 開啟「記一筆」。</p>
+</aside>
+
+<script>
+const P = {
+  home: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  list: '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  pie: '<path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+  utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  coffee: '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/>',
+  tram: '<rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h.01"/><path d="M16 15h.01"/>',
+  basket: '<path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m5 11 4-7"/><path d="m9 11 1 9"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  banknote: '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  swap: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  trend: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  external: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  calc: '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  card: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+  bank: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  okCircle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  infoCircle: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+};
+// 細線圖示：預設 1.5 筆畫，配合細字體
+const icon = (name, size = 20, sw = 1.5) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]}</svg>`;
+
+// 吉祥物圖檔底部切齊卡片上下兩區的細線，看起來像站在線上
+const chick = '<span class="hero-blob" aria-hidden="true"></span><img class="chick" src="Monee.png" alt="" width="124" height="90" draggable="false">';
+
+const CAT_ICON = { food: 'utensils', cafe: 'coffee', transit: 'tram', daily: 'basket', shop: 'bag', salary: 'banknote', transfer: 'swap' };
+
+const state = { scenario: 'onTrack', hidden: false, pnl: 'red' };
+const MASK = '$ ••••';
+const fmt = (n) => '$' + Math.abs(n).toLocaleString('en-US');
+const money = (n) => (state.hidden ? MASK : fmt(n));
+// 大金額：$ 縮小上標，數字細體
+const bigMoney = (n) => `<small>$</small>${state.hidden ? '••••' : Math.abs(n).toLocaleString('en-US')}`;
+
+function model() {
+  const BUDGET = 24000, SPENT_BEFORE = 4234, INCOME = 48000, TRANSFER = 10000;
+  const DAYS = 31, DAY = 6;
+  const allowance = Math.floor((BUDGET - SPENT_BEFORE) / (DAYS - DAY + 1));
+
+  const tx = (title, cat, account, time, amount, kind, icon) => ({ title, cat, account, time, amount, kind, icon });
+  const extras = [];
+  if (state.scenario === 'over') extras.push(tx('運動鞋', '購物', '國泰信用卡', '18:20', 1280, 'expense', 'shop'));
+  if (state.scenario !== 'onTrack') extras.push(tx('下午茶・蛋糕拿鐵', '餐飲', '國泰信用卡', '15:10', 300, 'expense', 'cafe'));
+  const today = [
+    ...extras,
+    tx('午餐・拉麵', '餐飲', '國泰信用卡', '12:30', 260, 'expense', 'food'),
+    tx('捷運', '交通', '台新 FlyGo', '08:50', 35, 'expense', 'transit'),
+    tx('早餐・蛋餅豆漿', '餐飲', '現金', '08:20', 75, 'expense', 'food'),
+  ];
+  const yesterday = [
+    tx('全聯・日用品', '日用', '台新 FlyGo', '19:40', 528, 'expense', 'daily'),
+    tx('轉入投資帳戶', '轉帳', '玉山銀行 → 投資帳戶', '09:30', TRANSFER, 'transfer', 'transfer'),
+    tx('十月薪資', '收入', '玉山銀行', '09:00', INCOME, 'income', 'salary'),
+  ];
+  const shape = (t) => ({
+    ...t,
+    sub: t.kind === 'transfer' ? `不算支出 · ${t.account}` : `${t.cat} · ${t.account} · ${t.time}`,
+    amountText: state.hidden ? MASK : (t.kind === 'income' ? '+' : t.kind === 'expense' ? '−' : '') + fmt(t.amount),
+  });
+
+  const todaySpent = today.reduce((s, t) => s + t.amount, 0);
+  const left = allowance - todaySpent;
+  const over = left < 0;
+  const tight = !over && left / allowance < 0.2;
+  const monthExpense = SPENT_BEFORE + todaySpent;
+  const usedPct = Math.round((monthExpense / BUDGET) * 100);
+  const timePct = (DAY / DAYS) * 100;
+  const diff = usedPct - Math.round(timePct);
+  const nextDaily = Math.floor((BUDGET - monthExpense) / (DAYS - DAY));
+
+  return {
+    todaySpent,
+    allowance: money(allowance),
+    pct: Math.min(100, Math.round((todaySpent / allowance) * 100)),
+    barColor: over ? 'var(--alert)' : tight ? 'var(--warn)' : 'var(--text)',
+    moodLine: over ? `沒關係，明天起每天可花 ${money(nextDaily)}` : tight ? '今天再省一點點就達標' : '節奏剛剛好，繼續保持',
+    chipCls: over ? 'over' : tight ? 'warn' : '',
+    chipText: over ? `超出 ${money(-left)}` : tight ? `只剩 ${money(left)}` : `還能花 ${money(left)}`,
+    balance: INCOME - monthExpense,
+    income: state.hidden ? MASK : '+' + fmt(INCOME),
+    monthExpense: money(monthExpense),
+    budget: money(BUDGET),
+    usedPct,
+    timePct,
+    paceOk: diff <= 2,
+    paceText: diff <= 2 ? '跟時間進度差不多，剛剛好' : `比時間進度快 ${diff}%，留意一下就好`,
+    transfer: money(TRANSFER),
+    groups: [
+      { label: '今天 · 10/6 週二', total: money(todaySpent), items: today.slice(0, 6).map(shape) },
+      { label: '昨天 · 10/5 週一', total: money(528), items: yesterday.slice(0, Math.max(0, 6 - today.length)).map(shape) },
+    ],
+    netWorth: 386240,
+    cashBank: money(245600),
+    cardDue: state.hidden ? MASK : '−' + fmt(12360),
+    invest: money(153000),
+    pnlText: state.hidden ? '▲ ••••' : `▲ ${fmt(11800)} (+8.4%)`,
+    pnlCls: state.pnl,
+  };
+}
+
+const txRow = (t) => `
+  <li><button type="button" class="row-btn press" data-demo="示意稿：交易詳情還沒設計">
+    <span class="ico ${t.kind === 'income' ? 'in' : t.kind === 'transfer' ? 'tr' : ''}" aria-hidden="true">${icon(CAT_ICON[t.icon])}</span>
+    <span class="txt"><span class="t1">${t.title}</span><span class="t2">${t.sub}</span></span>
+    <span class="amt ${t.kind === 'transfer' ? 'tr' : ''}">${t.amountText}</span>
+  </button></li>`;
+
+function renderHome(m) {
+  return `
+  <header class="top">
+    <div class="greet"><span class="caption">10月6日 週二</span><h1>早安</h1></div>
+    <div class="top-actions">
+      <button type="button" id="eye" class="icon-btn press" data-action="toggle-hidden" aria-pressed="${state.hidden}" aria-label="隱藏金額">${icon(state.hidden ? 'eyeOff' : 'eye')}</button>
+      <a href="#" class="icon-btn avatar press" aria-label="我的・設定">${icon('user')}</a>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="today-title">
+    <div class="hero-top">
+      ${chick}
+      <h2 id="today-title" class="hero-label">今天花了</h2>
+      <p class="hero-amount">${bigMoney(m.todaySpent)}</p>
+      <p class="hero-mood">${m.moodLine}</p>
+    </div>
+    <div class="hero-bottom">
+      <div class="bar" aria-hidden="true"><i style="width:${m.pct}%;background:${m.barColor}"></i></div>
+      <div class="hero-row">
+        <span>今日額度 <span class="num">${m.allowance}</span></span>
+        <span class="chip ${m.chipCls}">${m.chipText}</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card month" aria-labelledby="month-title">
+    <div class="month-head">
+      <h2 id="month-title" class="h-sec">10 月結餘<span class="en">October</span></h2>
+      <span class="caption">第 6 天・共 31 天</span>
+    </div>
+    <p class="big">${bigMoney(m.balance)}</p>
+    <div class="stats">
+      <div class="stat in"><span class="k">收入</span><span class="v">${m.income}</span></div>
+      <div class="stat"><span class="k">支出</span><span class="v">${m.monthExpense}</span></div>
+    </div>
+    <div class="budget">
+      <div class="budget-meta"><span>每月預算 <span class="num">${m.budget}</span></span><span>已用 <span class="num">${m.usedPct}%</span></span></div>
+      <div class="track" aria-hidden="true">
+        <i style="width:${Math.min(100, m.usedPct)}%"></i>
+        <span class="today-mark" style="left:${m.timePct}%"><span>今天</span></span>
+      </div>
+      <p class="pace ${m.paceOk ? '' : 'warn'}">${icon(m.paceOk ? 'okCircle' : 'infoCircle', 16)}<span>${m.paceText}</span></p>
+    </div>
+    <p class="footnote">${icon('swap', 16)}<span>已排除內部轉帳 <span class="num">${m.transfer}</span>，不算進支出</span></p>
+  </section>
+
+  <section class="sec" aria-labelledby="recent-title">
+    <div class="sec-head">
+      <h2 id="recent-title" class="h-sec">最近交易<span class="en">Recent</span></h2>
+      <a href="#" class="more">全部明細${icon('arrow', 16)}</a>
+    </div>
+    <div class="card list-card">
+      ${m.groups.map((g) => `
+        <div class="group-head"><span>${g.label}</span><span class="num">${g.total}</span></div>
+        <ul class="list">${g.items.map(txRow).join('')}</ul>`).join('')}
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="assets-title">
+    <div class="sec-head">
+      <h2 id="assets-title" class="h-sec">資產<span class="en">Assets</span></h2>
+      <a href="#" class="more">全部資產${icon('arrow', 16)}</a>
+    </div>
+    <div class="card list-card">
+      <div class="net"><span class="caption">淨資產</span><span class="net-v">${bigMoney(m.netWorth)}</span></div>
+      <ul class="list">
+        <li><a href="#" class="row-btn press">
+          <span class="ico" aria-hidden="true">${icon('bank')}</span>
+          <span class="txt"><span class="t1">現金與存款</span><span class="t2">現金・玉山・台新</span></span>
+          <span class="amt">${m.cashBank}</span>
+        </a></li>
+        <li><a href="#" class="row-btn press">
+          <span class="ico" aria-hidden="true">${icon('card')}</span>
+          <span class="txt"><span class="t1">信用卡待繳</span><span class="t2">國泰・台新 FlyGo</span></span>
+          <span class="amt">${m.cardDue}</span>
+        </a></li>
+        <li><a href="#" class="row-btn tall press" data-demo="示意稿：這裡會跳到 Monee Invest">
+          <span class="ico" aria-hidden="true">${icon('trend')}</span>
+          <span class="txt"><span class="t1 with-icon">外部投資${icon('external', 14)}</span><span class="t2">Monee Invest 同步・08:00</span></span>
+          <span class="amt-col"><span class="amt">${m.invest}</span><span class="pnl ${m.pnlCls}">${m.pnlText}</span></span>
+        </a></li>
+      </ul>
+    </div>
+  </section>`;
+}
+
+function renderEmpty() {
+  return `
+  <header class="top">
+    <div class="greet"><span class="caption">10月6日 週二</span><h1>歡迎來到 Monee</h1></div>
+    <div class="top-actions">
+      <a href="#" class="icon-btn avatar press" aria-label="我的・設定">${icon('user')}</a>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="first-title">
+    <div class="hero-top">
+      ${chick}
+      <h2 id="first-title" class="hero-title">今天還沒記帳</h2>
+      <p class="hero-text">記下第一筆，Monee 就開始幫你看懂錢花去哪。</p>
+    </div>
+    <div class="hero-bottom">
+      <button type="button" class="cta press" data-action="open-sheet" aria-haspopup="dialog">記下第一筆${icon('arrow', 18)}</button>
+    </div>
+  </section>
+
+  <section class="card setup" aria-labelledby="setup-title">
+    <div class="setup-head"><h2 id="setup-title" class="h-sec">開始設定<span class="en">Setup</span></h2><span class="caption num">1 / 3</span></div>
+    <ol class="steps">
+      <li class="step done">
+        <span class="step-dot" aria-hidden="true">${icon('check', 14, 2)}</span>
+        <span class="txt"><span class="t1">建立帳號</span><span class="t2">已完成</span></span>
+      </li>
+      <li><a href="#" class="step press">
+        <span class="step-dot" aria-hidden="true">2</span>
+        <span class="txt"><span class="t1">新增帳戶</span><span class="t2">現金、銀行、信用卡都可以加</span></span>
+        <span class="chev" aria-hidden="true">${icon('chevron', 18)}</span>
+      </a></li>
+      <li><a href="#" class="step press">
+        <span class="step-dot" aria-hidden="true">3</span>
+        <span class="txt"><span class="t1">設定每月預算</span><span class="t2">Monee 會算出你每天能花多少</span></span>
+        <span class="chev" aria-hidden="true">${icon('chevron', 18)}</span>
+      </a></li>
+    </ol>
+  </section>
+
+  <section class="sec" aria-labelledby="recent-empty-title">
+    <div class="sec-head"><h2 id="recent-empty-title" class="h-sec">最近交易<span class="en">Recent</span></h2></div>
+    <div class="empty-box">
+      <p class="e1">還沒有交易</p>
+      <p class="e2">點下方 ＋，說一句「早餐 75」、拍張發票，或手動輸入都可以。</p>
+    </div>
+  </section>`;
+}
+
+const tab = (name, label, current) =>
+  `<a href="#" class="tab press"${current ? ' aria-current="page"' : ''}><span class="tab-ico">${icon(name, 22)}</span><span>${label}</span></a>`;
+const navHtml = `
+  ${tab('home', '首頁', true)}
+  ${tab('list', '明細')}
+  <div class="fab-wrap">
+    <button type="button" class="fab press" data-action="open-sheet" aria-haspopup="dialog" aria-label="記一筆">${icon('plus', 26, 2)}</button>
+    <span aria-hidden="true">記一筆</span>
+  </div>
+  ${tab('wallet', '資產')}
+  ${tab('pie', '報表')}`;
+
+const sheetHtml = `
+  <div class="handle" aria-hidden="true"></div>
+  <div class="sheet-head">
+    <div><h2 id="sheet-title">記一筆<span class="en">New entry</span></h2><p class="caption">想怎麼記都可以，Monee 幫你整理</p></div>
+    <button type="button" class="icon-btn press" data-action="close-sheet" aria-label="關閉">${icon('x', 20)}</button>
+  </div>
+  <ul class="opts">
+    <li><button type="button" class="opt featured press" data-demo="示意稿：下一步是 AI 草稿預覽卡">
+      <span class="ico mic" aria-hidden="true">${icon('mic', 22)}</span>
+      <span class="txt"><span class="t1">說一句<span class="badge">AI</span></span><span class="t2">「午餐拉麵 260，刷國泰」</span></span>
+      <span class="chev" aria-hidden="true">${icon('arrow', 18)}</span>
+    </button></li>
+    <li><button type="button" class="opt press" data-demo="示意稿：下一步是開啟相機">
+      <span class="ico" aria-hidden="true">${icon('camera', 22)}</span>
+      <span class="txt"><span class="t1">拍收據／發票<span class="badge">AI</span></span><span class="t2">自動辨識金額、品項與日期</span></span>
+      <span class="chev" aria-hidden="true">${icon('arrow', 18)}</span>
+    </button></li>
+    <li><button type="button" class="opt press" data-demo="示意稿：下一步是數字鍵盤">
+      <span class="ico" aria-hidden="true">${icon('calc', 22)}</span>
+      <span class="txt"><span class="t1">手動輸入</span><span class="t2">用數字鍵盤自己記</span></span>
+      <span class="chev" aria-hidden="true">${icon('arrow', 18)}</span>
+    </button></li>
+  </ul>
+  <div class="quick-wrap">
+    <h3 class="caption">最近常用・點一下帶入草稿</h3>
+    <div class="quick">
+      <button type="button" class="qchip press" data-demo="已帶入草稿：早餐 $75">${icon('utensils', 16)}早餐 <span class="num">$75</span></button>
+      <button type="button" class="qchip press" data-demo="已帶入草稿：捷運 $35">${icon('tram', 16)}捷運 <span class="num">$35</span></button>
+      <button type="button" class="qchip press" data-demo="已帶入草稿：午餐 $260">${icon('utensils', 16)}午餐 <span class="num">$260</span></button>
+    </div>
+  </div>`;
+
+const phone = document.getElementById('phone');
+const scroll = document.getElementById('scroll');
+const nav = document.getElementById('nav');
+const sheet = document.getElementById('sheet');
+const toastEl = document.getElementById('toast');
+
+function render() {
+  const top = scroll.scrollTop;
+  scroll.innerHTML = state.scenario === 'empty' ? renderEmpty() : renderHome(model());
+  scroll.scrollTop = top;
+}
+
+let toastTimer;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+
+let opener = null;
+function openSheet(from) {
+  opener = from;
+  phone.classList.add('open');
+  scroll.inert = true;
+  nav.inert = true;
+  sheet.inert = false;
+  sheet.querySelector('[data-action="close-sheet"]').focus();
+}
+function closeSheet() {
+  phone.classList.remove('open');
+  scroll.inert = false;
+  nav.inert = false;
+  sheet.inert = true;
+  if (opener && document.contains(opener)) opener.focus();
+}
+
+phone.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action], [data-demo], a[href="#"]');
+  if (!el) return;
+  if (el.tagName === 'A') e.preventDefault();
+
+  if (el.dataset.action === 'toggle-hidden') {
+    state.hidden = !state.hidden;
+    render();
+    document.getElementById('eye').focus();
+  } else if (el.dataset.action === 'open-sheet') {
+    openSheet(el);
+  } else if (el.dataset.action === 'close-sheet') {
+    closeSheet();
+  } else if (el.dataset.demo) {
+    toast(el.dataset.demo);
+  } else if (el.getAttribute('aria-current') === 'page') {
+    scroll.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  } else {
+    toast('示意稿：這一頁還沒設計');
+  }
+});
+phone.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && phone.classList.contains('open')) closeSheet();
+});
+
+document.querySelectorAll('input[name="scenario"]').forEach((r) => r.addEventListener('change', () => {
+  state.scenario = r.value;
+  if (phone.classList.contains('open')) closeSheet();
+  render();
+  scroll.scrollTop = 0;
+}));
+document.querySelectorAll('input[name="pnl"]').forEach((r) => r.addEventListener('change', () => {
+  state.pnl = r.value;
+  render();
+}));
+
+// 外觀：淺色／深色／跟隨系統
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+let themeChoice = 'light';
+function applyTheme() {
+  const dark = themeChoice === 'dark' || (themeChoice === 'system' && darkMQ.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+}
+document.querySelectorAll('input[name="theme"]').forEach((r) => r.addEventListener('change', () => {
+  themeChoice = r.value;
+  applyTheme();
+}));
+darkMQ.addEventListener('change', applyTheme);
+
+nav.innerHTML = navHtml;
+sheet.innerHTML = sheetHtml;
+applyTheme();
+render();
+</script>
+</body>
+</html>

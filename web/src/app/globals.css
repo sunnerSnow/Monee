@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/* Lexend Exa 由 next/font 託管（字體名稱會被加上雜湊），用它產生的變數取代 tokens.css 裡的名稱；
+   Noto Sans TC 由 layout.tsx 的 Google Fonts 連結載入，沿用原名，系統中文字體當備援 */
+:root {
+  --font-num: var(--font-lexend-exa), 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --font-body: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+}
+
+/* 讓 Tailwind 的 utility 讀 tokens：bg-page、text-muted、text-caption… */
+@theme inline {
+  --color-page: var(--bg);
+  --color-surface: var(--surface);
+  --color-fill: var(--fill);
+  --color-cream: var(--cream);
+  --color-fg: var(--text);
+  --color-muted: var(--text-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-dash: var(--dash);
+  --color-brand: var(--yellow);
+  --color-ink: var(--ink);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-warn: var(--warn);
+  --color-warn-fg: var(--warn-text);
+  --color-warn-tint: var(--warn-tint);
+  --color-alert: var(--alert);
+  --color-alert-tint: var(--alert-tint);
+  --color-gain: var(--gain);
+  --color-gain-tint: var(--gain-tint);
+
+  --font-sans: var(--font-body);
+  --font-numeric: var(--font-num);
+
+  --text-display-xl: var(--fs-display-xl);
+  --text-display-l: var(--fs-display-l);
+  --text-display-m: var(--fs-display-m);
+  --text-title-l: var(--fs-title-l);
+  --text-title-m: var(--fs-title-m);
+  --text-title-s: var(--fs-title-s);
+  --text-body: var(--fs-body);
+  --text-body-s: var(--fs-body-s);
+  --text-caption: var(--fs-caption);
+  /* rounded-xs … rounded-2xl 直接沿用 tokens.css 的 --radius-*（12/14/18/20/24/28px） */
+}
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--text);
+    letter-spacing: var(--tracking-body);
+    font-feature-settings: "palt";
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+  button:not(:disabled), [role="button"] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .35; }
+  input::placeholder { color: var(--text-2); }
+}
+
+/* 重複出現的元件樣式；版面排列用 Tailwind utility */
+@layer components {
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+  .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-num); }
+  .display { font-family: var(--font-num); font-weight: var(--fw-light); letter-spacing: -.01em; }
+  .display small { font-size: .5em; font-weight: var(--fw-light); vertical-align: .72em; margin-right: 4px; }
+  .caption { font-size: var(--fs-caption); color: var(--text-2); letter-spacing: var(--tracking-caption); }
+  .en { font-family: var(--font-num); font-size: var(--fs-caption); font-weight: var(--fw-light); letter-spacing: .06em; color: var(--text-2); }
+  .h-sec { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-title-s); font-weight: var(--fw-medium); letter-spacing: var(--tracking-title); }
+  .h-page { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-title-l); font-weight: var(--fw-medium); line-height: 1.3; letter-spacing: var(--tracking-title); }
+
+  .press { transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-press) ease-out; }
+  .press:active:not(:disabled) { transform: scale(.98); }
+
+  .icon-btn {
+    flex: none; width: var(--touch); height: var(--touch); border-radius: var(--radius-pill);
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn.ghost { border-color: transparent; background: transparent; }
+  .icon-btn.soft { border-color: transparent; background: var(--fill); }
+
+  .btn-primary {
+    min-height: 52px; padding: 0 var(--space-6); border-radius: var(--radius-pill);
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--primary); color: var(--on-primary);
+    font-size: 15px; font-weight: var(--fw-medium); letter-spacing: var(--tracking-title);
+  }
+  .btn-secondary {
+    min-height: var(--touch); padding: 0 var(--space-4); border-radius: var(--radius-pill);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-body-s);
+  }
+
+  .pill {
+    flex: none; min-height: var(--touch); padding: 0 var(--space-4); border-radius: var(--radius-pill);
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-body-s); white-space: nowrap;
+  }
+  .pill[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .pills { display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; }
+  .pills::-webkit-scrollbar { display: none; }
+
+  .field-input {
+    width: 100%; height: 48px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 16px;
+  }
+
+  .row {
+    width: 100%; min-height: var(--row-h); padding: 10px var(--space-5);
+    display: flex; align-items: center; gap: 14px; text-align: left;
+  }
+  @media (hover: hover) { button.row:hover, a.row:hover { background: var(--hover); } }
+  .row.flash { animation: flash 1.6s var(--ease-out); }
+
+  .ico {
+    flex: none; width: var(--icon-chip); height: var(--icon-chip); border-radius: var(--radius-xs);
+    background: var(--fill); color: var(--text); display: inline-flex; align-items: center; justify-content: center;
+  }
+  .ico.in { background: var(--yellow); color: var(--ink); }
+  .ico.tr { background: transparent; border: 1px dashed var(--dash); color: var(--text-2); }
+  .ico.sm { width: 28px; height: 28px; border-radius: 8px; }
+
+  .chip { padding: 5px 12px; border-radius: var(--radius-pill); border: 1px solid var(--text); font-size: var(--fs-body-s); font-weight: var(--fw-medium); white-space: nowrap; }
+  .chip.tight { border-color: transparent; background: var(--warn-tint); color: var(--warn-text); }
+  .chip.over { border-color: transparent; background: var(--alert-tint); color: var(--alert); }
+
+  .pnl { padding: 2px 8px; border-radius: var(--radius-pill); font-family: var(--font-num); font-size: var(--fs-caption); letter-spacing: 0; white-space: nowrap; }
+  .pnl.red_up { background: var(--alert-tint); color: var(--alert); }
+  .pnl.green_up { background: var(--gain-tint); color: var(--gain); }
+
+  .empty-box { display: flex; flex-direction: column; gap: 6px; padding: 18px var(--space-5); border-radius: var(--radius-lg); border: 1px dashed var(--dash); }
+
+  .skeleton { border-radius: var(--radius-lg); background: var(--fill); animation: pulse 1.4s ease-in-out infinite; }
+}
+
+@keyframes flash { from { background: rgba(254, 217, 0, .4); } to { background: transparent; } }
+@keyframes pulse { 50% { opacity: .5; } }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .press:active:not(:disabled) { transform: none; }
+  .row.flash, .skeleton { animation: none; }
+}

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monee 設計規範</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend+Exa:wght@200;300;400&family=Noto+Sans+TC:wght@400;500&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font-body); font-weight: var(--fw-regular);
+  letter-spacing: var(--tracking-body); font-feature-settings: "palt";
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; letter-spacing: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible + span { outline: 2px solid var(--text); outline-offset: 3px; }
+
+.wrap { max-width: 1040px; margin: 0 auto; padding: var(--space-10) var(--gutter) 80px; display: flex; flex-direction: column; gap: 56px; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-6); }
+.head h1 { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-title-l); font-weight: var(--fw-medium); letter-spacing: var(--tracking-title); }
+.head h1 .en { font-family: var(--font-num); font-size: 44px; font-weight: var(--fw-thin); letter-spacing: 0; }
+.head p { margin: var(--space-2) 0 0; font-size: var(--fs-body-s); color: var(--text-2); }
+
+.sec { display: flex; flex-direction: column; gap: var(--space-5); }
+.sec > h2 { margin: 0; display: flex; align-items: baseline; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); font-size: var(--fs-title-s); font-weight: var(--fw-medium); letter-spacing: var(--tracking-title); }
+.en { font-family: var(--font-num); font-size: var(--fs-caption); font-weight: var(--fw-light); letter-spacing: .06em; color: var(--text-2); }
+.sub { margin: 0; font-size: var(--fs-caption); color: var(--text-2); letter-spacing: var(--tracking-caption); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--space-5); }
+
+/* 切換 */
+.seg { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.seg span { display: inline-flex; align-items: center; min-height: var(--touch); padding: 0 var(--space-4); border-radius: var(--radius-pill); border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-body-s); }
+.seg input:checked + span { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+/* 色票 */
+.groups { display: flex; flex-direction: column; gap: var(--space-6); }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); }
+.sw { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.sw-color { height: 64px; border-bottom: 1px solid var(--line); }
+.sw-meta { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; }
+.sw-name { font-size: var(--fs-body-s); }
+.sw-token, .sw-hex { font-family: var(--font-num); font-size: 11px; letter-spacing: 0; color: var(--text-2); }
+
+/* 字級 */
+.type-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: baseline; gap: var(--space-4); padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
+.type-row:last-child { border-bottom: 0; }
+.type-meta { display: flex; flex-direction: column; gap: 2px; }
+.type-meta code { font-family: var(--font-num); font-size: 11px; letter-spacing: 0; color: var(--text-2); }
+.money small { font-size: .5em; font-weight: var(--fw-light); vertical-align: .72em; margin-right: 4px; }
+
+/* 間距與圓角 */
+.scale { display: flex; flex-direction: column; gap: var(--space-2); }
+.scale-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: var(--space-3); font-family: var(--font-num); font-size: 11px; letter-spacing: 0; color: var(--text-2); }
+.scale-bar { height: 12px; border-radius: 2px; background: var(--yellow); }
+.radii { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-3); }
+.radius-box { display: flex; align-items: flex-end; height: 88px; padding: 10px; border: 1px solid var(--text); background: var(--surface); font-family: var(--font-num); font-size: 11px; letter-spacing: 0; color: var(--text-2); }
+
+/* 元件 */
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+.comp { display: flex; flex-direction: column; gap: var(--space-4); }
+.comp h3 { margin: 0; font-size: var(--fs-body-s); font-weight: var(--fw-medium); letter-spacing: var(--tracking-caption); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+.btn-primary { min-height: 52px; padding: 0 var(--space-6); border: 0; border-radius: var(--radius-pill); display: inline-flex; align-items: center; gap: 10px; background: var(--primary); color: var(--on-primary); font-size: 15px; font-weight: var(--fw-medium); letter-spacing: var(--tracking-title); cursor: pointer; }
+.btn-secondary { min-height: var(--touch); padding: 0 var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface); font-size: var(--fs-body-s); cursor: pointer; }
+.btn-secondary[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.fab { width: var(--fab); height: var(--fab); padding: 0; border-radius: var(--radius-pill); border: 4px solid var(--surface); background: var(--fab-bg); color: var(--fab-fg); display: flex; align-items: center; justify-content: center; box-shadow: var(--fab-shadow); cursor: pointer; }
+
+.chip { padding: 5px 12px; border-radius: var(--radius-pill); border: 1px solid var(--text); font-size: var(--fs-body-s); font-weight: var(--fw-medium); white-space: nowrap; }
+.chip.warn { border-color: transparent; background: var(--warn-tint); color: var(--warn-text); }
+.chip.over { border-color: transparent; background: var(--alert-tint); color: var(--alert); }
+.pnl { padding: 2px 8px; border-radius: var(--radius-pill); font-family: var(--font-num); font-size: var(--fs-caption); letter-spacing: 0; }
+.pnl.red { background: var(--alert-tint); color: var(--alert); }
+.pnl.green { background: var(--gain-tint); color: var(--gain); }
+
+.bar-wrap { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-caption); color: var(--text-2); }
+.bar { height: var(--bar-h); border-radius: var(--radius-pill); background: var(--fill); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: var(--radius-pill); }
+.track { position: relative; margin-top: 20px; height: var(--bar-h); border-radius: var(--radius-pill); background: var(--fill); }
+.track > i { display: block; width: 26%; height: 100%; border-radius: var(--radius-pill); background: var(--text); }
+.today-mark { position: absolute; left: 19.35%; top: -5px; width: 2px; height: 16px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.today-mark span { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: var(--fs-caption); color: var(--text); white-space: nowrap; }
+
+.list { list-style: none; margin: 0 calc(-1 * var(--space-5)); padding: 0; }
+.li { min-height: var(--row-h); display: flex; align-items: center; gap: 14px; padding: 10px var(--space-5); }
+.ico { flex: none; width: var(--icon-chip); height: var(--icon-chip); border-radius: var(--radius-xs); background: var(--fill); color: var(--text); display: flex; align-items: center; justify-content: center; }
+.ico.in { background: var(--yellow); color: var(--ink); }
+.ico.tr { background: transparent; border: 1px dashed var(--dash); color: var(--text-2); }
+.txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t1 { font-size: var(--fs-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t2 { font-size: var(--fs-caption); color: var(--text-2); letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amt { flex: none; font-family: var(--font-num); font-size: var(--fs-body); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.amt.tr { color: var(--text-2); }
+
+.nav { height: var(--nav-h); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; padding: 0 6px; border-radius: var(--radius-xl); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--nav-shadow); margin-top: 28px; }
+.tab { height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--text-2); font-size: var(--fs-caption); letter-spacing: .08em; text-decoration: none; }
+.tab-ico { width: 48px; height: 28px; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; }
+.tab[aria-current="page"] { color: var(--text); font-weight: var(--fw-medium); }
+.tab[aria-current="page"] .tab-ico { background: var(--yellow); color: var(--ink); }
+.fab-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: var(--fs-caption); letter-spacing: .08em; }
+.fab-wrap .fab { margin-top: -30px; }
+
+.opt { width: 100%; min-height: 80px; padding: var(--space-4); border-radius: var(--radius-md); display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); text-align: left; cursor: pointer; }
+.opt .ico { width: 48px; height: 48px; border-radius: var(--radius-sm); }
+.opt.featured { background: var(--yellow); border-color: transparent; color: var(--ink); }
+.opt.featured .t2 { color: var(--ink); }
+.opt.featured .ico { background: var(--ink); color: var(--yellow); }
+
+.toast { align-self: flex-start; padding: 10px 18px; border-radius: var(--radius-pill); background: var(--text); color: var(--surface); font-size: var(--fs-body-s); }
+
+@media (max-width: 640px) {
+  .wrap { padding-top: var(--space-8); gap: 44px; }
+  .head h1 .en { font-size: 34px; }
+  .type-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <div>
+      <h1><span class="en">Monee</span>設計規範</h1>
+      <p>定案 2026-10-06・視覺參考 recruit.postas.co.jp・數值來源 tokens.css</p>
+    </div>
+    <fieldset class="seg" style="border:0;margin:0;padding:0" aria-label="外觀">
+      <label><input type="radio" name="theme" value="light" checked><span>淺色</span></label>
+      <label><input type="radio" name="theme" value="dark"><span>深色</span></label>
+    </fieldset>
+  </header>
+
+  <section class="sec" aria-labelledby="color-title">
+    <h2 id="color-title">色彩<span class="en">Color</span></h2>
+    <div class="groups" id="swatches"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="type-title">
+    <h2 id="type-title">字體<span class="en">Typography</span></h2>
+    <p class="sub">數字與英文 Lexend Exa 200–400・中文 Noto Sans TC 400–500・全站開 palt・最高字重 500</p>
+    <div class="card" style="padding-top:0;padding-bottom:0">
+      <div class="type-row"><div class="type-meta"><span class="sub">display-xl</span><code>Lexend Exa 40 / 300</code></div><div class="money" style="font-family:var(--font-num);font-size:var(--fs-display-xl);font-weight:var(--fw-light);line-height:1.15;letter-spacing:-.01em"><small>$</small>370</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">display-l</span><code>Lexend Exa 32 / 300</code></div><div class="money" style="font-family:var(--font-num);font-size:var(--fs-display-l);font-weight:var(--fw-light);line-height:1.15;letter-spacing:-.01em"><small>$</small>43,396</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">display-m</span><code>Lexend Exa 28 / 300</code></div><div class="money" style="font-family:var(--font-num);font-size:var(--fs-display-m);font-weight:var(--fw-light);line-height:1.2;letter-spacing:-.01em"><small>$</small>386,240</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">title-l</span><code>Noto Sans TC 22 / 500 / .14em</code></div><div style="font-size:var(--fs-title-l);font-weight:var(--fw-medium);letter-spacing:var(--tracking-title)">早安</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">title-m</span><code>Noto Sans TC 20 / 500 / .14em</code></div><div style="font-size:var(--fs-title-m);font-weight:var(--fw-medium);letter-spacing:var(--tracking-title)">記一筆</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">title-s ＋ 英文小標</span><code>16 / 500 / .14em ＋ Lexend 12 / 300</code></div><div style="display:flex;align-items:baseline;gap:10px;font-size:var(--fs-title-s);font-weight:var(--fw-medium);letter-spacing:var(--tracking-title)">最近交易<span class="en">Recent</span></div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">body</span><code>Noto Sans TC 15 / 400 / .04em</code></div><div style="font-size:var(--fs-body)">午餐・拉麵</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">body-s</span><code>Noto Sans TC 13 / 400 / 1.8</code></div><div style="font-size:var(--fs-body-s);line-height:1.8">節奏剛剛好，繼續保持。記下第一筆，Monee 就開始幫你看懂錢花去哪。</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">caption</span><code>Noto Sans TC 12 / 400 / .1em</code></div><div style="font-size:var(--fs-caption);letter-spacing:var(--tracking-caption);color:var(--text-2)">今天 · 10/6 週二</div></div>
+      <div class="type-row"><div class="type-meta"><span class="sub">列表金額</span><code>Lexend Exa 15 / 400 / tabular</code></div><div style="font-family:var(--font-num);font-size:var(--fs-body);font-variant-numeric:tabular-nums;letter-spacing:0">−$260　+$48,000　$ ••••</div></div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="space-title">
+    <h2 id="space-title">間距與圓角<span class="en">Spacing &amp; Radius</span></h2>
+    <div class="comp-grid">
+      <div class="card comp">
+        <h3>間距（4px 格線）</h3>
+        <div class="scale" id="spacing"></div>
+      </div>
+      <div class="card comp">
+        <h3>圓角</h3>
+        <div class="radii" id="radii"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="comp-title">
+    <h2 id="comp-title">元件<span class="en">Components</span></h2>
+    <div class="comp-grid">
+
+      <div class="card comp">
+        <h3>按鈕</h3>
+        <div class="row">
+          <button type="button" class="btn-primary">記下第一筆<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+        </div>
+        <div class="row">
+          <button type="button" class="btn-secondary" aria-pressed="true">全部</button>
+          <button type="button" class="btn-secondary" aria-pressed="false">支出</button>
+          <button type="button" class="btn-secondary" aria-pressed="false">收入</button>
+          <button type="button" class="btn-secondary" aria-pressed="false">轉帳</button>
+        </div>
+        <div class="row">
+          <button type="button" class="fab" aria-label="記一筆"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+          <span class="sub">＋ 按鈕 58px・深色時反轉成黃底</span>
+        </div>
+      </div>
+
+      <div class="card comp">
+        <h3>狀態標籤與進度條</h3>
+        <div class="row">
+          <span class="chip">還能花 $390</span>
+          <span class="chip warn">只剩 $90</span>
+          <span class="chip over">超出 $1,190</span>
+        </div>
+        <div class="bar-wrap">節奏剛好<div class="bar"><i style="width:49%;background:var(--text)"></i></div></div>
+        <div class="bar-wrap">快用完了<div class="bar"><i style="width:88%;background:var(--warn)"></i></div></div>
+        <div class="bar-wrap">超支<div class="bar"><i style="width:100%;background:var(--alert)"></i></div></div>
+        <div class="bar-wrap">月預算＋今天標記<div class="track"><i></i><span class="today-mark"><span>今天</span></span></div></div>
+        <div class="row">
+          <span class="pnl red">▲ $11,800 (+8.4%)</span>
+          <span class="pnl green">▲ $11,800 (+8.4%)</span>
+          <span class="sub">紅漲／綠漲</span>
+        </div>
+      </div>
+
+      <div class="card comp">
+        <h3>列表列與圖示底</h3>
+        <ul class="list">
+          <li class="li"><span class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></span><span class="txt"><span class="t1">午餐・拉麵</span><span class="t2">餐飲 · 國泰信用卡 · 12:30</span></span><span class="amt">−$260</span></li>
+          <li class="li"><span class="ico in" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span><span class="txt"><span class="t1">十月薪資</span><span class="t2">收入 · 玉山銀行 · 09:00</span></span><span class="amt">+$48,000</span></li>
+          <li class="li"><span class="ico tr" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></span><span class="txt"><span class="t1">轉入投資帳戶</span><span class="t2">不算支出 · 玉山銀行 → 投資帳戶</span></span><span class="amt tr">$10,000</span></li>
+        </ul>
+      </div>
+
+      <div class="card comp">
+        <h3>底部導覽</h3>
+        <nav class="nav" aria-label="導覽範例">
+          <a href="#" class="tab" aria-current="page"><span class="tab-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>首頁</a>
+          <a href="#" class="tab"><span class="tab-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>明細</a>
+          <div class="fab-wrap"><button type="button" class="fab" aria-label="記一筆"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button><span aria-hidden="true">記一筆</span></div>
+          <a href="#" class="tab"><span class="tab-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>資產</a>
+          <a href="#" class="tab"><span class="tab-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>報表</a>
+        </nav>
+      </div>
+
+      <div class="card comp">
+        <h3>面板選項與 Toast</h3>
+        <button type="button" class="opt featured"><span class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></span><span class="txt"><span class="t1">說一句</span><span class="t2">「午餐拉麵 260，刷國泰」</span></span></button>
+        <button type="button" class="opt"><span class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg></span><span class="txt"><span class="t1">手動輸入</span><span class="t2">用數字鍵盤自己記</span></span></button>
+        <div class="toast">已記下：午餐 $260</div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<script>
+const GROUPS = [
+  { title: '品牌', items: [['招牌黃', '--yellow'], ['黃底上的字', '--ink']] },
+  { title: '表面', items: [['頁面底色', '--bg'], ['卡片', '--surface'], ['圖示底・進度軌', '--fill'], ['收入小卡', '--cream']] },
+  { title: '文字與線條', items: [['主要文字', '--text'], ['說明文字', '--text-2'], ['細線', '--line'], ['把手・色票框', '--line-strong'], ['虛線', '--dash']] },
+  { title: '操作', items: [['主要按鈕', '--primary'], ['主要按鈕文字', '--on-primary'], ['＋ 底色', '--fab-bg'], ['＋ 圖示', '--fab-fg']] },
+  { title: '狀態', items: [['快用完了', '--warn'], ['快用完了・字', '--warn-text'], ['快用完了・底', '--warn-tint'], ['超支', '--alert'], ['超支・底', '--alert-tint'], ['綠漲', '--gain'], ['綠漲・底', '--gain-tint']] },
+];
+const SPACING = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-5', '--space-6', '--space-8', '--space-10'];
+const RADII = ['--radius-xs', '--radius-sm', '--radius-md', '--radius-lg', '--radius-xl', '--radius-2xl', '--radius-pill'];
+
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim().toUpperCase();
+
+function renderSwatches() {
+  document.getElementById('swatches').innerHTML = GROUPS.map((g) => `
+    <div class="sec" style="gap:var(--space-3)">
+      <p class="sub">${g.title}</p>
+      <div class="swatches">${g.items.map(([name, token]) => `
+        <div class="sw">
+          <div class="sw-color" style="background:var(${token})"></div>
+          <div class="sw-meta"><span class="sw-name">${name}</span><span class="sw-token">${token}</span><span class="sw-hex">${css(token)}</span></div>
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+document.getElementById('spacing').innerHTML = SPACING.map((t) =>
+  `<div class="scale-row"><span>${t} · ${css(t).toLowerCase()}</span><span class="scale-bar" style="width:calc(var(${t}) * 4)"></span></div>`).join('');
+document.getElementById('radii').innerHTML = RADII.map((t) =>
+  `<div class="radius-box" style="border-radius:var(${t})">${t.replace('--radius-', '')} · ${css(t).toLowerCase()}</div>`).join('');
+
+document.querySelectorAll('input[name="theme"]').forEach((r) => r.addEventListener('change', () => {
+  document.documentElement.dataset.theme = r.value;
+  renderSwatches();
+}));
+document.querySelectorAll('a[href="#"]').forEach((a) => a.addEventListener('click', (e) => e.preventDefault()));
+renderSwatches();
+</script>
+</body>
+</html>
