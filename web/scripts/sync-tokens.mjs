@@ -14,8 +14,10 @@ if (!existsSync(source)) {
   process.exit(0);
 }
 
-const next = banner + readFileSync(source, 'utf8');
-if (!existsSync(target) || readFileSync(target, 'utf8') !== next) {
+// 統一成 LF 再比較：Windows 的 git 會把換行轉成 CRLF，不統一的話每次重新 clone 都會被當成有改動
+const lf = (s) => s.replace(/\r\n/g, '\n');
+const next = banner + lf(readFileSync(source, 'utf8'));
+if (!existsSync(target) || lf(readFileSync(target, 'utf8')) !== next) {
   writeFileSync(target, next);
   console.log('[sync-tokens] 已更新 src/styles/tokens.css');
 }
