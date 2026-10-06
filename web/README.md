@@ -8,7 +8,7 @@ Phase 1（MVP）：手機網頁版的手動記帳、收支分類、內部轉帳�
 
 - **Next.js 16**（App Router、Turbopack）＋ **React 19** ＋ **TypeScript**
 - **Tailwind CSS 4**：色彩、字級、圓角都讀 `src/styles/tokens.css`
-- **Supabase**：登入（Email 魔法連結）＋ Postgres；每張表都開 RLS，每個人只看得到自己的資料
+- **Supabase**：登入（Email ＋ 密碼）＋ Postgres；每張表都開 RLS，每個人只看得到自己的資料
 - **TanStack Query** 管伺服器資料，**Zustand** 管畫面狀態（面板、隱藏金額、深淺色）
 - **Vitest**：預算計算等邏輯的單元測試
 
@@ -34,9 +34,10 @@ npm run dev:demo
    cp .env.local.example .env.local
    ```
 
-5. `npm run dev`，用 Email 登入（第一次登入會自動建立帳號）。
+5. `npm run dev`，在登入頁按「註冊」建立帳號（預設會寄確認信，點信裡的連結完成註冊），之後就用 Email 和密碼登入。
+6. 只有自己用的話，註冊完到 Authentication → Sign In / Providers 關掉 **Allow new users to sign up**，別人就不能用你的網址註冊。
 
-> Supabase 免費專案一週沒有任何存取會自動暫停，到後台按一下就能恢復。內建寄信服務每小時只能寄幾封登入信，正式上線前建議在 Authentication → SMTP 換成自己的寄信服務。
+> Supabase 免費專案一週沒有任何存取會自動暫停，到後台按一下就能恢復。內建寄信服務（註冊確認信、重設密碼信）只寄給 Supabase 專案成員的 Email，而且每小時只能寄 2 封；要給別人用前，請在 Authentication → SMTP 換成自己的寄信服務。
 
 ## 指令
 
@@ -55,7 +56,8 @@ npm run dev:demo
 src/
   app/
     (app)/              登入後的頁面：首頁、transactions、assets、reports、settings
-    login/              Email 魔法連結登入
+    login/              Email ＋ 密碼登入、註冊、忘記密碼
+    reset-password/     設定新密碼（重設信回來、或從「我的」修改密碼）
     auth/callback/      登入信的連結回到這裡換成登入狀態
     layout.tsx          字體、深淺色（行內腳本避免閃爍）
     globals.css         Tailwind ＋ tokens ＋ 共用元件樣式

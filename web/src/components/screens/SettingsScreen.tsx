@@ -1,7 +1,8 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, CloudUpload, LogOut, Sheet as SheetIcon, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut, Sheet as SheetIcon, User } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useProfile, useUpdateProfile, useUser } from '@/lib/data';
@@ -73,6 +74,14 @@ export function SettingsScreen() {
           <span className="caption">Monee 帳號</span>
         </span>
       </section>
+
+      {!isDemo && (
+        <Link href="/reset-password" className="card press flex min-h-14 items-center gap-3.5 px-5 py-2 text-body">
+          <span aria-hidden className="ico sm"><KeyRound size={16} strokeWidth={1.5} /></span>
+          修改密碼
+          <ChevronRight size={18} strokeWidth={1.5} aria-hidden className="ml-auto text-muted" />
+        </Link>
+      )}
 
       <section aria-labelledby="s-budget" className="flex flex-col gap-2">
         <h2 id="s-budget" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">每月預算</h2>

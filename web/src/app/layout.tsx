@@ -17,6 +17,8 @@ const NOTO_SANS_TC = 'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght
 export const metadata: Metadata = {
   title: { default: 'Monee', template: '%s · Monee' },
   description: '可愛輕量、懂你金流的個人生活財務助理。Know your money. Grow your money.',
+  // iPhone 從主畫面打開時用獨立視窗、名稱顯示 Monee（圖示來自 app/apple-icon.png）
+  appleWebApp: { capable: true, title: 'Monee', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {
