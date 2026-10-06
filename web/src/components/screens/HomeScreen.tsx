@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, Eye, EyeOff, Info, Landmark, CreditCard, TrendingUp, User } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, Eye, EyeOff, Info, Landmark, CreditCard, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { accountSummary, budgetPace, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
 import { useAccounts, useProfile, useTransactions } from '@/lib/data';
@@ -10,7 +10,7 @@ import type { Account, Profile, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { TxGroups } from '../TxList';
-import { BigMoney, EmptyBox, ErrorBox, HeroCard, LoadingBlocks, SectionHeader, useHidden } from '../ui';
+import { Avatar, BigMoney, EmptyBox, ErrorBox, HeroCard, LoadingBlocks, SectionHeader, useHidden } from '../ui';
 
 const MORE = 'press inline-flex min-h-11 items-center gap-1 px-1 text-body-s tracking-[.08em]';
 
@@ -48,8 +48,8 @@ function TopBar({ now, showEye = true }: { now: Date; showEye?: boolean }) {
             {hidden ? <EyeOff size={20} strokeWidth={1.5} aria-hidden /> : <Eye size={20} strokeWidth={1.5} aria-hidden />}
           </button>
         )}
-        <Link href="/settings" aria-label="我的・設定" className="icon-btn soft press">
-          <User size={20} strokeWidth={1.5} aria-hidden />
+        <Link href="/settings" aria-label="我的・設定" className="press flex-none rounded-full">
+          <Avatar size={44} />
         </Link>
       </div>
     </header>

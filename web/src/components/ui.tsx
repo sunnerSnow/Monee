@@ -9,6 +9,20 @@ import { useUi } from '@/lib/ui-store';
 
 export const useHidden = () => useUi((s) => s.hidden);
 
+/** 使用者頭像：破殼小雞（public/avatar.png，由根目錄的 Monee user.png 置中放進圓形）；外層按鈕或連結負責無障礙名稱 */
+export function Avatar({ size }: { size: number }) {
+  return (
+    <Image
+      src="/avatar.png"
+      alt=""
+      width={size}
+      height={size}
+      className="flex-none rounded-full border border-line"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 /** 大金額：$ 縮成上標、數字細體；隱藏模式顯示 •••• */
 export function BigMoney({ value, className = '' }: { value: number; className?: string }) {
   const hidden = useHidden();

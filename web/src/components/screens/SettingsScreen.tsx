@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut, Sheet as SheetIcon, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut, Sheet as SheetIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -11,6 +11,7 @@ import { formatMoney, parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/client';
 import type { PnlColor } from '@/lib/types';
 import { useUi, type ThemePref } from '@/lib/ui-store';
+import { Avatar } from '../ui';
 
 const THEMES: [ThemePref, string][] = [['light', '淺色'], ['dark', '深色'], ['system', '跟隨系統']];
 const PNL: [PnlColor, string][] = [['red_up', '紅漲綠跌（台股）'], ['green_up', '綠漲紅跌']];
@@ -68,7 +69,7 @@ export function SettingsScreen() {
       </header>
 
       <section className="card flex items-center gap-4 p-5">
-        <span aria-hidden className="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-fill"><User size={24} strokeWidth={1.5} /></span>
+        <Avatar size={56} />
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-body">{user?.email ?? '…'}</span>
           <span className="caption">Monee 帳號</span>
