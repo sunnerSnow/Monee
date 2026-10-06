@@ -77,6 +77,7 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 - **轉帳（TRANSFER）不算支出**：首頁、報表的支出都排除轉帳，首頁會另外標示「已排除內部轉帳」。
 - **校準**：輸入銀行或信用卡 App 上的數字，有差額就補一筆「未記錄雜項（支出）」或「未記錄收入」，並記下校準時間。投資帳戶不提供校準，因為市值變動不是生活收支。
 - **投資帳戶**：Phase 1 可以手動建立並轉帳進去；Phase 3 改由 Monee Invest 同步 `investment_snapshot`。
+- **點交易列可以編輯或刪除**：跟記一筆共用同一個表單；刪除要再按一次確認。
 - **＋ 直接打開手動記帳**：語音、拍收據是 Phase 2，面板上先標「即將推出」。最近常用的品項可以一鍵帶入。
 - **分類先固定**（`lib/categories.ts`），分類管理之後再做。
 - **字體**：英數 Lexend Exa 由 `next/font` 託管；中文 Noto Sans TC 有上百個分片，交給 `next/font` 下載時只要一片逾時就會讓建置失敗，所以改由瀏覽器向 Google Fonts 按需載入。
@@ -85,4 +86,4 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 
 - Phase 2：語音記帳＋AI 草稿卡、發票 OCR、Google Sheets 匯出、資料備份
 - Phase 3：Monee Invest 同步投資快照
-- 交易編輯／刪除、分類管理、帳戶編輯／封存、帳戶排序
+- 分類管理、帳戶編輯／封存、帳戶排序

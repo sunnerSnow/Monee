@@ -1,10 +1,10 @@
 'use client';
 
-import { Delete, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Delete, Sparkles, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, getCategory } from '@/lib/categories';
-import { useAccounts, useAddTransaction, useTransactions } from '@/lib/data';
+import { useAccounts, useAddTransaction, useDeleteTransaction, useTransactions, useUpdateTransaction } from '@/lib/data';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import type { Transaction, TransactionType } from '@/lib/types';
@@ -15,39 +15,55 @@ import { EmptyBox } from '../ui';
 const TYPES: [TransactionType, string][] = [['EXPENSE', '支出'], ['INCOME', '收入'], ['TRANSFER', '轉帳']];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0', 'del'] as const;
 
+/** 記一筆（新增）與點交易列打開的編輯共用同一個表單 */
 export function EntrySheet() {
-  const open = useUi((s) => s.sheet?.kind === 'entry');
+  const sheet = useUi((s) => s.sheet);
   const close = useUi((s) => s.closeSheet);
+  const { data: txs, isSuccess } = useTransactions();
+  const editId = sheet?.kind === 'transaction' ? sheet.id : null;
+  const editing = editId ? txs?.find((t) => t.id === editId) : undefined;
+  const open = sheet?.kind === 'entry' || Boolean(editing);
+
+  // 要編輯的交易已經不在了（例如在別的分頁刪掉），就關掉面板，避免背景一直保持不可操作
+  useEffect(() => {
+    if (editId && isSuccess && !editing) close();
+  }, [editId, isSuccess, editing, close]);
+
   return (
     <Sheet open={open} onClose={close} labelledBy="entry-title">
-      {open && <EntryForm onClose={close} />}
+      {open && <EntryForm key={editing?.id ?? 'new'} editing={editing} onClose={close} />}
     </Sheet>
   );
 }
 
-function EntryForm({ onClose }: { onClose: () => void }) {
+function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () => void }) {
   const { data: accounts = [], isPending } = useAccounts();
   const { data: txs = [] } = useTransactions();
   const add = useAddTransaction();
+  const update = useUpdateTransaction();
+  const remove = useDeleteTransaction();
   const openSheet = useUi((s) => s.openSheet);
   const showToast = useUi((s) => s.showToast);
   const flash = useUi((s) => s.flash);
 
-  const [type, setType] = useState<TransactionType>('EXPENSE');
-  const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState('food');
-  const [source, setSource] = useState('');
-  const [target, setTarget] = useState('');
-  const [note, setNote] = useState('');
-  const [date, setDate] = useState(() => toISODate(new Date()));
+  const [type, setType] = useState<TransactionType>(editing?.type ?? 'EXPENSE');
+  const [amount, setAmount] = useState(editing ? String(Math.round(editing.amount)) : '');
+  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? 'food');
+  const [source, setSource] = useState(editing?.sourceAccountId ?? '');
+  const [target, setTarget] = useState(editing?.targetAccountId ?? '');
+  const [note, setNote] = useState(editing?.note ?? '');
+  const [date, setDate] = useState(() => editing?.date ?? toISODate(new Date()));
   const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // 投資帳戶由 Monee Invest 同步，只能當轉入對象
-  const payable = accounts.filter((a) => a.type !== 'INVESTMENT_MIRROR');
+  // 投資帳戶由 Monee Invest 同步，只能當轉入對象；編輯舊交易時保留它原本的帳戶
+  const payable = accounts.filter((a) => a.type !== 'INVESTMENT_MIRROR' || a.id === editing?.sourceAccountId);
   const sourceId = source || payable[0]?.id || '';
   const targets = accounts.filter((a) => a.id !== sourceId);
   const value = Number(amount) || 0;
-  const quick = frequentEntries(txs);
+  const quick = editing ? [] : frequentEntries(txs);
+  const busy = add.isPending || update.isPending || remove.isPending;
+  const title = note.trim() || getCategory(type === 'TRANSFER' ? 'transfer' : categoryId).name;
 
   const switchType = (next: TransactionType) => {
     setType(next);
@@ -75,27 +91,41 @@ function EntryForm({ onClose }: { onClose: () => void }) {
     if (!sourceId) return setError('請先新增帳戶');
     if (type === 'TRANSFER' && !target) return setError('請選擇轉入帳戶');
     const now = new Date();
-    const title = note.trim() || getCategory(type === 'TRANSFER' ? 'transfer' : categoryId).name;
+    const payload = {
+      date,
+      time: editing ? editing.time : date === toISODate(now) ? toTime(now) : null,
+      type,
+      amount: value,
+      categoryId: type === 'TRANSFER' ? 'transfer' : categoryId,
+      sourceAccountId: sourceId,
+      targetAccountId: type === 'TRANSFER' ? target : null,
+      note: note.trim() || null,
+    };
     try {
-      const id = await add.mutateAsync({
-        date,
-        time: date === toISODate(now) ? toTime(now) : null,
-        type,
-        amount: value,
-        categoryId: type === 'TRANSFER' ? 'transfer' : categoryId,
-        sourceAccountId: sourceId,
-        targetAccountId: type === 'TRANSFER' ? target : null,
-        note: note.trim() || null,
-      });
+      const id = editing ? await update.mutateAsync({ id: editing.id, ...payload }) : await add.mutateAsync(payload);
       flash(id);
       onClose();
-      showToast(`已記下：${title} ${formatMoney(value)}`);
+      showToast(`${editing ? '已更新' : '已記下'}：${title} ${formatMoney(value)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '儲存失敗，請再試一次');
     }
   };
 
-  const header = <SheetHeader id="entry-title" title="記一筆" en="New entry" onClose={onClose} />;
+  const destroy = async () => {
+    if (!editing) return;
+    try {
+      await remove.mutateAsync(editing.id);
+      onClose();
+      showToast(`已刪除：${editing.note || getCategory(editing.categoryId).name} ${formatMoney(editing.amount)}`);
+    } catch (e) {
+      setConfirmDelete(false);
+      setError(e instanceof Error ? e.message : '刪除失敗，請再試一次');
+    }
+  };
+
+  const header = editing
+    ? <SheetHeader id="entry-title" title="編輯交易" en="Edit" onClose={onClose} />
+    : <SheetHeader id="entry-title" title="記一筆" en="New entry" onClose={onClose} />;
 
   if (!isPending && payable.length === 0) {
     return (
@@ -122,9 +152,11 @@ function EntryForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       {header}
-      <p className="caption -mt-2.5 flex items-center gap-1.5">
-        <Sparkles size={14} strokeWidth={1.5} aria-hidden />語音與拍收據記帳即將推出
-      </p>
+      {!editing && (
+        <p className="caption -mt-2.5 flex items-center gap-1.5">
+          <Sparkles size={14} strokeWidth={1.5} aria-hidden />語音與拍收據記帳即將推出
+        </p>
+      )}
 
       {chips(TYPES.map(([id, label]) => ({ id, label })), type, (id) => switchType(id as TransactionType), '類型')}
 
@@ -189,9 +221,25 @@ function EntryForm({ onClose }: { onClose: () => void }) {
 
       {error && <p role="alert" className="-my-2 text-caption text-alert">{error}</p>}
 
-      <button type="button" onClick={save} disabled={!value || add.isPending} className="btn-primary press w-full">
-        {add.isPending ? '儲存中…' : `記下${value ? ` ${formatMoney(value)}` : ''}`}
+      <button type="button" onClick={save} disabled={!value || busy} className="btn-primary press w-full">
+        {add.isPending || update.isPending ? '儲存中…' : editing ? '儲存變更' : `記下${value ? ` ${formatMoney(value)}` : ''}`}
       </button>
+
+      {editing && (confirmDelete ? (
+        <div role="alertdialog" aria-labelledby="delete-question" className="flex flex-col gap-3 rounded-sm bg-alert-tint p-4">
+          <p id="delete-question" className="text-body-s text-alert">確定要刪除「{title}」嗎？刪除後無法復原。</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setConfirmDelete(false)} className="btn-secondary press" autoFocus>取消</button>
+            <button type="button" onClick={destroy} disabled={busy} className="btn-secondary press border-alert text-alert">
+              {remove.isPending ? '刪除中…' : '刪除'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className="btn-secondary press w-full text-alert">
+          <Trash2 size={16} strokeWidth={1.5} aria-hidden />刪除這筆交易
+        </button>
+      ))}
     </>
   );
 }

@@ -5,6 +5,7 @@ import { create } from 'zustand';
 export type ThemePref = 'light' | 'dark' | 'system';
 export type SheetState =
   | { kind: 'entry' }
+  | { kind: 'transaction'; id: string }
   | { kind: 'account' }
   | { kind: 'reconcile'; accountId: string }
   | null;

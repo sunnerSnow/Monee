@@ -143,28 +143,52 @@ function useInvalidate() {
   return (...list: QueryKey[]) => Promise.all(list.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
+const toTransactionRow = (t: NewTransaction) => ({
+  date: t.date,
+  time: t.time,
+  type: t.type,
+  amount: t.amount,
+  category_id: t.categoryId,
+  source_account_id: t.sourceAccountId,
+  target_account_id: t.type === 'TRANSFER' ? t.targetAccountId : null,
+  note: t.note,
+});
+
 export function useAddTransaction() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (t: NewTransaction) => {
       if (isDemo) return demo.addTransaction(t);
       const row = await unwrap<{ id: string }>(
-        createClient()
-          .from('transactions')
-          .insert({
-            date: t.date,
-            time: t.time,
-            type: t.type,
-            amount: t.amount,
-            category_id: t.categoryId,
-            source_account_id: t.sourceAccountId,
-            target_account_id: t.type === 'TRANSFER' ? t.targetAccountId : null,
-            note: t.note,
-          })
-          .select('id')
-          .single(),
+        createClient().from('transactions').insert(toTransactionRow(t)).select('id').single(),
       );
       return row.id;
+    },
+    onSuccess: () => invalidate(keys.transactions, keys.accounts),
+  });
+}
+
+export function useUpdateTransaction() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ id, ...t }: NewTransaction & { id: string }) => {
+      if (isDemo) return demo.updateTransaction(id, t);
+      const rows = await unwrap<{ id: string }[]>(createClient().from('transactions').update(toTransactionRow(t)).eq('id', id).select('id'));
+      if (!rows.length) throw new Error('找不到這筆交易，可能已經刪除');
+      return id;
+    },
+    onSuccess: () => invalidate(keys.transactions, keys.accounts),
+  });
+}
+
+export function useDeleteTransaction() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemo) return demo.deleteTransaction(id);
+      // 用 select 確認真的刪到一筆；RLS 擋下時 Supabase 不會報錯，只會回傳空陣列
+      const rows = await unwrap<{ id: string }[]>(createClient().from('transactions').delete().eq('id', id).select('id'));
+      if (!rows.length) throw new Error('找不到這筆交易，可能已經刪除');
     },
     onSuccess: () => invalidate(keys.transactions, keys.accounts),
   });

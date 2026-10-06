@@ -100,6 +100,19 @@ export const demo = {
     db().txs.push(row);
     return row.id;
   },
+  async updateTransaction(id: string, t: NewTransaction) {
+    await pause();
+    const row = db().txs.find((x) => x.id === id);
+    if (!row) throw new Error('找不到這筆交易，可能已經刪除');
+    Object.assign(row, t, { targetAccountId: t.type === 'TRANSFER' ? t.targetAccountId : null });
+    return id;
+  },
+  async deleteTransaction(id: string) {
+    await pause();
+    const index = db().txs.findIndex((x) => x.id === id);
+    if (index < 0) throw new Error('找不到這筆交易，可能已經刪除');
+    db().txs.splice(index, 1);
+  },
   async addAccount(a: NewAccount) {
     await pause();
     const row: DemoAccount = { id: id('a'), name: a.name, type: a.type, openingBalance: a.openingBalance, investmentSnapshot: null, lastReconciledAt: null };

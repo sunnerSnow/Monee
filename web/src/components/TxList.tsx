@@ -10,6 +10,7 @@ import { useUi } from '@/lib/ui-store';
 export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, Account> }) {
   const hidden = useUi((s) => s.hidden);
   const flashId = useUi((s) => s.flashId);
+  const openSheet = useUi((s) => s.openSheet);
   const category = getCategory(t.categoryId);
   const Icon = category.icon;
   const from = accounts.get(t.sourceAccountId)?.name ?? '已刪除的帳戶';
@@ -22,13 +23,20 @@ export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, A
   const tone = t.type === 'INCOME' ? 'in' : t.type === 'TRANSFER' ? 'tr' : '';
 
   return (
-    <li className={`row ${t.id === flashId ? 'flash' : ''}`}>
-      <span aria-hidden className={`ico ${tone}`}><Icon size={20} strokeWidth={1.5} /></span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-body">{title}</span>
-        <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>
-      </span>
-      <span className={`num flex-none text-body ${t.type === 'TRANSFER' ? 'text-muted' : ''}`}>{transactionAmount(t, hidden)}</span>
+    <li>
+      <button
+        type="button"
+        onClick={() => openSheet({ kind: 'transaction', id: t.id })}
+        aria-haspopup="dialog"
+        className={`row press ${t.id === flashId ? 'flash' : ''}`}
+      >
+        <span aria-hidden className={`ico ${tone}`}><Icon size={20} strokeWidth={1.5} /></span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-body">{title}</span>
+          <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>
+        </span>
+        <span className={`num flex-none text-body ${t.type === 'TRANSFER' ? 'text-muted' : ''}`}>{transactionAmount(t, hidden)}</span>
+      </button>
     </li>
   );
 }
