@@ -163,7 +163,8 @@ function allocate(total, weights) {
   const raw = names.map((n) => (total * weights[n]) / W);
   const base = raw.map(Math.floor);
   const order = names.map((_, i) => i).sort((a, b) => (raw[b] - base[b]) - (raw[a] - base[a]) || a - b);
-  for (let k = 0; k < total - sumOf(base); k++) base[order[k]] += 1;
+  const remainder = total - sumOf(base);
+  for (let k = 0; k < remainder; k++) base[order[k % order.length]] += 1;
   return Object.fromEntries(names.map((n, i) => [n, base[i]]));
 }
 

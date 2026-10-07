@@ -35,6 +35,16 @@ describe('allocate / splitAmounts', () => {
     expect(allocate(389, { me: 1, kai: 1 })).toEqual({ me: 195, kai: 194 });
     expect(allocate(100, { a: 1, b: 1, c: 1 })).toEqual({ a: 34, b: 33, c: 33 });
   });
+  it('零頭超過 $1 時，前面幾個人各多付 $1，加總剛好等於總額', () => {
+    expect(allocate(2000, { a: 1, b: 1, c: 1 })).toEqual({ a: 667, b: 667, c: 666 });
+    expect(allocate(10, { a: 1, b: 1, c: 1, d: 1 })).toEqual({ a: 3, b: 3, c: 2, d: 2 });
+    for (const total of [1, 7, 99, 1001, 2000, 12345]) {
+      for (let n = 1; n <= 7; n++) {
+        const r = allocate(total, Object.fromEntries(Array.from({ length: n }, (_, i) => [`m${i}`, 1 + (i % 3)])));
+        expect(Object.values(r).reduce((s, v) => s + v, 0)).toBe(total);
+      }
+    }
+  });
   it('份數：點兩杯的人付兩份，加總一定等於總額', () => {
     const r = allocate(600, { me: 1, ming: 1, hua: 2, mei: 1 });
     expect(r).toEqual({ me: 120, ming: 120, hua: 240, mei: 120 });

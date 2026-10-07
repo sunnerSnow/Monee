@@ -15,7 +15,9 @@ export function allocate(total: number, weights: Record<string, number>): Record
   const raw = names.map((k) => (total * weights[k]) / W);
   const base = raw.map(Math.floor);
   const order = names.map((_, i) => i).sort((a, b) => raw[b] - base[b] - (raw[a] - base[a]) || a - b);
-  for (let i = 0; i < total - sumOf(base); i++) base[order[i]] += 1;
+  // 零頭要先算好；在迴圈條件裡重算的話，加了第一個 $1 後零頭就變少，剩 $2 以上會少分
+  const remainder = total - sumOf(base);
+  for (let i = 0; i < remainder; i++) base[order[i % order.length]] += 1;
   return Object.fromEntries(names.map((k, i) => [k, base[i]]));
 }
 

@@ -6,7 +6,7 @@ import { categoriesFor, getCategory } from '@/lib/categories';
 import { useAccounts, useSaveSplitExpense } from '@/lib/data';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
-import { meOf, splitAmounts, splitProblem } from '@/lib/split';
+import { allocate, meOf, splitAmounts, splitProblem } from '@/lib/split';
 import type { SplitExpense, SplitGroup, SplitMode } from '@/lib/types';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts } from './parts';
 
@@ -54,6 +54,8 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   const [who, setWho] = useState<Set<string>>(() => new Set(editing ? Object.keys(editing.amounts).filter((k) => editing.amounts[k] > 0) : ids));
   const [shares, setShares] = useState<Record<string, number>>(() => (editing?.mode === 'shares' ? { ...editing.weights } : Object.fromEntries(ids.map((k) => [k, 1]))));
   const [exact, setExact] = useState<Record<string, string>>(() => (editing?.mode === 'exact' ? Object.fromEntries(Object.entries(editing.weights).map(([k, v]) => [k, String(v)])) : {}));
+  // 指定金額裡使用者親手改過的人；沒改過的人會自動分掉剩下的金額（編輯舊的指定金額時全部視為改過）
+  const [touched, setTouched] = useState<Set<string>>(() => new Set(editing?.mode === 'exact' ? Object.keys(editing.weights) : []));
   const [date] = useState(editing?.date ?? initial?.date ?? toISODate(new Date()));
   const [error, setError] = useState('');
 
@@ -82,6 +84,32 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
     if (!n) setWho((prev) => { const next = new Set(prev); next.delete(k); return next; });
   };
   const exactValue = (k: string) => parseInt(exact[k] || '0', 10) || 0;
+  /** 指定金額：總額扣掉改過的人，剩下的由沒改過、而且有勾選的人平分 */
+  const rebalance = (values: Record<string, string>, fixed: Set<string>, sum: number) => {
+    const next = { ...values };
+    const free = ids.filter((k) => who.has(k) && !fixed.has(k));
+    if (!free.length) return next;
+    const rest = sum - ids.filter((k) => fixed.has(k)).reduce((s, k) => s + (parseInt(next[k] || '0', 10) || 0), 0);
+    const share = rest > 0 ? allocate(rest, Object.fromEntries(free.map((k) => [k, 1]))) : {};
+    for (const k of free) next[k] = String(share[k] ?? 0);
+    return next;
+  };
+  const resetExact = (sum = total) => {
+    setTouched(new Set());
+    setExact(rebalance({}, new Set(), sum));
+  };
+  const changeAmount = (raw: string) => {
+    const v = raw.replace(/\D/g, '').slice(0, 8);
+    setAmount(v);
+    setError('');
+    if (mode === 'exact') setExact(rebalance(exact, touched, parseInt(v || '0', 10) || 0));
+  };
+  const changeExact = (k: string, raw: string) => {
+    const nextTouched = new Set(touched).add(k);
+    setTouched(nextTouched);
+    setExact(rebalance({ ...exact, [k]: raw.replace(/\D/g, '').slice(0, 8) }, nextTouched, total));
+    setError('');
+  };
   const switchMode = (m: SplitMode) => {
     if (m === mode) return;
     // 從指定金額切回平分／份數：沿用有填金額的人，填 0 的人就是不分
@@ -89,15 +117,8 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
       const picked = ids.filter((k) => exactValue(k) > 0);
       if (picked.length) setWho(new Set(picked));
     }
-    // 切到指定金額：先帶入目前勾選的人平分的結果，改幾個數字就好（分的人變了就重帶）
-    if (m === 'exact' && total) {
-      const current = ids.filter((k) => exactValue(k) > 0);
-      const same = current.length === who.size && current.every((k) => who.has(k));
-      if (!same) {
-        const equal = splitAmounts('equal', total, Object.fromEntries(ids.filter((k) => who.has(k)).map((k) => [k, 1])));
-        setExact(Object.fromEntries(Object.entries(equal).map(([k, v]) => [k, String(v)])));
-      }
-    }
+    // 切到指定金額：先帶入目前勾選的人平分的結果，改幾個數字就好
+    if (m === 'exact') resetExact();
     setMode(m);
   };
 
@@ -124,7 +145,9 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
     }
   };
 
-  const remain = mode === 'exact' ? (problem && problem !== '請輸入金額' ? problem : total ? '剛好分完' : '') : MODE_HINT[mode];
+  const remain = mode === 'exact'
+    ? (problem && problem !== '請輸入金額' ? problem : total ? '剛好分完・改一個人的金額，其他沒改過的人會自動分剩下的' : '')
+    : MODE_HINT[mode];
 
   return (
     <>
@@ -136,7 +159,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
             data-autofocus
             inputMode="numeric"
             value={amount}
-            onChange={(e) => { setAmount(e.target.value.replace(/\D/g, '').slice(0, 8)); setError(''); }}
+            onChange={(e) => changeAmount(e.target.value)}
             placeholder="0"
             autoComplete="off"
             className="display min-w-0 flex-1 bg-transparent text-[36px] outline-none"
@@ -208,7 +231,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
                       id={`exact-${m.id}`}
                       inputMode="numeric"
                       value={exact[m.id] ?? ''}
-                      onChange={(e) => { setExact({ ...exact, [m.id]: e.target.value.replace(/\D/g, '').slice(0, 8) }); setError(''); }}
+                      onChange={(e) => changeExact(m.id, e.target.value)}
                       placeholder="0"
                       autoComplete="off"
                       className="num h-10 w-24 flex-none rounded-xs border border-line bg-page px-2.5 text-right text-[16px]"
@@ -219,7 +242,10 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
             );
           })}
         </ul>
-        {remain && <p aria-live="polite" className={`-mt-1 px-1 text-caption tracking-[.06em] ${mode === 'exact' && problem ? 'text-alert' : 'text-muted'}`}>{remain}</p>}
+        {remain && <p aria-live="polite" className={`-mt-1 px-1 text-caption leading-[1.8] tracking-[.06em] ${mode === 'exact' && problem ? 'text-alert' : 'text-muted'}`}>{remain}</p>}
+        {mode === 'exact' && total > 0 && touched.size > 0 && (
+          <button type="button" onClick={() => resetExact()} className="press -mt-1 self-start px-1 text-caption underline">重新平分</button>
+        )}
       </Field>
 
       <EffectBox lines={mode === 'exact' && problem ? ['分配好金額後，這裡會顯示怎麼記進你的帳'] : lines} />
