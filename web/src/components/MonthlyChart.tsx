@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { monthLabel } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
 
-interface Point { key: string; value: number }
+/** budget 是該月自己的預算（從某月起生效，各月可能不同）；沒有預算為 null */
+interface Point { key: string; value: number; budget: number | null }
 
-// 圖表規格（dataviz）：單一系列一個顏色、直條 ≤ 24px、頂端 4px 圓角、細線格線、預算線用虛線
+// 圖表規格（dataviz）：單一系列一個顏色、直條 ≤ 24px、頂端 4px 圓角、細線格線、預算用每月一段的虛線
 const W = 310;
 const H = 186;
 const L = 40;
@@ -20,20 +21,22 @@ const niceMax = (v: number) => {
   return Math.max(step * 3, Math.ceil((v * 1.1) / step) * step);
 };
 
-export function MonthlyChart({ points, budget, currentKey, hidden }: {
+export function MonthlyChart({ points, currentKey, hidden }: {
   points: Point[];
-  budget: number | null;
   currentKey: string;
   hidden: boolean;
 }) {
   const [active, setActive] = useState<number | null>(null);
-  const max = niceMax(Math.max(budget ?? 0, ...points.map((p) => p.value)));
+  const max = niceMax(Math.max(...points.map((p) => Math.max(p.value, p.budget ?? 0))));
   const y = (v: number) => B - (v / max) * (B - T);
   const slot = (W - L - R) / points.length;
   const ticks = [0, max / 3, (max / 3) * 2, max];
   const tip = (p: Point) => {
-    const note = p.key === currentKey ? '，月份進行中' : budget && p.value > budget ? `，超出預算 ${money(p.value - budget, hidden)}` : '';
-    return `${monthLabel(p.key)}支出 ${money(p.value, hidden)}${note}`;
+    const note = p.key === currentKey
+      ? '，月份進行中'
+      : p.budget && p.value > p.budget ? `，超出預算 ${money(p.value - p.budget, hidden)}` : '';
+    const budgetText = p.budget ? `（預算 ${money(p.budget, hidden)}）` : '';
+    return `${monthLabel(p.key)}支出 ${money(p.value, hidden)}${budgetText}${note}`;
   };
   const activePoint = active === null ? null : points[active];
 
@@ -48,7 +51,6 @@ export function MonthlyChart({ points, budget, currentKey, hidden }: {
             {hidden ? '' : v ? `${Math.round(v / 1000)}k` : '0'}
           </text>
         ))}
-        {budget && <line x1={L} x2={W - R} y1={y(budget)} y2={y(budget)} stroke="var(--text-2)" strokeWidth={1} strokeDasharray="4 4" />}
         {points.map((p, i) => {
           const cx = L + slot * i + slot / 2;
           const x = cx - BAR / 2;
@@ -57,6 +59,18 @@ export function MonthlyChart({ points, budget, currentKey, hidden }: {
           const current = p.key === currentKey;
           return (
             <g key={p.key}>
+              {/* 該月預算：只畫在這個月的範圍內，預算調整時虛線會跟著高低變化 */}
+              {p.budget && (
+                <line
+                  x1={L + slot * i + 3}
+                  x2={L + slot * (i + 1) - 3}
+                  y1={y(p.budget)}
+                  y2={y(p.budget)}
+                  stroke="var(--text-2)"
+                  strokeWidth={1}
+                  strokeDasharray="4 3"
+                />
+              )}
               {p.value > 0 && (
                 <path
                   d={`M${x},${B}V${top + r}Q${x},${top} ${x + r},${top}H${x + BAR - r}Q${x + BAR},${top} ${x + BAR},${top + r}V${B}Z`}

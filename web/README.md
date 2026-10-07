@@ -24,7 +24,7 @@ npm run dev:demo
 ## 正式使用：接上 Supabase
 
 1. 到 [supabase.com](https://supabase.com) 建一個專案（免費方案即可）。
-2. 後台 → **SQL Editor**，把 [`supabase/migrations/20261006000000_init.sql`](supabase/migrations/20261006000000_init.sql) 整份貼上執行。
+2. 後台 → **SQL Editor**，依檔名順序把 [`supabase/migrations/`](supabase/migrations/) 裡的每個檔案整份貼上執行。之後新增的 migration 也要這樣手動跑一次（免費方案的 GitHub 整合不會自動套用），而且要**先跑 SQL 再部署新版程式**。
 3. 後台 → **Authentication → URL Configuration**：
    - Site URL：`http://localhost:3000`（上線後改成正式網址）
    - Redirect URLs 加上 `http://localhost:3000/**`
@@ -75,6 +75,7 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 
 ## 設計與實作決定
 
+- **每月預算「從某月起生效」**（`budget_history`）：改預算只影響當月以後，過去月份保留當時的預算，報表逐月比較。
 - **帳戶餘額不存欄位**，由 `account_balances` view 用「期初餘額＋交易」即時計算，不會跟流水帳對不上。
 - **轉帳（TRANSFER）不算支出**：首頁、報表的支出都排除轉帳，首頁會另外標示「已排除內部轉帳」。
 - **校準**：輸入銀行或信用卡 App 上的數字，有差額就補一筆「未記錄雜項（支出）」或「未記錄收入」，並記下校準時間。投資帳戶不提供校準，因為市值變動不是生活收支。

@@ -1,7 +1,16 @@
-import type { Account, Transaction } from './types';
+import type { Account, BudgetEntry, Transaction } from './types';
 import { monthKey, shiftMonth } from './dates';
 
 const sum = (list: Pick<Transaction, 'amount'>[]) => list.reduce((s, t) => s + t.amount, 0);
+
+/** 某個月（YYYY-MM）的預算：生效月份 ≤ 該月的最後一筆紀錄；沒有紀錄或設成不設預算時回傳 null */
+export function budgetFor(entries: BudgetEntry[], month: string): number | null {
+  let found: BudgetEntry | undefined;
+  for (const e of entries) {
+    if (e.month <= month && (!found || e.month > found.month)) found = e;
+  }
+  return found?.amount ?? null;
+}
 
 export type BudgetStatus = 'ok' | 'tight' | 'over';
 

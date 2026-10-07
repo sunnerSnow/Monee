@@ -41,8 +41,13 @@ export interface Transaction {
 }
 
 export interface Profile {
-  monthlyBudget: number | null;
   pnlColor: PnlColor;
+}
+
+/** 預算紀錄：從 month（YYYY-MM）起生效；amount 為 null 代表從那個月起不設預算 */
+export interface BudgetEntry {
+  month: string;
+  amount: number | null;
 }
 
 export type NewTransaction = Omit<Transaction, 'id' | 'createdAt'>;

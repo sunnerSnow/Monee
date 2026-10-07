@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountSummary, budgetPace, dailyBudget, expenseByCategory, frequentEntries, groupByDay, monthTotals,
+  accountSummary, budgetFor, budgetPace, dailyBudget, expenseByCategory, frequentEntries, groupByDay, monthTotals,
   monthlyExpenses, reconcileDiff,
 } from './budget';
 import type { Account, Transaction } from './types';
@@ -23,6 +23,31 @@ const tx = (p: Partial<Transaction>): Transaction => ({
 const account = (p: Partial<Account>): Account => ({
   id: 'a', name: 'A', type: 'BANK', currency: 'TWD', currentBalance: 0, openingBalance: 0,
   icon: null, investmentSnapshot: null, lastReconciledAt: null, ...p,
+});
+
+describe('budgetFor', () => {
+  const entries = [
+    { month: '2026-12', amount: 30000 },
+    { month: '2026-05', amount: 22000 },
+    { month: '2026-09', amount: 24000 },
+    { month: '2027-01', amount: 24000 },
+  ];
+  it('用生效月份不晚於該月的最後一筆（順序不影響）', () => {
+    expect(budgetFor(entries, '2026-05')).toBe(22000);
+    expect(budgetFor(entries, '2026-08')).toBe(22000);
+    expect(budgetFor(entries, '2026-10')).toBe(24000);
+    expect(budgetFor(entries, '2026-12')).toBe(30000);
+    expect(budgetFor(entries, '2027-03')).toBe(24000);
+  });
+  it('最早的紀錄之前沒有預算', () => {
+    expect(budgetFor(entries, '2026-04')).toBeNull();
+  });
+  it('設成不設預算（null）後，之後的月份都沒有預算', () => {
+    expect(budgetFor([...entries, { month: '2027-02', amount: null }], '2027-06')).toBeNull();
+  });
+  it('沒有任何紀錄', () => {
+    expect(budgetFor([], '2026-10')).toBeNull();
+  });
 });
 
 describe('dailyBudget', () => {

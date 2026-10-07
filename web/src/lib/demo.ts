@@ -3,7 +3,7 @@
 import { reconcileDiff } from './budget';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
-import type { Account, NewAccount, NewTransaction, Profile, Transaction } from './types';
+import type { Account, BudgetEntry, NewAccount, NewTransaction, Profile, Transaction } from './types';
 
 export const isDemo = process.env.NEXT_PUBLIC_MONEE_DEMO === '1';
 
@@ -63,7 +63,12 @@ function seed() {
       });
     });
   });
-  return { accounts, txs, profile: { monthlyBudget: 24000, pnlColor: 'red_up' } as Profile };
+  // 前三個月預算 22,000、最近三個月 24,000，報表的預算線會跟著變
+  const budgets: BudgetEntry[] = [
+    { month: shiftMonth(current, -5), amount: 22000 },
+    { month: shiftMonth(current, -2), amount: 24000 },
+  ];
+  return { accounts, txs, budgets, profile: { pnlColor: 'red_up' } as Profile };
 }
 
 let store: ReturnType<typeof seed> | undefined;
@@ -133,6 +138,17 @@ export const demo = {
     const target = db().accounts.find((a) => a.id === account.id);
     if (target) target.lastReconciledAt = now.toISOString();
     return diff;
+  },
+  async budgets(): Promise<BudgetEntry[]> {
+    await pause();
+    return db().budgets.map((b) => ({ ...b }));
+  },
+  async setBudget(entry: BudgetEntry) {
+    await pause();
+    const list = db().budgets;
+    const hit = list.find((b) => b.month === entry.month);
+    if (hit) hit.amount = entry.amount;
+    else list.push({ ...entry });
   },
   async updateProfile(patch: Partial<Profile>) {
     await pause();

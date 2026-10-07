@@ -5,12 +5,15 @@ import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut, Sheet as Shee
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useProfile, useUpdateProfile, useUser } from '@/lib/data';
+import { budgetFor } from '@/lib/budget';
+import { useBudgets, useProfile, useSetBudget, useUpdateProfile, useUser } from '@/lib/data';
+import { monthKeyOf, monthLabel, monthTitle } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
 import { formatMoney, parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/client';
 import type { PnlColor } from '@/lib/types';
 import { useUi, type ThemePref } from '@/lib/ui-store';
+import { useNow } from '@/lib/use-now';
 import { Avatar } from '../ui';
 
 const THEMES: [ThemePref, string][] = [['light', '淺色'], ['dark', '深色'], ['system', '跟隨系統']];
@@ -21,23 +24,31 @@ export function SettingsScreen() {
   const queryClient = useQueryClient();
   const { data: user } = useUser();
   const { data: profile } = useProfile();
+  const { data: budgets = [] } = useBudgets();
   const update = useUpdateProfile();
+  const setBudget = useSetBudget();
+  const now = useNow();
   const theme = useUi((s) => s.theme);
   const setTheme = useUi((s) => s.setTheme);
   const showToast = useUi((s) => s.showToast);
   const [budgetInput, setBudgetInput] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
-  const budgetValue = budgetInput ?? (profile?.monthlyBudget ? String(profile.monthlyBudget) : '');
+  // 改預算只影響本月以後；過去月份維持當時的預算
+  const month = now ? monthKeyOf(now) : null;
+  const current = month ? budgetFor(budgets, month) : null;
+  const budgetValue = budgetInput ?? (current ? String(current) : '');
+  const history = [...budgets].sort((a, b) => b.month.localeCompare(a.month)).slice(0, 6);
 
   const back = () => (window.history.length > 1 ? router.back() : router.push('/'));
 
   const saveBudget = async () => {
+    if (!month) return;
     const value = parseAmount(budgetValue);
     try {
-      await update.mutateAsync({ monthlyBudget: value || null });
+      await setBudget.mutateAsync({ month, amount: value || null });
       setBudgetInput(null);
-      showToast(value ? `每月預算已設為 ${formatMoney(value)}` : '已清除每月預算');
+      showToast(value ? `從 ${monthLabel(month)}起，每月預算 ${formatMoney(value)}` : `從 ${monthLabel(month)}起不設預算`);
     } catch (e) {
       showToast(e instanceof Error ? e.message : '儲存失敗，請再試一次');
     }
@@ -87,7 +98,9 @@ export function SettingsScreen() {
       <section aria-labelledby="s-budget" className="flex flex-col gap-2">
         <h2 id="s-budget" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">每月預算</h2>
         <div className="card flex flex-col gap-3 px-5 py-4">
-          <label htmlFor="budget" className="caption leading-[1.8] tracking-[.04em]">設定後，首頁會算出每天能花多少，並顯示預算進度。</label>
+          <label htmlFor="budget" className="caption leading-[1.8] tracking-[.04em]">
+            {month ? `${monthTitle(month)}的預算。` : ''}改了之後從這個月起生效，之前的月份維持原本的預算；清空再儲存代表從這個月起不設預算。
+          </label>
           <div className="flex items-center gap-2">
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5 border-b border-fg px-0.5 pb-1.5 focus-within:border-b-2 focus-within:pb-[5px]">
               <span className="display text-[18px]">$</span>
@@ -101,10 +114,23 @@ export function SettingsScreen() {
                 className="display min-w-0 flex-1 bg-transparent text-[26px] outline-none"
               />
             </div>
-            <button type="button" onClick={saveBudget} disabled={update.isPending || budgetInput === null} className="btn-secondary press">
-              {update.isPending ? '儲存中…' : '儲存'}
+            <button type="button" onClick={saveBudget} disabled={setBudget.isPending || budgetInput === null || !month} className="btn-secondary press">
+              {setBudget.isPending ? '儲存中…' : '儲存'}
             </button>
           </div>
+          {history.length > 0 && (
+            <div className="flex flex-col gap-1.5 border-t border-dashed border-line-strong pt-3">
+              <span className="caption">預算紀錄</span>
+              <ul className="flex flex-col gap-1 text-body-s">
+                {history.map((b) => (
+                  <li key={b.month} className="flex justify-between gap-2">
+                    <span>{monthTitle(b.month)}起</span>
+                    <span className="num text-muted">{b.amount ? formatMoney(b.amount) : '不設預算'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 

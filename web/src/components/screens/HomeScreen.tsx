@@ -2,11 +2,11 @@
 
 import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, Eye, EyeOff, Info, Landmark, CreditCard, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
-import { accountSummary, budgetPace, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
-import { useAccounts, useProfile, useTransactions } from '@/lib/data';
+import { accountSummary, budgetFor, budgetPace, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
+import { useAccounts, useBudgets, useTransactions } from '@/lib/data';
 import { daysInMonth, greeting, longDate, monthKeyOf, toISODate } from '@/lib/dates';
 import { money, signedBalance } from '@/lib/money';
-import type { Account, Profile, Transaction } from '@/lib/types';
+import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { TxGroups } from '../TxList';
@@ -18,19 +18,22 @@ export function HomeScreen() {
   const now = useNow();
   const accountsQ = useAccounts();
   const txQ = useTransactions();
-  const profileQ = useProfile();
+  const budgetsQ = useBudgets();
 
-  if (!now || accountsQ.isPending || txQ.isPending || profileQ.isPending) return <LoadingBlocks />;
-  const error = accountsQ.error ?? txQ.error ?? profileQ.error;
+  if (!now || accountsQ.isPending || txQ.isPending || budgetsQ.isPending) return <LoadingBlocks />;
+  const error = accountsQ.error ?? txQ.error ?? budgetsQ.error;
   if (error) {
-    return <ErrorBox message={error.message} onRetry={() => { accountsQ.refetch(); txQ.refetch(); profileQ.refetch(); }} />;
+    return <ErrorBox message={error.message} onRetry={() => { accountsQ.refetch(); txQ.refetch(); budgetsQ.refetch(); }} />;
   }
 
   const accounts = accountsQ.data ?? [];
   const txs = txQ.data ?? [];
-  const profile = profileQ.data!;
-  if (!txs.length) return <Onboarding now={now} accounts={accounts} profile={profile} />;
-  return <Dashboard now={now} accounts={accounts} txs={txs} profile={profile} />;
+  // 本月的預算（預算紀錄是「從某月起生效」）
+  const budget = budgetFor(budgetsQ.data ?? [], monthKeyOf(now));
+  // 「開始設定」只在帳戶或預算還沒設好、也還沒記過帳時出現；設定完就收起來，直接顯示首頁
+  const setupDone = accounts.length > 0 && budget !== null;
+  if (!txs.length && !setupDone) return <Onboarding now={now} accounts={accounts} budget={budget} />;
+  return <Dashboard now={now} accounts={accounts} txs={txs} budget={budget} />;
 }
 
 function TopBar({ now, showEye = true }: { now: Date; showEye?: boolean }) {
@@ -56,13 +59,12 @@ function TopBar({ now, showEye = true }: { now: Date; showEye?: boolean }) {
   );
 }
 
-function Dashboard({ now, accounts, txs, profile }: { now: Date; accounts: Account[]; txs: Transaction[]; profile: Profile }) {
+function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Account[]; txs: Transaction[]; budget: number | null }) {
   const hidden = useHidden();
   const month = monthKeyOf(now);
   const today = toISODate(now);
   const totals = monthTotals(txs, month);
   const todaySpent = txs.filter((t) => t.type === 'EXPENSE' && t.date === today).reduce((s, t) => s + t.amount, 0);
-  const budget = profile.monthlyBudget;
   const calendar = { day: now.getDate(), daysInMonth: daysInMonth(now) };
   const daily = budget ? dailyBudget({ budget, monthExpense: totals.expense, todaySpent, ...calendar }) : null;
   const pace = budget ? budgetPace({ budget, monthExpense: totals.expense, ...calendar }) : null;
@@ -124,7 +126,7 @@ function Dashboard({ now, accounts, txs, profile }: { now: Date; accounts: Accou
         {budget && pace && (
           <div className="flex flex-col gap-2">
             <div className="flex justify-between gap-2 text-caption tracking-[.08em] text-muted">
-              <span>每月預算 <span className="num">{money(budget, hidden)}</span></span>
+              <span>本月預算 <span className="num">{money(budget, hidden)}</span></span>
               <span>已用 <span className="num">{pace.usedPct}%</span></span>
             </div>
             <div aria-hidden className="relative mt-5 h-[var(--bar-h)] rounded-full bg-fill">
@@ -151,7 +153,9 @@ function Dashboard({ now, accounts, txs, profile }: { now: Date; accounts: Accou
         <SectionHeader id="recent-title" title="最近交易" en="Recent" action={
           <Link href="/transactions" className={MORE}>全部明細<ArrowRight size={16} strokeWidth={1.5} aria-hidden /></Link>
         } />
-        <TxGroups txs={sortNewestFirst(txs).slice(0, 6)} accounts={accounts} today={now} variant="inline" />
+        {txs.length > 0
+          ? <TxGroups txs={sortNewestFirst(txs).slice(0, 6)} accounts={accounts} today={now} variant="inline" />
+          : <EmptyBox title="還沒有交易">點下方 ＋ 記下第一筆，這裡就會列出最近的花費。</EmptyBox>}
       </section>
 
       {accounts.length > 0 && (
@@ -191,10 +195,10 @@ function SummaryRow({ icon, title, sub, amount }: { icon: React.ReactNode; title
   );
 }
 
-function Onboarding({ now, accounts, profile }: { now: Date; accounts: Account[]; profile: Profile }) {
+function Onboarding({ now, accounts, budget }: { now: Date; accounts: Account[]; budget: number | null }) {
   const openSheet = useUi((s) => s.openSheet);
   const hasAccount = accounts.length > 0;
-  const hasBudget = profile.monthlyBudget !== null;
+  const hasBudget = budget !== null;
   const steps = [
     { done: true, title: '建立帳號', sub: '已完成' },
     { done: hasAccount, title: '新增帳戶', sub: hasAccount ? `已新增 ${accounts.length} 個` : '現金、銀行、信用卡都可以加', action: () => openSheet({ kind: 'account' }) },
