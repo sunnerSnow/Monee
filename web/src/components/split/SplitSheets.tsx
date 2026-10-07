@@ -16,6 +16,7 @@ import { useUi } from '@/lib/ui-store';
 import { Sheet, SheetHeader } from '../Sheet';
 import { EmptyBox } from '../ui';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts, receivingAccounts, shortDate } from './parts';
+import { RangeCalendar } from './RangeCalendar';
 import { InboxSheet, ShareSheet } from './ShareSheets';
 import { SplitExpenseForm } from './SplitExpenseForm';
 
@@ -310,7 +311,7 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
   const [kind, setKind] = useState<SplitKind>(g?.kind ?? initialKind ?? 'daily');
   // 旅程：預設今天出發、五天四夜、日本
   const [startDate, setStartDate] = useState(g?.startDate ?? toISODate(new Date()));
-  const [endDate, setEndDate] = useState(g?.endDate ?? plusDays(toISODate(new Date()), 4));
+  const [endDate, setEndDate] = useState<string | null>(g?.endDate ?? plusDays(toISODate(new Date()), 4));
   const [currency, setCurrency] = useState(g?.kind === 'trip' ? g.currency : 'JPY');
   const [budget, setBudget] = useState(g?.budget ? String(g.budget) : '');
   const [exclude, setExclude] = useState(g ? g.excludeFromBudget : true);
@@ -334,8 +335,8 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
   const save = async () => {
     const names = rows.map((r) => r.name.trim());
     const problem = !name.trim() ? (trip ? '旅程名稱不能空白' : '群組名稱不能空白')
-      : trip && (!startDate || !endDate) ? '請選出發和回來的日期'
-        : trip && endDate < startDate ? '回來的日期不能早於出發日期'
+      : trip && (!startDate || !endDate) ? '請在月曆上點回來的日期'
+        : trip && endDate! < startDate ? '回來的日期不能早於出發日期'
           : !names.length && !trip ? '至少要有一位朋友'
         : names.some((n) => !n) ? '成員名字不能空白'
           : names.includes('我') || new Set(names).size !== names.length ? '成員名字重複了' : '';
@@ -391,14 +392,9 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
       </Field>
       {trip && (
         <>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="出發" htmlFor="trip-start">
-              <input id="trip-start" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); if (e.target.value > endDate) setEndDate(e.target.value); setError(''); }} className="field-input px-3" />
-            </Field>
-            <Field label="回來" htmlFor="trip-end">
-              <input id="trip-end" type="date" value={endDate} min={startDate} onChange={(e) => { setEndDate(e.target.value); setError(''); }} className="field-input px-3" />
-            </Field>
-          </div>
+          <Field label="旅程日期">
+            <RangeCalendar start={startDate} end={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); setError(''); }} />
+          </Field>
           <Field label="目的地與幣別" htmlFor="trip-currency">
             <select id="trip-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="field-input appearance-none">
               {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.place}・{c.name} {c.code}</option>)}

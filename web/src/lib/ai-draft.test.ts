@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { NotATransactionError, draftInstruction, draftSchema, isISODate, parseDraftAccounts, sanitizeDraft, type DraftAccount } from './ai-draft';
+import {
+  NotATransactionError, draftInstruction, draftSchema, isISODate, parseDraftAccounts, parseDraftContext, sanitizeDraft, type DraftAccount,
+} from './ai-draft';
 
 const accounts: DraftAccount[] = [
   { id: 'cash', name: '現金', type: 'CASH' },
@@ -16,10 +18,28 @@ const base = {
 describe('sanitizeDraft', () => {
   it('合法的回傳原樣保留', () => {
     expect(sanitizeDraft(base, ctx)).toEqual({
-      rawInput: '昨天晚餐火鍋 580 刷國泰', confidence: 0.92, suggestedType: 'EXPENSE', suggestedAmount: 580,
+      rawInput: '昨天晚餐火鍋 580 刷國泰', confidence: 0.92, suggestedType: 'EXPENSE', suggestedAmount: 580, suggestedCurrency: 'TWD',
       suggestedCategoryId: 'food', suggestedAccountId: 'cathay', suggestedTargetAccountId: null,
-      suggestedDate: '2026-10-06', suggestedNote: '晚餐・火鍋',
+      suggestedDate: '2026-10-06', suggestedNote: '晚餐・火鍋', suggestedPayer: null,
     });
+  });
+
+  it('幣別：認得的就用，金額照幣別保留小數；沒有或亂填用群組幣別，一般記帳用台幣', () => {
+    expect(sanitizeDraft({ ...base, currency: 'JPY', amount: 3000.4 }, ctx)).toMatchObject({ suggestedCurrency: 'JPY', suggestedAmount: 3000 });
+    expect(sanitizeDraft({ ...base, currency: 'USD', amount: 12.506 }, ctx)).toMatchObject({ suggestedCurrency: 'USD', suggestedAmount: 12.51 });
+    expect(sanitizeDraft({ ...base, currency: 'XYZ' }, ctx).suggestedCurrency).toBe('TWD');
+    expect(sanitizeDraft({ ...base, currency: undefined }, { ...ctx, context: { members: [], currency: 'KRW' } }).suggestedCurrency).toBe('KRW');
+  });
+
+  it('分帳：一律是支出，付款人只能是「我」或群組成員', () => {
+    const split = { ...ctx, context: { members: ['小明', '阿凱'], currency: 'JPY' } };
+    expect(sanitizeDraft({ ...base, payer: '小明' }, split)).toMatchObject({ suggestedPayer: '小明', suggestedType: 'EXPENSE' });
+    expect(sanitizeDraft({ ...base, payer: '我' }, split).suggestedPayer).toBe('我');
+    expect(sanitizeDraft({ ...base, payer: '胖虎' }, split).suggestedPayer).toBeNull();
+    expect(sanitizeDraft({ ...base, payer: 'none' }, split).suggestedPayer).toBeNull();
+    expect(sanitizeDraft({ ...base, type: 'INCOME', categoryId: 'salary' }, split)).toMatchObject({ suggestedType: 'EXPENSE', suggestedCategoryId: 'food' });
+    // 一般記帳不看付款人
+    expect(sanitizeDraft({ ...base, payer: '小明' }, ctx).suggestedPayer).toBeNull();
   });
 
   it('不是記帳內容時丟出錯誤，訊息依來源不同', () => {
@@ -104,5 +124,36 @@ describe('給 AI 的指示與格式', () => {
   it('還沒有帳戶時也能產生指示', () => {
     expect(draftInstruction([], '2026-10-07')).toContain('還沒有帳戶');
     expect(draftSchema([]).properties.accountId.enum).toEqual(['none']);
+  });
+
+  it('一般記帳：沒提到幣別是台幣，沒有付款人欄位', () => {
+    expect(draftInstruction(accounts, '2026-10-07')).toContain('沒提到幣別時，金額是新台幣（TWD）');
+    const schema = draftSchema(accounts);
+    expect(schema.properties.currency.enum).toContain('JPY');
+    expect(schema.properties).not.toHaveProperty('payer');
+    expect(schema.required).not.toContain('payer');
+  });
+
+  it('旅程分帳：沒提到幣別用當地貨幣，付款人限定成員', () => {
+    const context = { members: ['小明', '阿凱'], currency: 'JPY' };
+    const text = draftInstruction(accounts, '2026-10-07', context);
+    expect(text).toContain('沒提到幣別時，金額是日圓（JPY）');
+    expect(text).toContain('旅程（當地貨幣是 日圓 JPY）跟朋友分帳的花費');
+    expect(text).toContain('成員：我、小明、阿凱');
+    const schema = draftSchema(accounts, context);
+    expect(schema.properties).toHaveProperty('payer.enum', ['我', '小明', '阿凱', 'none']);
+    expect(schema.required).toContain('payer');
+    // 一個人的旅程不用問誰付的
+    expect(draftInstruction(accounts, '2026-10-07', { members: [], currency: 'JPY' })).not.toContain('payer');
+    expect(draftSchema(accounts, { members: [], currency: 'JPY' }).properties).not.toHaveProperty('payer');
+  });
+});
+
+describe('parseDraftContext', () => {
+  it('成員名字去重、去掉「我」，幣別不支援就用台幣', () => {
+    expect(parseDraftContext({ members: [' 小明 ', '小明', '我', 'none', 3, ''], currency: 'JPY' })).toEqual({ members: ['小明'], currency: 'JPY' });
+    expect(parseDraftContext({ members: 'x', currency: 'BTC' })).toEqual({ members: [], currency: 'TWD' });
+    expect(parseDraftContext(null)).toBeUndefined();
+    expect(parseDraftContext(['小明'])).toBeUndefined();
   });
 });

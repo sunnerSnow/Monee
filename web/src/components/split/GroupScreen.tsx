@@ -129,7 +129,7 @@ function TripHero({ g, mine }: { g: SplitGroup; mine: number }) {
     <section aria-label="旅程摘要" className="card flex flex-col gap-3 p-5">
       <span className="caption flex flex-wrap items-center gap-x-1.5">
         <Plane size={14} strokeWidth={1.5} aria-hidden />
-        {g.startDate && g.endDate ? `${shortDate(g.startDate)}–${shortDate(g.endDate)}・` : ''}{cur.place}・{cur.name}{status ? `・${status}` : ''}
+        {g.startDate && g.endDate ? `${shortDate(g.startDate)}${g.endDate !== g.startDate ? `–${shortDate(g.endDate)}` : ''}・` : ''}{cur.place}・{cur.name}{status ? `・${status}` : ''}
       </span>
       <div className="flex flex-col gap-1">
         <span className="caption">你在這趟旅程花了</span>

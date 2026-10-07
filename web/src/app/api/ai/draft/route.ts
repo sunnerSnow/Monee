@@ -1,7 +1,7 @@
 // AI 記帳草稿：收語音、收據照片或一句文字，請 Gemini 整理成交易草稿回傳。不寫資料庫，使用者確認後才由前端寫入。
 import { NextResponse } from 'next/server';
 import {
-  NotATransactionError, SOURCE_PROMPT, draftInstruction, draftSchema, isISODate, parseDraftAccounts, sanitizeDraft, type DraftSource,
+  NotATransactionError, SOURCE_PROMPT, draftInstruction, draftSchema, isISODate, parseDraftAccounts, parseDraftContext, sanitizeDraft, type DraftSource,
 } from '@/lib/ai-draft';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createClient } from '@/lib/supabase/server';
@@ -109,6 +109,13 @@ export async function POST(request: Request) {
   } catch {
     accounts = parseDraftAccounts([]);
   }
+  // 分帳／旅程才會帶：成員名字與群組幣別
+  let context;
+  try {
+    context = form.has('context') ? parseDraftContext(JSON.parse(String(form.get('context')))) : undefined;
+  } catch {
+    context = undefined;
+  }
 
   const parts: Part[] = [{ text: SOURCE_PROMPT[source] }];
   if (source === 'text') {
@@ -127,17 +134,17 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callGemini(key, {
-      systemInstruction: { parts: [{ text: draftInstruction(accounts, today) }] },
+      systemInstruction: { parts: [{ text: draftInstruction(accounts, today, context) }] },
       contents: [{ role: 'user', parts }],
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: draftSchema(accounts),
+        responseSchema: draftSchema(accounts, context),
         temperature: 0.2,
         // 記帳整理不需要長考，最低思考等級最快（實測約 2 秒）
         thinkingConfig: { thinkingLevel: 'minimal' },
       },
     });
-    return NextResponse.json({ draft: sanitizeDraft(raw, { accounts, today, source }) });
+    return NextResponse.json({ draft: sanitizeDraft(raw, { accounts, today, source, context }) });
   } catch (e) {
     if (e instanceof NotATransactionError) return fail(422, e.message);
     if (e instanceof HttpError) return fail(e.status, e.message);

@@ -61,6 +61,7 @@ export function SplitScreen() {
 
       <section aria-labelledby="groups-title" className="flex flex-col gap-2.5">
         <h2 id="groups-title" className="h-sec px-1">群組<span className="en">Groups</span></h2>
+        {addButton}
         {open.map((g) => {
           const list = openExpenses(g);
           const total = list.reduce((s, e) => s + e.amount, 0);
@@ -80,7 +81,6 @@ export function SplitScreen() {
             </Link>
           );
         })}
-        {addButton}
       </section>
 
       {settled.length > 0 && (

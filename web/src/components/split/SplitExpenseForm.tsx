@@ -2,6 +2,7 @@
 
 import { Check, Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
+import { ME, type AiDraftTransaction } from '@/lib/ai-draft';
 import { categoriesFor, getCategory } from '@/lib/categories';
 import { cleanAmountInput, formatForeign, getCurrency, toMinor, toTwd, twdPerUnit } from '@/lib/currency';
 import { useAccounts, useFxRates, useSaveSplitExpense } from '@/lib/data';
@@ -9,6 +10,7 @@ import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { allocate, meOf, splitProblem } from '@/lib/split';
 import type { SplitExpense, SplitGroup, SplitMode } from '@/lib/types';
+import { AiEntryBar } from '../sheets/AiEntryBar';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts } from './parts';
 
 const MODES: { id: SplitMode; label: string }[] = [
@@ -51,8 +53,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   const me = meOf(group)!;
   const payable = payableAccounts(accounts);
   const ids = group.members.map((m) => m.id);
-  // 旅程的幣別可以切換：旅程幣別或台幣；一般群組只有台幣
-  const currencyChoices = [...new Set([editing?.currency, group.currency, 'TWD'].filter((c): c is string => Boolean(c)))];
+  const friends = group.members.filter((m) => !m.isMe);
 
   const [currency, setCurrency] = useState(editing?.currency ?? group.currency ?? 'TWD');
   const [rateInput, setRateInput] = useState(editing?.fxRate ? String(editing.fxRate) : '');
@@ -67,9 +68,11 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   const [exact, setExact] = useState<Record<string, string>>(() => (editing?.mode === 'exact' ? Object.fromEntries(Object.entries(editing.weights).map(([k, v]) => [k, String(v)])) : {}));
   // 指定金額裡使用者親手改過的人；沒改過的人會自動分掉剩下的金額（編輯舊的指定金額時全部視為改過）
   const [touched, setTouched] = useState<Set<string>>(() => new Set(editing?.mode === 'exact' ? Object.keys(editing.weights) : []));
-  const [date] = useState(editing?.date ?? initial?.date ?? toISODate(new Date()));
+  const [date, setDate] = useState(editing?.date ?? initial?.date ?? toISODate(new Date()));
   const [error, setError] = useState('');
 
+  // 幣別可以切換：旅程幣別或台幣，加上 AI 從收據認出來的幣別；一般群組平常只有台幣
+  const currencyChoices = [...new Set([editing?.currency, group.currency, 'TWD', currency].filter((c): c is string => Boolean(c)))];
   const cur = getCurrency(currency);
   const dec = cur.decimals;
   const foreign = currency !== 'TWD';
@@ -158,6 +161,31 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
     if (mode === 'exact') resetExact(num(v), d);
   };
 
+  // AI 草稿只先幫忙填：幣別、金額、品項、分類、日期、誰先付、付款帳戶；沒提到的維持原樣
+  const applyDraft = (d: AiDraftTransaction) => {
+    const c = d.suggestedCurrency;
+    const decimals = getCurrency(c).decimals;
+    const v = d.suggestedAmount ? inputValue(d.suggestedAmount, decimals) : '';
+    if (c !== currency) {
+      setCurrency(c);
+      setRateInput('');
+    }
+    setAmount(v);
+    if (mode === 'exact') resetExact(num(v), decimals);
+    if (d.suggestedNote) setTitle(d.suggestedNote);
+    if (getCategory(d.suggestedCategoryId).type === 'EXPENSE') setCategoryId(d.suggestedCategoryId);
+    setDate(d.suggestedDate);
+    const payer = d.suggestedPayer === ME ? me : friends.find((m) => m.name === d.suggestedPayer);
+    if (payer) setPayerId(payer.id);
+    if (d.suggestedAccountId && payable.some((a) => a.id === d.suggestedAccountId)) setAccountId(d.suggestedAccountId);
+    setError('');
+    if (c !== currency && c !== group.currency && c !== 'TWD') return `認出來是${getCurrency(c).name}，幣別已切換，匯率帶入今天的參考匯率`;
+  };
+  const groupUnit = group.currency && group.currency !== 'TWD' ? ` ${getCurrency(group.currency).name}` : '';
+  const example = friends.length
+    ? `「晚餐 1200${groupUnit} ${friends[0].name}付的」「計程車 800${groupUnit} 我刷卡」`
+    : `「拉麵 1200${groupUnit} 刷卡」「藥妝店 5800${groupUnit} 付現」`;
+
   const submit = async (again: boolean) => {
     if (problem) return setError(problem);
     const now = new Date();
@@ -191,6 +219,15 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
 
   return (
     <>
+      {!editing && (
+        <AiEntryBar
+          accounts={payable}
+          onDraft={applyDraft}
+          context={{ members: friends.map((m) => m.name), currency: group.currency ?? 'TWD' }}
+          example={example}
+        />
+      )}
+
       {currencyChoices.length > 1 && (
         <Field label="幣別">
           <Pills items={currencyChoices.map((c) => ({ id: c, label: `${getCurrency(c).name} ${c}` }))} value={currency} onPick={switchCurrency} label="幣別" />
@@ -232,8 +269,12 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
         )}
       </Field>
 
-      <Field label="品項" htmlFor="split-title">
-        <input id="split-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} placeholder="例如：午餐・野菜鍋" autoComplete="off" className="field-input" />
+      <Field label="品項與日期" htmlFor="split-title">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <input id="split-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} placeholder="例如：午餐・野菜鍋" autoComplete="off" className="field-input" />
+          <label className="sr-only" htmlFor="split-date">日期</label>
+          <input id="split-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input w-[150px] px-3" />
+        </div>
         <Pills items={categoriesFor('EXPENSE').map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
       </Field>
 

@@ -4,7 +4,7 @@ import { Camera, Keyboard, Mic, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { requestDraft, shrinkImage } from '@/lib/ai-client';
-import type { AiDraftTransaction, DraftSource } from '@/lib/ai-draft';
+import type { AiDraftTransaction, DraftContext, DraftSource } from '@/lib/ai-draft';
 import type { Account } from '@/lib/types';
 import { canRecord, useRecorder } from '@/lib/use-recorder';
 
@@ -15,7 +15,7 @@ type Phase =
   | { kind: 'idle' }
   | { kind: 'typing' }
   | { kind: 'working'; source: DraftSource }
-  | { kind: 'done'; source: DraftSource; draft: AiDraftTransaction }
+  | { kind: 'done'; source: DraftSource; draft: AiDraftTransaction; note?: string }
   | { kind: 'error'; source: DraftSource; message: string };
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -23,8 +23,16 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 /**
  * 記一筆上方的 AI 入口：說一句、拍收據（不能錄音的瀏覽器改成打一句）。
  * 辨識結果交給 onDraft 填進下面的表單，使用者檢查後按「記下」才會寫入。
+ * onDraft 可以回傳一句補充說明（例如外幣換算），顯示在草稿說明裡。
+ * 分帳、旅程帶 context（成員與幣別），AI 才認得「小明付的」和當地貨幣。
  */
-export function AiEntryBar({ accounts, onDraft }: { accounts: Account[]; onDraft: (draft: AiDraftTransaction) => void }) {
+export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉麵 260 刷國泰」「昨天全聯 389 付現」' }: {
+  accounts: Account[];
+  onDraft: (draft: AiDraftTransaction) => string | void;
+  context?: DraftContext;
+  /** 錄音時的說法範例 */
+  example?: string;
+}) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [text, setText] = useState('');
   const [voiceOk] = useState(canRecord);
@@ -46,9 +54,9 @@ export function AiEntryBar({ accounts, onDraft }: { accounts: Account[]; onDraft
     request.current = controller;
     setPhase({ kind: 'working', source });
     try {
-      const draft = await requestDraft({ source, accounts, signal: controller.signal, ...input });
-      onDraft(draft);
-      setPhase({ kind: 'done', source, draft });
+      const draft = await requestDraft({ source, accounts, context, signal: controller.signal, ...input });
+      const note = onDraft(draft) || undefined;
+      setPhase({ kind: 'done', source, draft, note });
     } catch (e) {
       if (controller.signal.aborted) return;
       setPhase({ kind: 'error', source, message: e instanceof Error ? e.message : 'AI 辨識失敗，請再試一次' });
@@ -115,7 +123,7 @@ export function AiEntryBar({ accounts, onDraft }: { accounts: Account[]; onDraft
           <span role="status">{recorder.state === 'starting' ? '準備麥克風…' : '聆聽中'}</span>
           <span aria-hidden className="num ml-auto text-body-s text-muted">{clock(recorder.seconds)}{left <= 10 ? `・剩 ${left} 秒` : ''}</span>
         </div>
-        <p className="caption leading-[1.8]">說出品項、金額和付款方式，例如「午餐拉麵 260 刷國泰」「昨天全聯 389 付現」。</p>
+        <p className="caption leading-[1.8]">說出品項、金額和付款方式，例如{example}。</p>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={recorder.cancel} className="btn-secondary press">取消</button>
           <button type="button" onClick={recorder.stop} autoFocus className="btn-secondary press border-primary bg-primary text-on-primary">
@@ -211,6 +219,7 @@ export function AiEntryBar({ accounts, onDraft }: { accounts: Account[]; onDraft
             <Sparkles size={14} strokeWidth={1.5} aria-hidden />AI 已填好下面的欄位，確認後按「記下」
           </span>
           {draft.rawInput && <p className="text-body-s leading-[1.8]">「{draft.rawInput}」</p>}
+          {phase.note && <p className="caption leading-[1.8]">{phase.note}</p>}
           {(draft.confidence < LOW_CONFIDENCE || !draft.suggestedAmount) && (
             <p className="caption text-warn-fg">
               {draft.suggestedAmount ? '有些地方不太確定，請檢查金額、分類和帳戶。' : '沒有聽到金額，請用下面的鍵盤輸入。'}

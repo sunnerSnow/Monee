@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plane, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCreateSplitGroup, useSplitGroups } from '@/lib/data';
@@ -29,6 +29,7 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
   const { data: groups = [], isPending } = useSplitGroups();
   const create = useCreateSplitGroup();
   const showToast = useUi((s) => s.showToast);
+  const openSheet = useUi((s) => s.openSheet);
   const ordered = [...groups.filter((g) => !isSettled(g)), ...groups.filter(isSettled)];
   const [groupId, setGroupId] = useState<string | null>(defaultGroupId ?? null);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -71,6 +72,10 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
           ))}
           <button type="button" aria-pressed={showQuick} onClick={() => setQuickOpen(true)} className="pill press">
             <Plus size={16} strokeWidth={1.5} aria-hidden />新群組
+          </button>
+          {/* 旅程要填日期、幣別，改開建立旅程的面板；建好會直接到旅程頁 */}
+          <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupKind: 'trip' })} aria-haspopup="dialog" className="pill press">
+            <Plane size={16} strokeWidth={1.5} aria-hidden />新旅程
           </button>
         </div>
       </Field>

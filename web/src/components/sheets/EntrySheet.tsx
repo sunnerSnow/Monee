@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, getCategory } from '@/lib/categories';
-import { useAccounts, useAddTransaction, useDeleteTransaction, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
+import { formatForeign, getCurrency, toTwd, twdPerUnit } from '@/lib/currency';
+import { useAccounts, useAddTransaction, useDeleteTransaction, useFxRates, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
 import { activeTrip } from '@/lib/split';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
@@ -60,6 +61,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { data: groups = [] } = useSplitGroups();
+  const fx = useFxRates();
   // 旅程期間打開記一筆：直接記到這趟旅程（可以關掉分帳開關改記一般支出）
   const trip = editing ? undefined : activeTrip(groups, toISODate(new Date()));
   const [splitOff, setSplitOff] = useState(false);
@@ -103,14 +105,28 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   // AI 草稿只是先幫忙填欄位；沒提到的帳戶沿用目前選的，使用者檢查後按「記下」才寫入
   const applyDraft = (d: AiDraftTransaction) => {
     const from = d.suggestedAccountId ?? sourceId;
+    // 一般記帳只記台幣：外幣收據用今天的參考匯率換成台幣，原幣金額寫進備註
+    let twd = d.suggestedAmount;
+    let hint: string | undefined;
+    let draftNote = d.suggestedNote;
+    if (d.suggestedCurrency !== 'TWD' && d.suggestedAmount) {
+      const original = formatForeign(d.suggestedAmount, d.suggestedCurrency);
+      const rate = twdPerUnit(fx.data, d.suggestedCurrency);
+      twd = rate ? toTwd(d.suggestedAmount, rate) : 0;
+      draftNote = `${draftNote}（${original}）`;
+      hint = rate
+        ? `${getCurrency(d.suggestedCurrency).name} ${original} 用今天的參考匯率換成台幣，可以改成實際刷卡的金額`
+        : `${getCurrency(d.suggestedCurrency).name} ${original}，匯率暫時拿不到，請自己輸入台幣金額`;
+    }
     setType(d.suggestedType);
-    setAmount(d.suggestedAmount ? String(d.suggestedAmount) : '');
+    setAmount(twd ? String(twd) : '');
     setCategoryId(d.suggestedCategoryId);
     if (d.suggestedAccountId) setSource(d.suggestedAccountId);
     setTarget(d.suggestedTargetAccountId && d.suggestedTargetAccountId !== from ? d.suggestedTargetAccountId : '');
-    setNote(d.suggestedNote);
+    setNote(draftNote);
     setDate(d.suggestedDate);
     setError('');
+    return hint;
   };
 
   const applyQuick = (t: Transaction) => {
