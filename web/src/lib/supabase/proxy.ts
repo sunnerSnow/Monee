@@ -37,6 +37,8 @@ export async function updateSession(request: NextRequest) {
     return redirect;
   };
 
+  // API 是給前端 fetch 用的，未登入回 401，導到登入頁的話前端只會拿到一頁 HTML
+  if (!signedIn && pathname.startsWith('/api/')) return NextResponse.json({ error: '登入已過期，請重新登入' }, { status: 401 });
   if (!signedIn && !isPublic) return redirectTo('/login');
   if (signedIn && pathname === '/login') return redirectTo('/');
   return response;

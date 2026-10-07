@@ -1,7 +1,8 @@
 'use client';
 
-import { Delete, Sparkles, Trash2 } from 'lucide-react';
+import { Delete, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, getCategory } from '@/lib/categories';
 import { useAccounts, useAddTransaction, useDeleteTransaction, useTransactions, useUpdateTransaction } from '@/lib/data';
@@ -11,6 +12,7 @@ import type { Transaction, TransactionType } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { Sheet, SheetHeader } from '../Sheet';
 import { EmptyBox } from '../ui';
+import { AiEntryBar } from './AiEntryBar';
 
 const TYPES: [TransactionType, string][] = [['EXPENSE', '支出'], ['INCOME', '收入'], ['TRANSFER', '轉帳']];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0', 'del'] as const;
@@ -75,6 +77,19 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     setError('');
     if (key === 'del') return setAmount((a) => a.slice(0, -1));
     setAmount((a) => (a.length >= 8 || (a === '' && key.startsWith('0')) ? a : a + key));
+  };
+
+  // AI 草稿只是先幫忙填欄位；沒提到的帳戶沿用目前選的，使用者檢查後按「記下」才寫入
+  const applyDraft = (d: AiDraftTransaction) => {
+    const from = d.suggestedAccountId ?? sourceId;
+    setType(d.suggestedType);
+    setAmount(d.suggestedAmount ? String(d.suggestedAmount) : '');
+    setCategoryId(d.suggestedCategoryId);
+    if (d.suggestedAccountId) setSource(d.suggestedAccountId);
+    setTarget(d.suggestedTargetAccountId && d.suggestedTargetAccountId !== from ? d.suggestedTargetAccountId : '');
+    setNote(d.suggestedNote);
+    setDate(d.suggestedDate);
+    setError('');
   };
 
   const applyQuick = (t: Transaction) => {
@@ -152,11 +167,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   return (
     <>
       {header}
-      {!editing && (
-        <p className="caption -mt-2.5 flex items-center gap-1.5">
-          <Sparkles size={14} strokeWidth={1.5} aria-hidden />語音與拍收據記帳即將推出
-        </p>
-      )}
+      {!editing && <AiEntryBar accounts={accounts} onDraft={applyDraft} />}
 
       {chips(TYPES.map(([id, label]) => ({ id, label })), type, (id) => switchType(id as TransactionType), '類型')}
 
