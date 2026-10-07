@@ -134,6 +134,29 @@
   .empty-box { display: flex; flex-direction: column; gap: 6px; padding: 18px var(--space-5); border-radius: var(--radius-lg); border: 1px dashed var(--dash); }
 
   .skeleton { border-radius: var(--radius-lg); background: var(--fill); animation: pulse 1.4s ease-in-out infinite; }
+
+  /* 分帳：朋友只有名字，用一個字當頭像；你自己是招牌黃 */
+  .av {
+    flex: none; width: 32px; height: 32px; border-radius: var(--radius-pill);
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--fill); color: var(--text); font-size: 13px; font-weight: var(--fw-medium); letter-spacing: 0;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  .av.me { background: var(--yellow); color: var(--ink); }
+  .avs { display: flex; }
+  .avs .av + .av { margin-left: -8px; }
+  .seg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--radius-pill); background: var(--fill); }
+  .seg-tabs button { min-height: 40px; border-radius: var(--radius-pill); font-size: var(--fs-body-s); letter-spacing: .1em; color: var(--text-2); }
+  .seg-tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: var(--fw-medium); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+  .check-btn {
+    flex: none; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface);
+    display: inline-flex; align-items: center; justify-content: center; color: transparent;
+  }
+  .check-btn[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+  .switch { position: relative; flex: none; width: 52px; height: 32px; border-radius: var(--radius-pill); background: var(--line-strong); transition: background var(--dur-press) ease-out; }
+  .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); transition: transform var(--dur-press) var(--ease-out); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+  .switch[aria-checked="true"] { background: var(--primary); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-primary); }
 }
 
 @keyframes flash { from { background: rgba(254, 217, 0, .4); } to { background: transparent; } }
@@ -144,4 +167,5 @@
 @media (prefers-reduced-motion: reduce) {
   .press:active:not(:disabled) { transform: none; }
   .row.flash, .skeleton { animation: none; }
+  .switch, .switch::after { transition: none; }
 }

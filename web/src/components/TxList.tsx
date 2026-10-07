@@ -1,6 +1,6 @@
 'use client';
 
-import { groupByDay } from '@/lib/budget';
+import { groupByDay, visibleTransactions } from '@/lib/budget';
 import { getCategory } from '@/lib/categories';
 import { dayLabel } from '@/lib/dates';
 import { money, transactionAmount } from '@/lib/money';
@@ -19,7 +19,7 @@ export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, A
   // 最重要的資訊放副標題最前面，太長時被省略的是後面
   const sub = t.type === 'TRANSFER'
     ? `不算支出 · ${from} → ${to}`
-    : [category.name, from, t.time].filter(Boolean).join(' · ');
+    : [category.name, t.splitExpenseId ? '分帳' : null, from, t.time].filter(Boolean).join(' · ');
   const tone = t.type === 'INCOME' ? 'in' : t.type === 'TRANSFER' ? 'tr' : '';
 
   return (
@@ -50,7 +50,7 @@ export function TxGroups({ txs, accounts, today, variant }: {
 }) {
   const hidden = useUi((s) => s.hidden);
   const byId = new Map(accounts.map((a) => [a.id, a]));
-  const groups = groupByDay(txs);
+  const groups = groupByDay(visibleTransactions(txs));
 
   if (variant === 'inline') {
     return (

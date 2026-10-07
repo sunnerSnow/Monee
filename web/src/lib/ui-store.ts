@@ -8,6 +8,12 @@ export type SheetState =
   | { kind: 'transaction'; id: string }
   | { kind: 'account' }
   | { kind: 'reconcile'; accountId: string }
+  // 分帳
+  | { kind: 'splitExpense'; groupId: string; expenseId?: string }
+  | { kind: 'splitDetail'; groupId: string; expenseId: string }
+  | { kind: 'splitSettle'; groupId: string; fromId: string; toId: string; amount: number }
+  | { kind: 'splitGroup'; groupId?: string }
+  | { kind: 'splitRound'; groupId: string; roundId: string }
   | null;
 
 /** layout.tsx 的行內腳本也讀這個 key，兩邊要一致 */

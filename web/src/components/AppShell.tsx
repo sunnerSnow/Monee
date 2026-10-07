@@ -8,6 +8,7 @@ import { Toast } from './Toast';
 import { AccountSheet } from './sheets/AccountSheet';
 import { EntrySheet } from './sheets/EntrySheet';
 import { ReconcileSheet } from './sheets/ReconcileSheet';
+import { SplitSheets } from './split/SplitSheets';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const sheetOpen = useUi((s) => s.sheet !== null);
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <EntrySheet />
       <AccountSheet />
       <ReconcileSheet />
+      <SplitSheets />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, Eye, EyeOff, Info, Landmark, CreditCard, TrendingUp } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, CreditCard, Eye, EyeOff, Info, Landmark, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
 import { accountSummary, budgetFor, budgetPace, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
 import { useAccounts, useBudgets, useTransactions } from '@/lib/data';
@@ -172,6 +172,15 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
               {assets.liquid.length > 0 && <SummaryRow icon={<Landmark size={20} strokeWidth={1.5} />} title="現金與存款" sub={assets.liquid.map((a) => a.name).join('・')} amount={money(assets.liquidSum, hidden)} />}
               {assets.cards.length > 0 && <SummaryRow icon={<CreditCard size={20} strokeWidth={1.5} />} title="信用卡待繳" sub={assets.cards.map((a) => a.name).join('・')} amount={signedBalance(assets.cardSum, hidden)} />}
               {assets.investments.length > 0 && <SummaryRow icon={<TrendingUp size={20} strokeWidth={1.5} />} title="投資帳戶" sub={assets.investments.map((a) => a.name).join('・')} amount={money(assets.investSum, hidden)} />}
+              {assets.friends.length > 0 && (
+                <SummaryRow
+                  href="/split"
+                  icon={<Users size={20} strokeWidth={1.5} />}
+                  title="朋友往來"
+                  sub={assets.friendsSum > 0 ? '分帳・朋友欠你' : assets.friendsSum < 0 ? '分帳・你欠朋友' : '分帳・都結清了'}
+                  amount={signedBalance(assets.friendsSum, hidden)}
+                />
+              )}
             </ul>
           </div>
         </section>
@@ -180,10 +189,10 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
   );
 }
 
-function SummaryRow({ icon, title, sub, amount }: { icon: React.ReactNode; title: string; sub: string; amount: string }) {
+function SummaryRow({ icon, title, sub, amount, href = '/assets' }: { icon: React.ReactNode; title: string; sub: string; amount: string; href?: string }) {
   return (
     <li>
-      <Link href="/assets" className="row press">
+      <Link href={href} className="row press">
         <span aria-hidden className="ico">{icon}</span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-body">{title}</span>

@@ -3,7 +3,7 @@
 > 可愛輕量、懂你金流的個人生活財務助理。規格見 [`../monee_ux.md`](../monee_ux.md)，設計規範見 [`../design-system/monee/`](../design-system/monee/MASTER.md)。
 
 Phase 1（MVP）：手機網頁版的手動記帳、收支分類、內部轉帳、帳戶與校準餘額、首頁／明細／資產／報表／我的。
-Phase 2（進行中）：說一句、拍收據的 AI 記帳（Gemini 整理成草稿，確認後才寫入）。
+Phase 2（進行中）：說一句、拍收據的 AI 記帳（Gemini 整理成草稿，確認後才寫入）；跟朋友分帳（第 ① 階段：自己記、自己看）。
 
 ## 技術
 
@@ -26,7 +26,7 @@ npm run dev:demo
 ## 正式使用：接上 Supabase
 
 1. 到 [supabase.com](https://supabase.com) 建一個專案（免費方案即可）。
-2. 後台 → **SQL Editor**，依檔名順序把 [`supabase/migrations/`](supabase/migrations/) 裡的每個檔案整份貼上執行。之後新增的 migration 也要這樣手動跑一次（免費方案的 GitHub 整合不會自動套用），而且要**先跑 SQL 再部署新版程式**。
+2. 後台 → **SQL Editor**，依檔名順序把 [`supabase/migrations/`](supabase/migrations/) 裡的每個檔案整份貼上執行。之後新增的 migration 也要這樣手動跑一次（免費方案的 GitHub 整合不會自動套用），而且要**先跑 SQL 再部署新版程式**。`20261008000000_friends_account_type.sql` 要單獨執行完，再執行下一份（Postgres 規定新加的類型值要先生效）。
 3. 後台 → **Authentication → URL Configuration**：
    - Site URL：`http://localhost:3000`（上線後改成正式網址）
    - Redirect URLs 加上 `http://localhost:3000/**`
@@ -76,11 +76,13 @@ src/
   proxy.ts              每次請求更新登入 cookie，未登入導到 /login（Next 16 的 middleware）
   components/
     screens/            五個頁面＋登入頁
-    sheets/             記一筆（含 AI 入口 AiEntryBar）、新增帳戶、校準餘額三個底部面板
+    sheets/             記一筆（含 AI 入口 AiEntryBar、分帳開關）、新增帳戶、校準餘額三個底部面板
+    split/              分帳：分帳頁、群組頁、花費表單、還款與群組設定面板
   lib/
     budget.ts           今日額度、預算進度、分組、校準差額等純函式（有測試）
     ai-draft.ts         給 Gemini 的指示、回傳格式、草稿檢查（有測試）
     ai-client.ts        前端上傳（照片先縮小）；use-recorder.ts 錄音
+    split.ts            分帳的分攤、淨額、建議還款（有測試）
     data.ts             Supabase 讀寫（React Query hooks）
     demo.ts             示範模式的範例資料
     ui-store.ts         面板、提示訊息、隱藏金額、深淺色
@@ -96,6 +98,7 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 - **投資帳戶**：Phase 1 可以手動建立並轉帳進去；Phase 3 改由 Monee Invest 同步 `investment_snapshot`。
 - **點交易列可以編輯或刪除**：跟記一筆共用同一個表單；刪除要再按一次確認。
 - **＋ 打開記一筆**：上方是「說一句」「拍收據」，下方是手動輸入；最近常用的品項可以一鍵帶入。
+- **分帳**（規格見 monee_ux.md「06. 分帳」，原型見 `../prototype/split.html`）：朋友只有名字；你的帳只算你的部分，朋友欠你的錢記在系統建立的「朋友往來」帳戶（算進淨資產）。花費、還款連同個人帳的交易都由資料庫函式（`split_*`）一次寫完；全部還清時自動收進「已結清的紀錄」。分帳產生的交易只能在群組裡改，明細裡點它會帶你到群組；你先付時的「代墊」轉帳在明細收起來，只顯示你的部分。
 - **AI 只產生草稿**：辨識結果直接填進同一個表單（上方顯示 AI 聽到／看到的內容），使用者檢查後按「記下」才寫入。伺服器會再檢查一次：分類、帳戶一定是現有的，金額取整數，日期不晚於今天。不能錄音的瀏覽器會改成「打一句」。
 - **錄音直接交給 Gemini**，不用瀏覽器的語音辨識：iPhone、Android、電腦的瀏覽器都能用，一次呼叫就完成聽寫與整理。最長 30 秒。
 - **分類先固定**（`lib/categories.ts`），分類管理之後再做。
@@ -105,4 +108,5 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 
 - Phase 2：Google Sheets 匯出、資料備份、收據照片存檔（目前辨識完就丟掉）
 - Phase 3：Monee Invest 同步投資快照
+- 分帳第 ②～④ 階段：分享連結給朋友、旅程（外幣）、朋友從連結新增花費
 - 分類管理、帳戶編輯／封存、帳戶排序

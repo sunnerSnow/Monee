@@ -1,7 +1,7 @@
 'use client';
 
 import { Delete, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, getCategory } from '@/lib/categories';
@@ -11,6 +11,7 @@ import { formatMoney } from '@/lib/money';
 import type { Transaction, TransactionType } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { Sheet, SheetHeader } from '../Sheet';
+import { SplitEntryPanel, SplitLinkedNotice, SplitSwitch } from '../split/SplitInEntry';
 import { EmptyBox } from '../ui';
 import { AiEntryBar } from './AiEntryBar';
 
@@ -57,11 +58,24 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const [date, setDate] = useState(() => editing?.date ?? toISODate(new Date()));
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [splitOn, setSplitOn] = useState(false);
+  const splitToggled = useRef(false);
 
-  // 投資帳戶由 Monee Invest 同步，只能當轉入對象；編輯舊交易時保留它原本的帳戶
-  const payable = accounts.filter((a) => a.type !== 'INVESTMENT_MIRROR' || a.id === editing?.sourceAccountId);
+  // 切換分帳時畫面整個換掉，把焦點放回開關
+  useEffect(() => {
+    if (!splitToggled.current) return;
+    document.querySelector<HTMLElement>('[data-split-switch]')?.focus();
+  }, [splitOn]);
+  const toggleSplit = (on: boolean) => {
+    splitToggled.current = true;
+    setSplitOn(on);
+  };
+
+  // 朋友往來由分帳管理；投資帳戶由 Monee Invest 同步，只能當轉入對象；編輯舊交易時保留它原本的帳戶
+  const usable = accounts.filter((a) => a.type !== 'FRIENDS');
+  const payable = usable.filter((a) => a.type !== 'INVESTMENT_MIRROR' || a.id === editing?.sourceAccountId);
   const sourceId = source || payable[0]?.id || '';
-  const targets = accounts.filter((a) => a.id !== sourceId);
+  const targets = usable.filter((a) => a.id !== sourceId);
   const value = Number(amount) || 0;
   const quick = editing ? [] : frequentEntries(txs);
   const busy = add.isPending || update.isPending || remove.isPending;
@@ -142,6 +156,10 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     ? <SheetHeader id="entry-title" title="編輯交易" en="Edit" onClose={onClose} />
     : <SheetHeader id="entry-title" title="記一筆" en="New entry" onClose={onClose} />;
 
+  if (editing?.splitExpenseId || editing?.splitSettlementId) {
+    return <>{header}<SplitLinkedNotice t={editing} onClose={onClose} /></>;
+  }
+
   if (!isPending && payable.length === 0) {
     return (
       <>
@@ -164,10 +182,21 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     </div>
   );
 
+  if (splitOn) {
+    return (
+      <>
+        {header}
+        <SplitSwitch on onChange={toggleSplit} />
+        <SplitEntryPanel initial={{ amount, title: note, categoryId, date }} onDone={onClose} />
+      </>
+    );
+  }
+
   return (
     <>
       {header}
-      {!editing && <AiEntryBar accounts={accounts} onDraft={applyDraft} />}
+      {!editing && <AiEntryBar accounts={usable} onDraft={applyDraft} />}
+      {!editing && type === 'EXPENSE' && <SplitSwitch on={false} onChange={toggleSplit} />}
 
       {chips(TYPES.map(([id, label]) => ({ id, label })), type, (id) => switchType(id as TransactionType), '類型')}
 

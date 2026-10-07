@@ -96,6 +96,15 @@ export const sortNewestFirst = (txs: Transaction[]) =>
   [...txs].sort((a, b) =>
     `${b.date} ${b.time ?? ''} ${b.createdAt}`.localeCompare(`${a.date} ${a.time ?? ''} ${a.createdAt}`));
 
+/**
+ * 列表要顯示的交易：分帳時你先付，會有「支出（你的部分）」和「代墊轉帳」兩筆；
+ * 代墊那筆收起來，只留支出那筆（你沒有參與時只有代墊，就照常顯示）。
+ */
+export function visibleTransactions(txs: Transaction[]) {
+  const withExpense = new Set(txs.filter((t) => t.type === 'EXPENSE' && t.splitExpenseId).map((t) => t.splitExpenseId));
+  return txs.filter((t) => !(t.type === 'TRANSFER' && t.splitExpenseId && withExpense.has(t.splitExpenseId)));
+}
+
 export function groupByDay(txs: Transaction[]) {
   const groups = new Map<string, Transaction[]>();
   sortNewestFirst(txs).forEach((t) => {
@@ -114,12 +123,16 @@ export function accountSummary(accounts: Account[]) {
   const liquid = accounts.filter((a) => a.type === 'CASH' || a.type === 'BANK');
   const cards = accounts.filter((a) => a.type === 'CREDIT_CARD');
   const investments = accounts.filter((a) => a.type === 'INVESTMENT_MIRROR');
+  // 朋友往來：正數是朋友欠你（資產），負數是你欠朋友（負債）
+  const friends = accounts.filter((a) => a.type === 'FRIENDS');
   const total = (list: Account[]) => list.reduce((s, a) => s + a.currentBalance, 0);
   const liquidSum = total(liquid);
   const cardSum = total(cards);
   const investSum = total(investments);
-  const assets = liquidSum + investSum;
-  return { liquid, cards, investments, liquidSum, cardSum, investSum, assets, net: assets + cardSum };
+  const friendsSum = total(friends);
+  const assets = liquidSum + investSum + Math.max(friendsSum, 0);
+  const liabilities = cardSum + Math.min(friendsSum, 0);
+  return { liquid, cards, investments, friends, liquidSum, cardSum, investSum, friendsSum, assets, liabilities, net: assets + liabilities };
 }
 
 /** 校準：實際餘額與紀錄的差額。信用卡輸入的是待繳金額（正數）。 */

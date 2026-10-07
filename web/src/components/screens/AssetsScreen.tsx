@@ -1,11 +1,14 @@
 'use client';
 
-import { CreditCard, Info, Landmark, Plus, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowRight, CreditCard, Info, Landmark, Plus, TrendingUp, Users, Wallet, type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
 import { accountSummary } from '@/lib/budget';
-import { useAccounts, useProfile } from '@/lib/data';
+import { useAccounts, useProfile, useSplitGroups } from '@/lib/data';
+import { isSettled, myNet } from '@/lib/split';
 import { formatMoney, money, signedBalance } from '@/lib/money';
-import type { Account, PnlColor } from '@/lib/types';
+import type { Account, PnlColor, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
+import { Avatars, OweText } from '../split/parts';
 import { BigMoney, EmptyBox, ErrorBox, LoadingBlocks, PageHeader, useHidden } from '../ui';
 
 const ICONS: Record<Account['type'], LucideIcon> = {
@@ -13,6 +16,7 @@ const ICONS: Record<Account['type'], LucideIcon> = {
   BANK: Landmark,
   CREDIT_CARD: CreditCard,
   INVESTMENT_MIRROR: TrendingUp,
+  FRIENDS: Users,
 };
 
 const reconciledLabel = (a: Account) => {
@@ -24,6 +28,7 @@ const reconciledLabel = (a: Account) => {
 export function AssetsScreen() {
   const accountsQ = useAccounts();
   const profileQ = useProfile();
+  const splitQ = useSplitGroups();
   const hidden = useHidden();
   const openSheet = useUi((s) => s.openSheet);
 
@@ -97,18 +102,62 @@ export function AssetsScreen() {
             <span className="caption">資產</span><span className="num text-[16px]">{money(s.assets, hidden)}</span>
           </div>
           <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3">
-            <span className="caption">負債</span><span className="num text-[16px]">{signedBalance(s.cardSum, hidden)}</span>
+            <span className="caption">負債</span><span className="num text-[16px]">{signedBalance(s.liabilities, hidden)}</span>
           </div>
         </div>
       </section>
       {group('g-liquid', '現金與銀行', s.liquid, s.liquidSum)}
       {group('g-cards', '信用卡待繳', s.cards, s.cardSum)}
       {group('g-invest', '投資帳戶', s.investments, s.investSum)}
+      <FriendsSection groups={splitQ.data ?? []} balance={s.friendsSum} hidden={hidden} />
       <p className="flex items-start gap-2 px-1 text-caption leading-[1.7] text-muted">
         <Info size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 flex-none" />
         <span>點帳戶可以校準餘額。轉進投資帳戶的錢會記成「轉帳」，不會算進生活支出。</span>
       </p>
       {addButton}
     </>
+  );
+}
+
+/** 朋友往來：分帳的入口。列出還沒結清的群組，結清的收在分帳頁 */
+function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; balance: number; hidden: boolean }) {
+  const open = groups.filter((g) => !isSettled(g));
+  const settled = groups.length - open.length;
+  return (
+    <section aria-labelledby="g-friends" className="flex flex-col gap-2">
+      <h2 id="g-friends" className="flex items-baseline justify-between px-1 text-body-s font-normal tracking-[.1em] text-muted">
+        <span>朋友往來</span><span className="num">{signedBalance(balance, hidden)}</span>
+      </h2>
+      <ul className="card py-1">
+        {open.length ? open.map((g) => (
+          <li key={g.id}>
+            <Link href={`/split/${g.id}`} className="row press">
+              <Avatars members={g.members.filter((m) => !m.isMe)} max={3} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-body">{g.name}</span>
+                <span className="truncate text-caption tracking-[.06em] text-muted">{g.kind === 'event' ? '活動・旅程' : '日常'}・{g.members.length} 人</span>
+              </span>
+              <OweText value={myNet(g)} hidden={hidden} />
+            </Link>
+          </li>
+        )) : (
+          <li>
+            <Link href="/split" className="row press">
+              <span aria-hidden className="ico"><Users size={20} strokeWidth={1.5} /></span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-body">{groups.length ? '都結清了' : '跟朋友分帳'}</span>
+                <span className="truncate text-caption tracking-[.06em] text-muted">{groups.length ? '有新的一起付的花費，到分帳頁記' : '誰先付都能記，你的帳只算你的部分'}</span>
+              </span>
+              <ArrowRight size={18} strokeWidth={1.5} aria-hidden className="text-muted" />
+            </Link>
+          </li>
+        )}
+      </ul>
+      {groups.length > 0 && (
+        <Link href="/split" className="press inline-flex min-h-11 items-center gap-1 self-end px-1 text-body-s tracking-[.08em]">
+          {settled ? `已結清 ${settled} 個・` : ''}全部分帳<ArrowRight size={16} strokeWidth={1.5} aria-hidden />
+        </Link>
+      )}
+    </section>
   );
 }

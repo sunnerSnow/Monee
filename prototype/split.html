@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monee 分帳原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend+Exa:wght@200;300;400&family=Noto+Sans+TC:wght@400;500&display=swap">
+<link rel="stylesheet" href="../design-system/monee/tokens.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="split.css">
+</head>
+<body>
+
+<!-- 左：你的 Monee App -->
+<figure class="device">
+  <figcaption class="device-cap"><b>你的 Monee</b>（Yuki）</figcaption>
+  <div class="phone" id="me">
+    <main class="scroll" data-role="scroll" aria-label="你的 Monee"></main>
+    <nav class="nav" data-role="nav" aria-label="主選單"></nav>
+    <div class="toast" data-role="toast" role="status" aria-live="polite"></div>
+    <button type="button" class="scrim" data-action="close-sheet" tabindex="-1" aria-label="關閉面板"></button>
+    <section class="sheet" data-role="sheet" role="dialog" aria-modal="true" aria-labelledby="me-sheet-title" inert></section>
+  </div>
+</figure>
+
+<!-- 中：朋友點 LINE 連結後看到的網頁（不用下載、不用註冊） -->
+<figure class="device">
+  <figcaption class="device-cap"><b>朋友收到的連結</b>（手機瀏覽器）</figcaption>
+  <div class="phone" id="friend">
+    <div class="browser-bar" aria-hidden="true"><span class="url">monee.app/s/8fK2x9Qa</span></div>
+    <main class="scroll with-bar" data-role="scroll" aria-label="朋友看到的分帳頁"></main>
+    <div class="toast" data-role="toast" role="status" aria-live="polite"></div>
+    <button type="button" class="scrim" data-action="close-sheet" tabindex="-1" aria-label="關閉面板"></button>
+    <section class="sheet" data-role="sheet" role="dialog" aria-modal="true" aria-labelledby="friend-sheet-title" inert></section>
+  </div>
+</figure>
+
+<aside class="panel" aria-labelledby="panel-title">
+  <h1 id="panel-title"><span class="en">Split</span>分帳互動原型</h1>
+  <p class="panel-sub">左邊是你的 App，右邊是朋友點 LINE 連結看到的網頁，兩邊會連動。</p>
+
+  <fieldset class="field-set">
+    <legend>外觀</legend>
+    <div class="seg">
+      <label><input type="radio" name="theme" value="light" checked><span>淺色</span></label>
+      <label><input type="radio" name="theme" value="dark"><span>深色</span></label>
+    </div>
+  </fieldset>
+
+  <section aria-labelledby="try-title">
+    <h2 id="try-title">可以試試</h2>
+    <ol class="try">
+      <li>左邊「資產」最下面的<b>朋友往來</b>，點進「週六陽明山」：一天 6 筆、4 個人輪流先付，看<b>結算</b>怎麼算出最少轉帳</li>
+      <li>點任一筆花費，看它怎麼記進你的帳（你的部分算支出、代墊算朋友欠你）</li>
+      <li><b>新增花費</b>：試試改成「小明付」、「指定金額」、「份數」，以及<b>記下並再記一筆</b></li>
+      <li>右邊選「阿美」→ 按<b>我已付款</b> → 回左邊看「待確認」</li>
+      <li>右邊用朋友身分<b>新增一筆</b>（朋友先付）→ 左邊也會跳出待確認</li>
+      <li>底部 ＋ 記一筆，打開<b>分帳</b>開關</li>
+      <li>「室友」結算 → 記錄阿凱還的錢 → 花費<b>自動收進已結清的紀錄</b>；再到底部「明細」看，每一筆都還在</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="where-title">
+    <h2 id="where-title">從哪裡建立、編輯</h2>
+    <ul>
+      <li><b>建立</b>：分帳頁「建立群組」；或記一筆 → 分帳 → <b>＋ 新群組</b>，當場輸入朋友名字（只跟一個人分也行）</li>
+      <li><b>編輯</b>：群組右上角 <b>⋯</b> → 改名、加人、改成員名字、誰能新增花費</li>
+      <li><b>結清自動收起</b>：全部還清時，那段花費收進「已結清的紀錄」，群組移到列表最下面的「已結清」；有新花費就回到上面。明細裡每一筆都還在</li>
+      <li><b>刪除</b>：只有沒任何花費的群組能刪</li>
+      <li><b>入口</b>：資產 → 朋友往來；有待確認或還沒結清時，首頁也會出現</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="rule-title">
+    <h2 id="rule-title">設計重點</h2>
+    <ul>
+      <li>一個群組可以記很多筆、每筆不同人付；最後一起結算，不用每筆都算</li>
+      <li>你的支出只算<b>你的部分</b>；朋友欠你的錢算資產，淨資產永遠正確</li>
+      <li>朋友只用名字，不用帳號；用連結分享，朋友只看得到這個群組</li>
+      <li>朋友新增或說已付款，都要你按確認才寫進你的帳</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="phase-title">
+    <h2 id="phase-title">建議分階段</h2>
+    <ul>
+      <li>① 分帳記帳＋朋友往來＋結算</li>
+      <li>② 分享連結：朋友看帳、說已付款</li>
+      <li>③ 旅程：日期、外幣、匯率</li>
+      <li>④ 朋友從連結新增花費</li>
+    </ul>
+  </section>
+
+  <button type="button" class="btn-secondary block press" id="reset">重設原型資料</button>
+</aside>
+
+<script src="split.js"></script>
+</body>
+</html>

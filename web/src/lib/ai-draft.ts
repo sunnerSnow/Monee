@@ -30,6 +30,7 @@ const TYPE_LABEL: Record<AccountType, string> = {
   BANK: '銀行',
   CREDIT_CARD: '信用卡',
   INVESTMENT_MIRROR: '投資帳戶，只能當轉入帳戶',
+  FRIENDS: '朋友往來，不能選',
 };
 const NONE = 'none';
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -123,7 +124,7 @@ export function sanitizeDraft(raw: unknown, { accounts, today, source }: { accou
   const categoryId = allowed.some((c) => c.id === r.categoryId) ? (r.categoryId as string) : allowed[0].id;
 
   // 投資帳戶由 Monee Invest 同步，只能當轉入對象（跟手動記帳的規則一樣）
-  const payable = accounts.filter((a) => a.type !== 'INVESTMENT_MIRROR');
+  const payable = accounts.filter((a) => a.type !== 'INVESTMENT_MIRROR' && a.type !== 'FRIENDS');
   const accountId = payable.some((a) => a.id === r.accountId) ? (r.accountId as string) : null;
   const targetAccountId = type === 'TRANSFER' && r.targetAccountId !== accountId && accounts.some((a) => a.id === r.targetAccountId)
     ? (r.targetAccountId as string)

@@ -30,7 +30,9 @@ function Tab({ href, label, icon: Icon, current }: (typeof TABS)[number] & { cur
 export function BottomNav({ inert }: { inert: boolean }) {
   const pathname = usePathname();
   const openSheet = useUi((s) => s.openSheet);
-  const isCurrent = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  // 分帳頁從資產頁進去，底部也標在資產
+  const isCurrent = (href: string) =>
+    href === '/' ? pathname === '/' : pathname.startsWith(href) || (href === '/assets' && pathname.startsWith('/split'));
 
   return (
     <nav

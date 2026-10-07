@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  accountSummary, budgetFor, budgetPace, dailyBudget, expenseByCategory, frequentEntries, groupByDay, monthTotals,
+  accountSummary, budgetFor, budgetPace, dailyBudget, expenseByCategory, frequentEntries, groupByDay, monthTotals, visibleTransactions,
   monthlyExpenses, reconcileDiff,
 } from './budget';
 import type { Account, Transaction } from './types';
@@ -160,6 +160,25 @@ describe('accountSummary', () => {
     expect(s.liquidSum).toBe(245600);
     expect(s.assets).toBe(398600);
     expect(s.net).toBe(386240);
+  });
+  it('朋友往來：朋友欠你算資產、你欠朋友算負債，都算進淨資產', () => {
+    const owed = accountSummary([account({ type: 'BANK', currentBalance: 1000 }), account({ type: 'FRIENDS', currentBalance: 730 })]);
+    expect([owed.assets, owed.liabilities, owed.net]).toEqual([1730, 0, 1730]);
+    const owe = accountSummary([account({ type: 'BANK', currentBalance: 1000 }), account({ type: 'FRIENDS', currentBalance: -170 })]);
+    expect([owe.assets, owe.liabilities, owe.net]).toEqual([1000, -170, 830]);
+  });
+});
+
+describe('visibleTransactions', () => {
+  it('分帳你先付：代墊轉帳收起來，只留支出；你沒參與時代墊照常顯示', () => {
+    const base = { date: '2026-10-03', time: null, categoryId: 'food', sourceAccountId: 'card', note: null, createdAt: '' };
+    const txs = [
+      { ...base, id: 'a', type: 'EXPENSE' as const, amount: 520, targetAccountId: null, splitExpenseId: 'e1' },
+      { ...base, id: 'b', type: 'TRANSFER' as const, amount: 1320, targetAccountId: 'friends', splitExpenseId: 'e1' },
+      { ...base, id: 'c', type: 'TRANSFER' as const, amount: 900, targetAccountId: 'friends', splitExpenseId: 'e2' },
+      { ...base, id: 'd', type: 'TRANSFER' as const, amount: 550, targetAccountId: 'bank', splitSettlementId: 's1' },
+    ];
+    expect(visibleTransactions(txs).map((t) => t.id)).toEqual(['a', 'c', 'd']);
   });
 });
 
