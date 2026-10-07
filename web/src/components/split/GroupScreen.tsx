@@ -8,7 +8,7 @@ import { getCategory } from '@/lib/categories';
 import { useAccounts, useDeleteSettlement, useSplitGroups } from '@/lib/data';
 import { dayLabel } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
-import { balances, meOf, memberName, modeText, myShare, openExpenses, openSettlements, suggestTransfers } from '@/lib/split';
+import { balances, isEmptyGroup, meOf, memberName, modeText, myShare, openExpenses, openSettlements, suggestTransfers } from '@/lib/split';
 import type { SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
@@ -42,6 +42,8 @@ export function GroupScreen({ id }: { id: string }) {
   const mine = net[me.id] ?? 0;
   const list = openExpenses(g);
   const total = list.reduce((s, e) => s + e.amount, 0);
+  // 剛建好的群組還沒有花費，不是「已結清」
+  const empty = isEmptyGroup(g);
 
   return (
     <>
@@ -49,7 +51,7 @@ export function GroupScreen({ id }: { id: string }) {
       <section aria-label="你在這個群組" className="card flex flex-col gap-3 p-5">
         <span className="caption">{mine > 0 ? '朋友總共欠你' : mine < 0 ? '你總共要付' : '你在這個群組'}</span>
         <p className={`display m-0 text-display-m leading-[1.2] ${mine < 0 ? 'text-alert' : ''}`}>
-          {mine ? <><small>$</small>{hidden ? '••••' : Math.abs(mine).toLocaleString('en-US')}</> : '已結清'}
+          {mine ? <><small>$</small>{hidden ? '••••' : Math.abs(mine).toLocaleString('en-US')}</> : empty ? '還沒有花費' : '已結清'}
         </p>
         <div className="flex items-center justify-between gap-3">
           <Avatars members={g.members} />
@@ -193,6 +195,16 @@ function Settle({ g, net }: { g: SplitGroup; net: Record<string, number> }) {
       </ul>
     </section>
   );
+
+  if (!transfers.length && isEmptyGroup(g)) {
+    return (
+      <div className="card flex flex-col items-center gap-2 p-5 text-center">
+        <Image src="/monee.png" alt="" width={110} height={80} className="h-auto w-[110px]" />
+        <p className="h-sec">還沒有花費</p>
+        <p className="caption leading-[1.8]">到「花費」分頁記第一筆。記了之後，這裡會算出每個人該付多少、怎麼還最省事。</p>
+      </div>
+    );
+  }
 
   if (!transfers.length) {
     return (

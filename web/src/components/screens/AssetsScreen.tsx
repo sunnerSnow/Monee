@@ -4,7 +4,7 @@ import { ArrowRight, CreditCard, Info, Landmark, Plus, TrendingUp, Users, Wallet
 import Link from 'next/link';
 import { accountSummary } from '@/lib/budget';
 import { useAccounts, useProfile, useSplitGroups } from '@/lib/data';
-import { isSettled, myNet } from '@/lib/split';
+import { isEmptyGroup, isSettled, myNet } from '@/lib/split';
 import { formatMoney, money, signedBalance } from '@/lib/money';
 import type { Account, PnlColor, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
@@ -137,7 +137,7 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
                 <span className="truncate text-body">{g.name}</span>
                 <span className="truncate text-caption tracking-[.06em] text-muted">{g.kind === 'event' ? '活動・旅程' : '日常'}・{g.members.length} 人</span>
               </span>
-              <OweText value={myNet(g)} hidden={hidden} />
+              <OweText value={myNet(g)} hidden={hidden} empty={isEmptyGroup(g)} />
             </Link>
           </li>
         )) : (

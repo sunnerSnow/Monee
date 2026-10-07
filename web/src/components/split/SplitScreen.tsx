@@ -4,7 +4,7 @@ import { ChevronLeft, Info, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useSplitGroups } from '@/lib/data';
 import { money } from '@/lib/money';
-import { friendTotals, isSettled, myNet, openExpenses } from '@/lib/split';
+import { friendTotals, isEmptyGroup, isSettled, myNet, openExpenses } from '@/lib/split';
 import { useUi } from '@/lib/ui-store';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
 import { Avatars, OweText, shortDate } from './parts';
@@ -69,7 +69,7 @@ export function SplitScreen() {
                   <Avatars members={g.members} />
                   <span className="caption truncate">{list.length ? `未結清 ${list.length} 筆・${money(total, hidden)}` : '還沒有花費'}</span>
                 </span>
-                <OweText value={myNet(g)} hidden={hidden} />
+                {!isEmptyGroup(g) && <OweText value={myNet(g)} hidden={hidden} />}
               </span>
             </Link>
           );

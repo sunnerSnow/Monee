@@ -90,6 +90,9 @@ export function suggestTransfers(net: Record<string, number>): Transfer[] {
 /** 已結清：目前沒有未結清的花費，而且結算過（剛建好的空群組不算） */
 export const isSettled = (g: SplitGroup) => !openExpenses(g).length && g.rounds.length > 0;
 
+/** 剛建好、還沒記過任何花費的群組：不要顯示「已結清」 */
+export const isEmptyGroup = (g: SplitGroup) => g.expenses.length === 0;
+
 /** 你在這個群組的淨額 */
 export const myNet = (g: SplitGroup) => {
   const me = meOf(g);

@@ -16,8 +16,9 @@ export function Avatars({ members, max = 5 }: { members: SplitMember[]; max?: nu
   return <span aria-hidden className="avs">{members.slice(0, max).map((m) => <MemberAvatar key={m.id} member={m} />)}</span>;
 }
 
-/** 你應收／你應付／已結清 */
-export function OweText({ value, hidden, prefix = '你' }: { value: number; hidden: boolean; prefix?: string }) {
+/** 你應收／你應付／已結清；還沒有花費的群組顯示「還沒有花費」 */
+export function OweText({ value, hidden, prefix = '你', empty = false }: { value: number; hidden: boolean; prefix?: string; empty?: boolean }) {
+  if (empty) return <span className="flex-none text-caption text-muted">還沒有花費</span>;
   if (value === 0) return <span className="flex-none text-caption text-muted">已結清</span>;
   return (
     <span className={`num flex-none whitespace-nowrap text-body ${value < 0 ? 'text-alert' : ''}`}>

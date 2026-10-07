@@ -81,12 +81,24 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
     setShares({ ...shares, [k]: n });
     if (!n) setWho((prev) => { const next = new Set(prev); next.delete(k); return next; });
   };
+  const exactValue = (k: string) => parseInt(exact[k] || '0', 10) || 0;
   const switchMode = (m: SplitMode) => {
-    setMode(m);
-    // 改成指定金額時，先帶入平分的結果，改幾個數字就好
-    if (m === 'exact' && !Object.keys(exact).length && total) {
-      setExact(Object.fromEntries(Object.entries(splitAmounts('equal', total, Object.fromEntries(ids.filter((k) => who.has(k)).map((k) => [k, 1])))).map(([k, v]) => [k, String(v)])));
+    if (m === mode) return;
+    // 從指定金額切回平分／份數：沿用有填金額的人，填 0 的人就是不分
+    if (mode === 'exact') {
+      const picked = ids.filter((k) => exactValue(k) > 0);
+      if (picked.length) setWho(new Set(picked));
     }
+    // 切到指定金額：先帶入目前勾選的人平分的結果，改幾個數字就好（分的人變了就重帶）
+    if (m === 'exact' && total) {
+      const current = ids.filter((k) => exactValue(k) > 0);
+      const same = current.length === who.size && current.every((k) => who.has(k));
+      if (!same) {
+        const equal = splitAmounts('equal', total, Object.fromEntries(ids.filter((k) => who.has(k)).map((k) => [k, 1])));
+        setExact(Object.fromEntries(Object.entries(equal).map(([k, v]) => [k, String(v)])));
+      }
+    }
+    setMode(m);
   };
 
   const submit = async (again: boolean) => {
@@ -155,21 +167,33 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
             const on = mode === 'exact' ? (parseInt(exact[m.id] || '0', 10) || 0) > 0 : who.has(m.id);
             const name = memberLabel(m);
             return (
-              <li key={m.id} className={`flex min-h-14 items-center gap-3 border-t border-line px-4 py-1.5 first:border-t-0 ${on ? '' : 'text-muted'}`}>
-                {mode === 'exact'
-                  ? <MemberAvatar member={m} />
-                  : (
-                    <button type="button" aria-pressed={on} aria-label={`${name}${on ? '有' : '沒有'}分這筆`} onClick={() => toggle(m.id)} className="check-btn press">
-                      <Check size={18} strokeWidth={2} aria-hidden />
-                    </button>
-                  )}
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-body">
-                    {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}
+              <li key={m.id} className={`flex min-h-14 items-center gap-3 border-t border-line pr-4 first:border-t-0 ${on ? '' : 'text-muted'}`}>
+                {mode === 'exact' ? (
+                  <span className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-4">
+                    <MemberAvatar member={m} />
+                    <span className="truncate text-body">
+                      {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}
+                    </span>
                   </span>
-                  {mode === 'shares' && on && <span className="num text-caption text-muted">{formatMoney(amounts[m.id] ?? 0)}</span>}
-                </span>
-                {mode === 'equal' && <span className="num flex-none text-body">{on ? formatMoney(amounts[m.id] ?? 0) : '不分'}</span>}
+                ) : (
+                  // 整列都能點（不只左邊的圓圈），手機上比較好按
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={`${name}${on ? '有' : '沒有'}分這筆${mode === 'equal' && on ? `，${formatMoney(amounts[m.id] ?? 0)}` : ''}`}
+                    onClick={() => toggle(m.id)}
+                    className="press flex min-h-14 min-w-0 flex-1 items-center gap-3 py-1.5 pl-4 text-left"
+                  >
+                    <span aria-hidden className={`check-btn ${on ? 'on' : ''}`}><Check size={18} strokeWidth={2} /></span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-body">
+                        {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}
+                      </span>
+                      {mode === 'shares' && on && <span className="num text-caption text-muted">{formatMoney(amounts[m.id] ?? 0)}</span>}
+                    </span>
+                    {mode === 'equal' && <span className="num flex-none text-body">{on ? formatMoney(amounts[m.id] ?? 0) : '不分'}</span>}
+                  </button>
+                )}
                 {mode === 'shares' && on && (
                   <span role="group" aria-label={`${name}的份數`} className="flex flex-none items-center gap-1">
                     <button type="button" onClick={() => step(m.id, -1)} aria-label="少一份" className="icon-btn press h-9 w-9"><Minus size={16} strokeWidth={1.5} aria-hidden /></button>
