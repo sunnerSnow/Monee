@@ -5,11 +5,12 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { getCategory } from '@/lib/categories';
 import { copyText } from '@/lib/clipboard';
+import { formatForeign } from '@/lib/currency';
 import { usePublicClaim, usePublicSplit } from '@/lib/data';
 import { formatMoney } from '@/lib/money';
-import { balances, initialOf, modeText, openExpenses, publicAsGroup, suggestTransfers, type Transfer } from '@/lib/split';
+import { balances, initialOf, modeText, openExpenses, originalShareOf, publicAsGroup, suggestTransfers, type Transfer } from '@/lib/split';
 import type { PublicSplit, SplitMember } from '@/lib/types';
-import { shortDate } from './parts';
+import { kindLabel, shortDate } from './parts';
 
 const whoKey = (token: string) => `monee-share-${token}`;
 
@@ -89,7 +90,7 @@ function PickWho({ view, onPick }: { view: PublicSplit; onPick: (id: string) => 
   return (
     <>
       <Header view={view}>
-        <span className="caption">{view.group.kind === 'event' ? '活動・旅程' : '日常'}・{view.members.length} 人・{open ? `未結清 ${open} 筆` : '都結清了'}</span>
+        <span className="caption">{kindLabel(view.group)}・{view.members.length} 人・{open ? `未結清 ${open} 筆` : '都結清了'}</span>
       </Header>
       <section aria-labelledby="who-title" className="flex flex-col gap-3">
         <h2 id="who-title" className="h-sec">你是誰？</h2>
@@ -191,9 +192,12 @@ function FriendView({ view, token, me, onSwitch }: { view: PublicSplit; token: s
                   <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-body">{e.title}</span>
-                    <span className="truncate text-caption tracking-[.06em] text-muted">{shortDate(e.date)}・{nameOf(e.payerId)}付 {formatMoney(e.amount)}・{modeText(e)}</span>
+                    <span className="truncate text-caption tracking-[.06em] text-muted">{shortDate(e.date)}・{nameOf(e.payerId)}付 {fullAmount(e)}・{modeText(e)}</span>
                   </span>
-                  <span className="num flex-none text-body">{formatMoney(e.amounts[me.id])}</span>
+                  <span className="flex flex-none flex-col items-end gap-0.5">
+                    <span className="num text-body">{shareAmount(e, me.id)}</span>
+                    {e.currency !== 'TWD' && e.originalAmount ? <span className="num text-caption text-muted">≈ {formatMoney(e.amounts[me.id])}</span> : null}
+                  </span>
                 </li>
               );
             })}
@@ -272,7 +276,20 @@ function PayCard({ view, token, me, t, toOwner, toName, onNotify }: {
   );
 }
 
-function ExpenseTable({ title, rows, nameOf }: { title: string; rows: { id: string; date: string; title: string; payerId: string; amount: number }[]; nameOf: (id: string) => string }) {
+/** 外幣花費顯示原幣（¥3,000），台幣照舊 */
+const fullAmount = (e: { amount: number; currency: string; originalAmount: number | null }) =>
+  e.currency !== 'TWD' && e.originalAmount ? formatForeign(e.originalAmount, e.currency) : formatMoney(e.amount);
+/** 某個人那份的原幣金額；台幣直接顯示 */
+const shareAmount = (e: Parameters<typeof originalShareOf>[0], memberId: string) => {
+  const v = originalShareOf(e, memberId);
+  return v === null ? formatMoney(e.amounts[memberId] ?? 0) : formatForeign(v, e.currency);
+};
+
+function ExpenseTable({ title, rows, nameOf }: {
+  title: string;
+  rows: { id: string; date: string; title: string; payerId: string; amount: number; currency: string; originalAmount: number | null }[];
+  nameOf: (id: string) => string;
+}) {
   return (
     <details className="group">
       <summary className="press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-1 text-body-s tracking-[.08em] [&::-webkit-details-marker]:hidden">
@@ -293,7 +310,7 @@ function ExpenseTable({ title, rows, nameOf }: { title: string; rows: { id: stri
               <td className="num border-b border-line px-1 py-2">{shortDate(e.date)}</td>
               <td className="border-b border-line px-1 py-2">{e.title}</td>
               <td className="border-b border-line px-1 py-2">{nameOf(e.payerId)}</td>
-              <td className="num border-b border-line px-1 py-2 text-right">{formatMoney(e.amount)}</td>
+              <td className="num border-b border-line px-1 py-2 text-right">{fullAmount(e)}</td>
             </tr>
           ))}
         </tbody>

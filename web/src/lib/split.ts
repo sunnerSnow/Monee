@@ -1,5 +1,6 @@
 // 分帳的計算：分攤、淨額、建議還款。純函式，畫面、示範模式與測試共用。
 // 資料庫的 split_balances 用同樣的規則算淨額（supabase/migrations/20261008000001_split.sql）。
+import { getCurrency, toMinor } from './currency';
 import type { PublicSplit, SplitExpense, SplitGroup, SplitMember, SplitMode, SplitSettlement } from './types';
 
 const sumOf = (list: number[]) => list.reduce((s, v) => s + v, 0);
@@ -99,10 +100,36 @@ export const waitingClaims = (g: Pick<SplitGroup, 'claims'>) => g.claims.filter(
 export function publicAsGroup(v: PublicSplit): SplitGroup {
   return {
     id: v.group.id, name: v.group.name, kind: v.group.kind, createdAt: '', shareToken: null, claims: v.claims, members: v.members, rounds: v.rounds,
-    expenses: v.expenses.map((e) => ({ ...e, amount: Number(e.amount), time: null, accountId: null, weights: {}, createdAt: '' })),
+    startDate: v.group.startDate ?? null, endDate: v.group.endDate ?? null, currency: v.group.currency ?? 'TWD', budget: null, excludeFromBudget: false,
+    expenses: v.expenses.map((e) => ({
+      ...e, amount: Number(e.amount), currency: e.currency ?? 'TWD', originalAmount: e.originalAmount != null ? Number(e.originalAmount) : null,
+      fxRate: null, time: null, accountId: null, weights: e.weights ?? {}, createdAt: '',
+    })),
     settlements: v.settlements.map((s) => ({ ...s, amount: Number(s.amount), accountId: null, createdAt: '' })),
   };
 }
+
+// ---------- 旅程 ----------
+export const isTrip = (g: Pick<SplitGroup, 'kind'>) => g.kind === 'trip';
+
+/** 今天在旅程日期內的旅程（記一筆會自動記到這裡）；有好幾個時取最晚出發的 */
+export function activeTrip(groups: SplitGroup[], today: string): SplitGroup | undefined {
+  return groups
+    .filter((g) => isTrip(g) && g.startDate && g.endDate && g.startDate <= today && today <= g.endDate)
+    .sort((a, b) => (b.startDate ?? '').localeCompare(a.startDate ?? ''))[0];
+}
+
+/** 旅程第幾天（出發那天是第 1 天）；不在旅程日期內回傳 null */
+export function tripDay(g: Pick<SplitGroup, 'startDate' | 'endDate'>, date: string): number | null {
+  if (!g.startDate || !g.endDate || date < g.startDate || date > g.endDate) return null;
+  return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${g.startDate}T00:00:00Z`)) / 86_400_000) + 1;
+}
+
+export const tripLength = (g: Pick<SplitGroup, 'startDate' | 'endDate'>) =>
+  g.startDate && g.endDate ? Math.round((Date.parse(`${g.endDate}T00:00:00Z`) - Date.parse(`${g.startDate}T00:00:00Z`)) / 86_400_000) + 1 : null;
+
+/** 旅程裡你花了多少（你的部分，含已結清的），跟旅程預算比 */
+export const myTripSpend = (g: SplitGroup) => g.expenses.reduce((s, e) => s + myShare(g, e), 0);
 
 /** 剛建好、還沒記過任何花費的群組：不要顯示「已結清」 */
 export const isEmptyGroup = (g: SplitGroup) => g.expenses.length === 0;
@@ -125,6 +152,18 @@ export function friendTotals(groups: SplitGroup[]) {
   return { recv, pay, net: recv - pay };
 }
 
+/**
+ * 外幣花費裡某個人分到的原幣金額：直接用原幣總額照同樣的權重分（¥15,400 兩人平分就是各 ¥7,700），
+ * 不從換算後的台幣反推，才不會差幾塊。台幣花費回傳 null。
+ */
+export function originalShareOf(e: Pick<SplitExpense, 'currency' | 'originalAmount' | 'amount' | 'amounts' | 'weights'>, memberId: string): number | null {
+  if (e.currency === 'TWD' || !e.originalAmount) return null;
+  const dec = getCurrency(e.currency).decimals;
+  const weights = Object.keys(e.weights ?? {}).length ? e.weights : e.amounts;
+  const minor = allocate(toMinor(e.originalAmount, dec), weights);
+  return (minor[memberId] ?? 0) / 10 ** dec;
+}
+
 /** 你在這筆花費的部分 */
 export const myShare = (g: SplitGroup, e: Pick<SplitExpense, 'amounts'>) => {
   const me = meOf(g);
@@ -140,6 +179,7 @@ export const participantCount = (e: Pick<SplitExpense, 'amounts'>) => Object.val
 
 export const modeText = (e: Pick<SplitExpense, 'amounts' | 'mode'>) => {
   const n = participantCount(e);
+  if (n === 1) return '個人花費';
   return e.mode === 'exact' ? `${n} 人指定金額` : e.mode === 'shares' ? `${n} 人依份數分` : `${n} 人平分`;
 };
 

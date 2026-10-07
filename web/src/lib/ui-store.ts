@@ -12,7 +12,7 @@ export type SheetState =
   | { kind: 'splitExpense'; groupId: string; expenseId?: string }
   | { kind: 'splitDetail'; groupId: string; expenseId: string }
   | { kind: 'splitSettle'; groupId: string; fromId: string; toId: string; amount: number }
-  | { kind: 'splitGroup'; groupId?: string }
+  | { kind: 'splitGroup'; groupId?: string; groupKind?: 'daily' | 'event' | 'trip' }
   | { kind: 'splitRound'; groupId: string; roundId: string }
   | { kind: 'splitShare'; groupId: string }
   | { kind: 'splitInbox'; groupId?: string }

@@ -1,11 +1,12 @@
 // 示範模式：NEXT_PUBLIC_MONEE_DEMO=1 時改用記憶體裡的範例資料，不連 Supabase。
 // 用途：還沒建 Supabase 專案時先試用、截圖檢查畫面。重新整理頁面就會回到初始資料。
 import { reconcileDiff } from './budget';
+import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
-import { balances, meOf, memberInvolved, openExpenses, splitAmounts } from './split';
+import { balances, meOf, memberInvolved, openExpenses, originalShareOf, splitAmounts } from './split';
 import type {
-  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, PublicSplit, SplitExpense, SplitGroup, SplitKind,
+  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, PublicSplit, SplitExpense, SplitGroup, SplitGroupInput, SplitKind,
   SplitSettlement, Transaction,
 } from './types';
 
@@ -165,29 +166,33 @@ export const demo = {
     await pause();
     return structuredClone(db().split);
   },
-  async createSplitGroup(name: string, kind: SplitKind, names: string[]) {
+  async createSplitGroup(input: SplitGroupInput, names: string[]) {
     await pause();
     const friends = [...new Set(names.map((n) => n.trim()).filter((n) => n && n !== '我'))];
-    if (!friends.length) throw new Error('至少要有一位朋友');
+    if (!friends.length && input.kind !== 'trip') throw new Error('至少要有一位朋友');
     const gid = id('g');
     db().split.unshift({
-      id: gid, name: name.trim(), kind, createdAt: new Date().toISOString(), expenses: [], settlements: [], rounds: [], shareToken: null, claims: [],
+      id: gid, name: input.name.trim(), kind: input.kind, createdAt: new Date().toISOString(), expenses: [], settlements: [], rounds: [],
+      shareToken: null, claims: [], ...tripFields(input),
       members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n) => ({ id: id('m'), name: n, isMe: false }))],
     });
     return gid;
   },
-  async updateSplitGroup(v: { groupId: string; name: string; kind: SplitKind; members: { id: string | null; name: string }[] }) {
+  async updateSplitGroup(v: SplitGroupInput & { groupId: string; members: { id: string | null; name: string }[] }) {
     await pause();
+    const s = db();
     const g = group(v.groupId);
     const keep = new Set(v.members.map((m) => m.id).filter(Boolean));
     if (g.members.some((m) => !m.isMe && !keep.has(m.id) && memberInvolved(g, m.id))) throw new Error('有花費或還款紀錄的成員不能移除，可以改名');
     const names = v.members.map((m) => m.name.trim());
     if (new Set(names).size !== names.length || names.includes('我')) throw new Error('成員名字重複了');
-    if (!names.length) throw new Error('至少要有一位朋友');
+    if (!names.length && v.kind !== 'trip') throw new Error('至少要有一位朋友');
     const me = meOf(g)!;
-    g.name = v.name.trim();
-    g.kind = v.kind;
+    Object.assign(g, { name: v.name.trim(), kind: v.kind, ...tripFields(v) });
     g.members = [me, ...v.members.map((m) => ({ id: m.id ?? id('m'), name: m.name.trim(), isMe: false }))];
+    // 改了「不算進每月預算」，已經記的支出也一起改
+    const ids = new Set(g.expenses.map((e) => e.id));
+    s.txs.forEach((t) => { if (t.type === 'EXPENSE' && t.splitExpenseId && ids.has(t.splitExpenseId)) t.excludeFromBudget = g.excludeFromBudget; });
   },
   async deleteSplitGroup(groupId: string) {
     await pause();
@@ -204,6 +209,7 @@ export const demo = {
     const fields = {
       date: e.date, time: e.time, title: e.title.trim(), categoryId: e.categoryId, amount: e.amount, payerId: e.payerId,
       accountId: e.payerId === me.id ? e.accountId : null, mode: e.mode, weights: e.weights, amounts: e.amounts,
+      currency: e.currency, originalAmount: e.currency === 'TWD' ? null : e.originalAmount, fxRate: e.currency === 'TWD' ? null : e.fxRate,
     };
     let row: SplitExpense;
     if (e.id) {
@@ -281,10 +287,12 @@ export const demo = {
     if (!g) return null;
     const p = db().profile;
     return structuredClone({
-      group: { id: g.id, name: g.name, kind: g.kind },
+      group: { id: g.id, name: g.name, kind: g.kind, startDate: g.startDate, endDate: g.endDate, currency: g.currency },
       owner: { name: p.displayName || '朋友', bank: p.payBank, line: p.payLine },
       members: g.members,
-      expenses: g.expenses.map(({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts }) => ({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts })),
+      expenses: g.expenses.map(({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts, weights, currency, originalAmount }) => ({
+        id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts, weights, currency, originalAmount,
+      })),
       settlements: g.settlements.map(({ id: sid, roundId, fromId, toId, amount, date }) => ({ id: sid, roundId, fromId, toId, amount, date })),
       rounds: g.rounds,
       claims: g.claims,
@@ -331,17 +339,25 @@ function writeExpenseTxs(s: Store, g: SplitGroup, e: SplitExpense) {
   s.txs = s.txs.filter((t) => t.splitExpenseId !== e.id);
   const me = meOf(g)!;
   const mine = e.amounts[me.id] ?? 0;
+  // 原幣金額：你的部分照同樣的權重分原幣總額，代墊的是剩下的（跟資料庫一樣）
+  const mineOriginal = originalShareOf(e, me.id);
+  const original = (part: 'mine' | 'lent') => (mineOriginal === null ? {} : {
+    currency: e.currency, originalAmount: part === 'mine' ? mineOriginal : Math.round((e.originalAmount! - mineOriginal) * 100) / 100,
+  });
+  const exclude = g.kind === 'trip' && g.excludeFromBudget;
   const base = { date: e.date, time: e.time, createdAt: e.createdAt, splitExpenseId: e.id, splitSettlementId: null, targetAccountId: null };
   if (e.payerId === me.id) {
-    if (mine > 0) s.txs.push({ ...base, id: id('t'), type: 'EXPENSE', amount: mine, categoryId: e.categoryId, sourceAccountId: e.accountId!, note: e.title });
+    if (mine > 0) {
+      s.txs.push({ ...base, ...original('mine'), id: id('t'), type: 'EXPENSE', amount: mine, categoryId: e.categoryId, sourceAccountId: e.accountId!, note: e.title, excludeFromBudget: exclude });
+    }
     if (e.amount > mine) {
       s.txs.push({
-        ...base, id: id('t'), type: 'TRANSFER', amount: e.amount - mine, categoryId: 'transfer', sourceAccountId: e.accountId!,
+        ...base, ...original('lent'), id: id('t'), type: 'TRANSFER', amount: e.amount - mine, categoryId: 'transfer', sourceAccountId: e.accountId!,
         targetAccountId: friendsAccount(s), note: `代墊・${e.title}`,
       });
     }
   } else if (mine > 0) {
-    s.txs.push({ ...base, id: id('t'), type: 'EXPENSE', amount: mine, categoryId: e.categoryId, sourceAccountId: friendsAccount(s), note: e.title });
+    s.txs.push({ ...base, ...original('mine'), id: id('t'), type: 'EXPENSE', amount: mine, categoryId: e.categoryId, sourceAccountId: friendsAccount(s), note: e.title, excludeFromBudget: exclude });
   }
 }
 
@@ -365,21 +381,35 @@ function closeIfSettled(g: SplitGroup, date: string) {
   return true;
 }
 
-type SeedOpts = { mode?: 'equal' | 'exact' | 'shares'; weights?: number[]; account?: string; roundId?: string };
+/** 旅程欄位：只有 kind = 'trip' 才保留，跟資料庫一樣 */
+function tripFields(v: SplitGroupInput) {
+  const trip = v.kind === 'trip';
+  return {
+    startDate: trip ? v.startDate : null, endDate: trip ? v.endDate : null, currency: trip ? v.currency : 'TWD',
+    budget: trip ? v.budget : null, excludeFromBudget: trip && v.excludeFromBudget,
+  };
+}
 
-/** 範例群組：一天 6 筆的出遊、每月結清的室友與午餐團、整個結清的烤肉 */
+type SeedOpts = { mode?: 'equal' | 'exact' | 'shares'; weights?: number[]; account?: string; roundId?: string; yen?: number };
+const NO_TRIP = { startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false };
+
+/** 範例群組：一天 6 筆的出遊、每月結清的室友與午餐團、整個結清的烤肉、進行中的東京旅程 */
 function seedSplit(day: (offset: number) => string): SplitGroup[] {
   const mk = (gid: string, name: string, kind: SplitKind, friends: string[], created: number): SplitGroup => ({
-    id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [], shareToken: null, claims: [],
+    id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [], shareToken: null, claims: [], ...NO_TRIP,
     members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n, i) => ({ id: `${gid}-${i}`, name: n, isMe: false }))],
   });
   const mid = (g: SplitGroup, n: string) => g.members.find((m) => m.name === n)!.id;
+  const jpy = twdPerUnit(SAMPLE_RATES, 'JPY')!;
+  // opts.yen：日圓花費，amount 用示範匯率換成台幣
   const ex = (g: SplitGroup, offset: number, time: string, title: string, categoryId: string, amount: number, payer: string, who: string[], opts: SeedOpts = {}) => {
     const mode = opts.mode ?? 'equal';
     const weights = Object.fromEntries(who.map((n, i) => [mid(g, n), opts.weights?.[i] ?? 1]));
+    const twd = opts.yen ? toTwd(opts.yen, jpy) : amount;
     g.expenses.push({
-      id: id('se'), roundId: opts.roundId ?? null, date: day(offset), time, title, categoryId, amount, payerId: mid(g, payer),
-      accountId: payer === '我' ? opts.account ?? 'cathay' : null, mode, weights, amounts: splitAmounts(mode, amount, weights),
+      id: id('se'), roundId: opts.roundId ?? null, date: day(offset), time, title, categoryId, amount: twd, payerId: mid(g, payer),
+      accountId: payer === '我' ? opts.account ?? 'cathay' : null, mode, weights, amounts: splitAmounts(mode, twd, weights),
+      currency: opts.yen ? 'JPY' : 'TWD', originalAmount: opts.yen ?? null, fxRate: opts.yen ? jpy : null,
       createdAt: `${day(offset)}T${time}:00Z`,
     });
   };
@@ -432,7 +462,16 @@ function seedSplit(day: (offset: number) => string): SplitGroup[] {
   st(bbq, 'Joy', '我', 690, 9, 'r-bbq', 'esun');
   st(bbq, '小美', '我', 330, 9, 'r-bbq', 'cash');
 
-  return [trip, room, lunch, bbq];
+  // 進行中的東京旅程：前天出發、後天回來，日圓，旅程預算 3 萬，不算進每月預算
+  const tokyo = mk('g-tokyo', '東京五日遊', 'trip', ['小明'], 10);
+  Object.assign(tokyo, { startDate: day(2), endDate: day(-2), currency: 'JPY', budget: 30000, excludeFromBudget: true });
+  ex(tokyo, 2, '13:10', '一蘭拉麵', 'food', 0, '我', ['我', '小明'], { yen: 2960 });
+  ex(tokyo, 2, '16:40', '西瓜卡儲值', 'transit', 0, '小明', ['我', '小明'], { yen: 4000 });
+  ex(tokyo, 1, '11:20', '唐吉訶德・藥妝', 'shopping', 0, '我', ['我'], { yen: 8600 });
+  ex(tokyo, 1, '19:30', '敘敘苑燒肉', 'food', 0, '小明', ['我', '小明'], { yen: 15400 });
+  ex(tokyo, 0, '09:00', '築地早餐', 'food', 0, '我', ['我', '小明'], { yen: 3200, account: 'cash' });
+
+  return [tokyo, trip, room, lunch, bbq];
 }
 
 /** 範例群組的花費與還款，也照正式版的規則寫進個人帳 */

@@ -12,12 +12,12 @@ import { Field } from './parts';
 import { SplitExpenseForm, type SplitInitial } from './SplitExpenseForm';
 
 /** 記一筆的「分帳」開關 */
-export function SplitSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+export function SplitSwitch({ on, onChange, trip }: { on: boolean; onChange: (on: boolean) => void; trip?: string }) {
   return (
     <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-1.5">
       <span className="flex flex-col gap-0.5">
-        <span className="text-body">分帳</span>
-        <span className="caption">跟朋友一起付的，只算你的部分</span>
+        <span className="text-body">{trip ? `記到旅程・${trip}` : '分帳'}</span>
+        <span className="caption">{trip ? '旅程期間會自動記到這趟旅程；關掉就記成一般支出' : '跟朋友一起付的，只算你的部分'}</span>
       </span>
       <button type="button" role="switch" aria-checked={on} aria-label="分帳" data-split-switch onClick={() => onChange(!on)} className="switch" />
     </div>
@@ -25,12 +25,12 @@ export function SplitSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
 }
 
 /** 記一筆打開分帳後：選群組（或當場建一個），再用分帳表單記 */
-export function SplitEntryPanel({ initial, onDone }: { initial: SplitInitial; onDone: () => void }) {
+export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: SplitInitial; onDone: () => void; defaultGroupId?: string }) {
   const { data: groups = [], isPending } = useSplitGroups();
   const create = useCreateSplitGroup();
   const showToast = useUi((s) => s.showToast);
   const ordered = [...groups.filter((g) => !isSettled(g)), ...groups.filter(isSettled)];
-  const [groupId, setGroupId] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState<string | null>(defaultGroupId ?? null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [names, setNames] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -45,7 +45,10 @@ export function SplitEntryPanel({ initial, onDone }: { initial: SplitInitial; on
   const createGroup = async () => {
     if (!list.length) return setError('請輸入至少一位朋友的名字');
     try {
-      const id = await create.mutateAsync({ name: groupName.trim() || defaultName, kind: 'daily', members: list });
+      const id = await create.mutateAsync({
+        name: groupName.trim() || defaultName, kind: 'daily', members: list,
+        startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false,
+      });
       setGroupId(id);
       setQuickOpen(false);
       setNames('');

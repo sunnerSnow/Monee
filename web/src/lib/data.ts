@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/
 import { reconcileDiff } from './budget';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
 import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
+import { SAMPLE_RATES, type FxRates } from './currency';
 import { demo, isDemo } from './demo';
 import { createClient } from './supabase/client';
 import type {
   Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, PnlColor, Profile, PublicSplit, SplitClaim,
-  SplitExpense, SplitGroup, SplitKind, SplitSettlement, Transaction,
+  SplitExpense, SplitGroup, SplitGroupInput, SplitKind, SplitSettlement, Transaction,
 } from './types';
 
 /** 首頁、明細與報表需要的歷史月數（含當月） */
@@ -48,6 +49,9 @@ interface TransactionRow {
   created_at: string;
   split_expense_id?: string | null;
   split_settlement_id?: string | null;
+  currency?: string | null;
+  original_amount?: number | string | null;
+  exclude_from_budget?: boolean | null;
 }
 
 const toAccount = (r: AccountRow): Account => ({
@@ -75,6 +79,9 @@ const toTransaction = (r: TransactionRow): Transaction => ({
   createdAt: r.created_at,
   splitExpenseId: r.split_expense_id ?? null,
   splitSettlementId: r.split_settlement_id ?? null,
+  currency: r.currency ?? null,
+  originalAmount: r.original_amount != null ? Number(r.original_amount) : null,
+  excludeFromBudget: Boolean(r.exclude_from_budget),
 });
 
 /** Supabase 查詢回傳 { data, error }，有錯就丟出，讓 React Query 接手錯誤狀態 */
@@ -314,12 +321,18 @@ interface SplitGroupRow {
   kind: SplitKind;
   created_at: string;
   share_token: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  currency: string | null;
+  budget: number | string | null;
+  exclude_from_budget: boolean | null;
   members: { id: string; name: string; is_me: boolean; created_at: string }[];
   claims: { id: string; from_id: string; to_id: string; amount: number | string; status: SplitClaim['status']; created_at: string }[];
   expenses: {
     id: string; round_id: string | null; date: string; time: string | null; title: string; category_id: string;
     amount: number | string; payer_id: string; account_id: string | null; mode: SplitExpense['mode'];
     weights: Record<string, number | string>; amounts: Record<string, number | string>; created_at: string;
+    currency: string | null; original_amount: number | string | null; fx_rate: number | string | null;
   }[];
   settlements: {
     id: string; round_id: string | null; from_id: string; to_id: string; amount: number | string;
@@ -336,6 +349,11 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
   kind: r.kind,
   createdAt: r.created_at,
   shareToken: r.share_token,
+  startDate: r.start_date,
+  endDate: r.end_date,
+  currency: r.currency ?? 'TWD',
+  budget: r.budget != null ? Number(r.budget) : null,
+  excludeFromBudget: Boolean(r.exclude_from_budget),
   claims: (r.claims ?? [])
     .map((c): SplitClaim => ({ id: c.id, fromId: c.from_id, toId: c.to_id, amount: Number(c.amount), status: c.status, createdAt: c.created_at }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -348,6 +366,8 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
       id: e.id, roundId: e.round_id, date: e.date, time: e.time ? e.time.slice(0, 5) : null, title: e.title, categoryId: e.category_id,
       amount: Number(e.amount), payerId: e.payer_id, accountId: e.account_id, mode: e.mode,
       weights: numbers(e.weights), amounts: numbers(e.amounts), createdAt: e.created_at,
+      currency: e.currency ?? 'TWD', originalAmount: e.original_amount != null ? Number(e.original_amount) : null,
+      fxRate: e.fx_rate != null ? Number(e.fx_rate) : null,
     }))
     .sort((a, b) => `${b.date} ${b.time ?? ''} ${b.createdAt}`.localeCompare(`${a.date} ${a.time ?? ''} ${a.createdAt}`)),
   settlements: r.settlements
@@ -369,7 +389,7 @@ export function useSplitGroups() {
       const rows = await unwrap<SplitGroupRow[]>(
         createClient()
           .from('split_groups')
-          .select('id, name, kind, created_at, share_token, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at)')
+          .select('id, name, kind, created_at, share_token, start_date, end_date, currency, budget, exclude_from_budget, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at)')
           .order('created_at', { ascending: false }),
       );
       return rows.map(toSplitGroup);
@@ -389,9 +409,12 @@ const SPLIT_TOUCHES = [keys.split, keys.transactions, keys.accounts];
 export function useCreateSplitGroup() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async ({ name, kind, members }: { name: string; kind: SplitKind; members: string[] }) => {
-      if (isDemo) return demo.createSplitGroup(name, kind, members);
-      return rpc<string>('split_create_group', { p_name: name, p_kind: kind, p_members: members });
+    mutationFn: async ({ members, ...g }: SplitGroupInput & { members: string[] }) => {
+      if (isDemo) return demo.createSplitGroup(g, members);
+      return rpc<string>('split_create_group', {
+        p_name: g.name, p_kind: g.kind, p_members: members, p_start: g.startDate, p_end: g.endDate, p_currency: g.currency,
+        p_budget: g.budget, p_exclude: g.excludeFromBudget,
+      });
     },
     onSuccess: () => invalidate(keys.split),
   });
@@ -400,11 +423,15 @@ export function useCreateSplitGroup() {
 export function useUpdateSplitGroup() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (v: { groupId: string; name: string; kind: SplitKind; members: { id: string | null; name: string }[] }) => {
+    mutationFn: async (v: SplitGroupInput & { groupId: string; members: { id: string | null; name: string }[] }) => {
       if (isDemo) return demo.updateSplitGroup(v);
-      await rpc('split_update_group', { p_group: v.groupId, p_name: v.name, p_kind: v.kind, p_members: v.members });
+      await rpc('split_update_group', {
+        p_group: v.groupId, p_name: v.name, p_kind: v.kind, p_members: v.members, p_start: v.startDate, p_end: v.endDate,
+        p_currency: v.currency, p_budget: v.budget, p_exclude: v.excludeFromBudget,
+      });
     },
-    onSuccess: () => invalidate(keys.split),
+    // 改「不算進每月預算」會一起改已記的支出
+    onSuccess: () => invalidate(keys.split, keys.transactions),
   });
 }
 
@@ -427,6 +454,7 @@ export function useSaveSplitExpense() {
       return rpc<string>('split_save_expense', {
         p_id: e.id ?? null, p_group: e.groupId, p_date: e.date, p_time: e.time, p_title: e.title, p_category: e.categoryId,
         p_amount: e.amount, p_payer: e.payerId, p_account: e.accountId, p_mode: e.mode, p_weights: e.weights, p_amounts: e.amounts,
+        p_currency: e.currency, p_original_amount: e.originalAmount, p_fx_rate: e.fxRate, p_original_shares: e.originalShares ?? null,
       });
     },
     onSuccess: () => invalidate(...SPLIT_TOUCHES),
@@ -547,5 +575,23 @@ export function usePublicClaim(token: string) {
       await rpc('split_public_claim', { p_token: token, p_from: v.fromId, p_to: v.toId, p_amount: v.amount });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['public-split', token] }),
+  });
+}
+
+// ---------- 匯率 ----------
+
+/** 1 台幣換多少外幣；6 小時內不重抓。抓不到時讓使用者自己輸入匯率 */
+export function useFxRates() {
+  return useQuery({
+    queryKey: ['fx'],
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: 1,
+    queryFn: async (): Promise<FxRates> => {
+      if (isDemo) return SAMPLE_RATES;
+      const res = await fetch('/api/fx');
+      const json = (await res.json().catch(() => null)) as (FxRates & { error?: string }) | null;
+      if (!res.ok || !json?.perTwd) throw new Error(json?.error ?? '匯率暫時拿不到');
+      return json;
+    },
   });
 }

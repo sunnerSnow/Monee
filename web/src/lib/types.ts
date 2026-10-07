@@ -42,6 +42,11 @@ export interface Transaction {
   /** 分帳產生的交易：只能從群組裡修改 */
   splitExpenseId?: string | null;
   splitSettlementId?: string | null;
+  /** 旅程的外幣花費：原幣與原幣金額（amount 是換算後的台幣） */
+  currency?: string | null;
+  originalAmount?: number | null;
+  /** 旅程設定「不算進每月預算」的支出 */
+  excludeFromBudget?: boolean;
 }
 
 export interface Profile {
@@ -58,11 +63,11 @@ export interface BudgetEntry {
   amount: number | null;
 }
 
-export type NewTransaction = Omit<Transaction, 'id' | 'createdAt' | 'splitExpenseId' | 'splitSettlementId'>;
+export type NewTransaction = Omit<Transaction, 'id' | 'createdAt' | 'splitExpenseId' | 'splitSettlementId' | 'currency' | 'originalAmount' | 'excludeFromBudget'>;
 
 // ---------- 分帳（monee_ux.md「06. 分帳」） ----------
 export type SplitMode = 'equal' | 'exact' | 'shares';
-export type SplitKind = 'daily' | 'event';
+export type SplitKind = 'daily' | 'event' | 'trip';
 
 /** 朋友只有名字；isMe 是你自己 */
 export interface SplitMember {
@@ -86,8 +91,12 @@ export interface SplitExpense {
   mode: SplitMode;
   /** 怎麼分的輸入：平分都是 1、份數、或指定金額（key 是成員 id） */
   weights: Record<string, number>;
-  /** 每個人分到的金額（key 是成員 id） */
+  /** 每個人分到的金額（key 是成員 id），一律是台幣 */
   amounts: Record<string, number>;
+  /** 外幣花費：原幣、原幣金額、當下匯率（1 單位外幣 = 多少台幣）；台幣時 originalAmount、fxRate 是 null */
+  currency: string;
+  originalAmount: number | null;
+  fxRate: number | null;
   createdAt: string;
 }
 
@@ -124,6 +133,12 @@ export interface SplitGroup {
   createdAt: string;
   /** 分享連結的 token；null 代表沒有分享 */
   shareToken: string | null;
+  /** 旅程（kind = 'trip'）才有：日期、幣別、旅程預算（台幣）、是否不算進每月預算 */
+  startDate: string | null;
+  endDate: string | null;
+  currency: string;
+  budget: number | null;
+  excludeFromBudget: boolean;
   claims: SplitClaim[];
   members: SplitMember[];
   /** 包含已結清的；用 lib/split.ts 的 openExpenses 取還沒結清的 */
@@ -146,14 +161,30 @@ export interface NewSplitExpense {
   mode: SplitMode;
   weights: Record<string, number>;
   amounts: Record<string, number>;
+  currency: string;
+  originalAmount: number | null;
+  fxRate: number | null;
+  /** 外幣時每個人分到的原幣金額，個人帳的交易用它記原幣（不從台幣反推） */
+  originalShares?: Record<string, number> | null;
+}
+
+/** 建立或修改群組；旅程欄位只有 kind = 'trip' 才會存 */
+export interface SplitGroupInput {
+  name: string;
+  kind: SplitKind;
+  startDate: string | null;
+  endDate: string | null;
+  currency: string;
+  budget: number | null;
+  excludeFromBudget: boolean;
 }
 
 /** 朋友點分享連結看到的資料（split_public_view 回傳） */
 export interface PublicSplit {
-  group: { id: string; name: string; kind: SplitKind };
+  group: { id: string; name: string; kind: SplitKind; startDate: string | null; endDate: string | null; currency: string };
   owner: { name: string; bank: string | null; line: string | null };
   members: SplitMember[];
-  expenses: Pick<SplitExpense, 'id' | 'roundId' | 'date' | 'title' | 'categoryId' | 'amount' | 'payerId' | 'mode' | 'amounts'>[];
+  expenses: (Pick<SplitExpense, 'id' | 'roundId' | 'date' | 'title' | 'categoryId' | 'amount' | 'payerId' | 'mode' | 'amounts' | 'currency' | 'originalAmount'> & { weights?: Record<string, number> })[];
   settlements: Pick<SplitSettlement, 'id' | 'roundId' | 'fromId' | 'toId' | 'amount' | 'date'>[];
   rounds: SplitRound[];
   claims: SplitClaim[];

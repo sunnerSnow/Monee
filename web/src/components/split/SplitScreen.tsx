@@ -1,15 +1,14 @@
 'use client';
 
-import { ChevronLeft, Info, Plus } from 'lucide-react';
+import { ChevronLeft, Info, Plane, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useSplitGroups } from '@/lib/data';
 import { money } from '@/lib/money';
 import { friendTotals, isEmptyGroup, isSettled, myNet, openExpenses, waitingClaims } from '@/lib/split';
 import { useUi } from '@/lib/ui-store';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
-import { Avatars, InboxBanner, OweText, shortDate } from './parts';
+import { Avatars, InboxBanner, OweText, kindLabel, shortDate } from './parts';
 
-const kindText = (kind: string) => (kind === 'event' ? '活動・旅程' : '日常');
 
 export function SplitScreen() {
   const groupsQ = useSplitGroups();
@@ -23,9 +22,14 @@ export function SplitScreen() {
     </header>
   );
   const addButton = (
-    <button type="button" onClick={() => openSheet({ kind: 'splitGroup' })} className="press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]">
-      <Plus size={18} strokeWidth={1.5} aria-hidden />建立群組
-    </button>
+    <div className="grid grid-cols-2 gap-2.5">
+      <button type="button" onClick={() => openSheet({ kind: 'splitGroup' })} className="press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]">
+        <Plus size={18} strokeWidth={1.5} aria-hidden />建立群組
+      </button>
+      <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupKind: 'trip' })} className="press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]">
+        <Plane size={18} strokeWidth={1.5} aria-hidden />建立旅程
+      </button>
+    </div>
   );
   if (groupsQ.isPending) return <>{header}<LoadingBlocks /></>;
   if (groupsQ.error) return <>{header}<ErrorBox message={groupsQ.error.message} onRetry={() => groupsQ.refetch()} /></>;
@@ -64,7 +68,7 @@ export function SplitScreen() {
             <Link key={g.id} href={`/split/${g.id}`} className="card press flex flex-col gap-3 px-5 py-4">
               <span className="flex items-center justify-between gap-3">
                 <span className="truncate text-body font-medium tracking-[.08em]">{g.name}</span>
-                <span className="flex-none rounded-full bg-fill px-2.5 py-0.5 text-caption text-muted">{kindText(g.kind)}</span>
+                <span className="flex-none rounded-full bg-fill px-2.5 py-0.5 text-caption text-muted">{kindLabel(g)}</span>
               </span>
               <span className="flex items-center justify-between gap-3">
                 <span className="flex min-w-0 items-center gap-2.5">

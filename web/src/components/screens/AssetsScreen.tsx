@@ -8,7 +8,7 @@ import { isEmptyGroup, isSettled, myNet } from '@/lib/split';
 import { formatMoney, money, signedBalance } from '@/lib/money';
 import type { Account, PnlColor, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
-import { Avatars, OweText } from '../split/parts';
+import { Avatars, OweText, kindLabel } from '../split/parts';
 import { BigMoney, EmptyBox, ErrorBox, LoadingBlocks, PageHeader, useHidden } from '../ui';
 
 const ICONS: Record<Account['type'], LucideIcon> = {
@@ -135,7 +135,7 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
               <Avatars members={g.members.filter((m) => !m.isMe)} max={3} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-body">{g.name}</span>
-                <span className="truncate text-caption tracking-[.06em] text-muted">{g.kind === 'event' ? '活動・旅程' : '日常'}・{g.members.length} 人</span>
+                <span className="truncate text-caption tracking-[.06em] text-muted">{kindLabel(g)}・{g.members.length} 人</span>
               </span>
               <OweText value={myNet(g)} hidden={hidden} empty={isEmptyGroup(g)} />
             </Link>

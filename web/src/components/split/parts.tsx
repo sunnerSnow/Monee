@@ -3,6 +3,7 @@
 import { Inbox } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { getCategory } from '@/lib/categories';
+import { getCurrency } from '@/lib/currency';
 import { formatMoney, money } from '@/lib/money';
 import { initialOf, meOf } from '@/lib/split';
 import type { Account, SplitExpense, SplitGroup, SplitMember } from '@/lib/types';
@@ -34,23 +35,32 @@ export const payableAccounts = (accounts: Account[]) => accounts.filter((a) => a
 /** 收朋友還的錢：存進現金或銀行 */
 export const receivingAccounts = (accounts: Account[]) => accounts.filter((a) => a.type === 'CASH' || a.type === 'BANK');
 
-/** 這筆花費怎麼記進你的個人帳（跟資料庫 split_save_expense 的規則一致） */
-export function effectLines(group: SplitGroup, e: Pick<SplitExpense, 'amount' | 'amounts' | 'payerId' | 'accountId' | 'categoryId'>, accounts: Account[]): ReactNode[] {
+/** 這筆花費怎麼記進你的個人帳（跟資料庫 split_save_expense 的規則一致）；original 是外幣原額，例如「¥3,000」 */
+export function effectLines(
+  group: SplitGroup,
+  e: Pick<SplitExpense, 'amount' | 'amounts' | 'payerId' | 'accountId' | 'categoryId'>,
+  accounts: Account[],
+  original?: string,
+): ReactNode[] {
   const me = meOf(group);
   const mine = me ? e.amounts[me.id] ?? 0 : 0;
   const cat = getCategory(e.categoryId).name;
   const b = (n: number) => <b className="num font-normal">{formatMoney(n)}</b>;
+  const solo = group.members.length === 1;
+  // 旅程設定不算進每月預算時，提醒這筆不會吃掉今日額度
+  const budgetNote = mine && group.kind === 'trip' && group.excludeFromBudget ? ['旅程花費，不算進每月預算'] : [];
   if (me && e.payerId === me.id) {
     const lent = e.amount - mine;
     const acct = accounts.find((a) => a.id === e.accountId)?.name ?? '付款帳戶';
     return [
-      <>{acct}實付 {b(e.amount)}</>,
-      mine ? <>你的支出 {b(mine)}（{cat}），報表和預算只算這個</> : '你沒有參與，不算你的支出',
+      <>{acct}實付 {b(e.amount)}{original ? `（${original}）` : ''}</>,
+      mine ? <>你的支出 {b(mine)}（{cat}）{solo ? '' : '，報表和預算只算你的部分'}</> : '你沒有參與，不算你的支出',
       ...(lent > 0 ? [<>代墊 {b(lent)} 記在朋友往來，等朋友還你</>] : []),
+      ...budgetNote,
     ];
   }
   const payer = group.members.find((m) => m.id === e.payerId)?.name ?? '朋友';
-  if (mine) return [<>{payer}先付，你這次不用掏錢</>, <>你的支出 {b(mine)}（{cat}）</>, <>欠 {payer} {b(mine)}，記在朋友往來</>];
+  if (mine) return [<>{payer}先付{original ? ` ${original}` : ''}，你這次不用掏錢</>, <>你的支出 {b(mine)}（{cat}）</>, <>欠 {payer} {b(mine)}，記在朋友往來</>, ...budgetNote];
   return ['你沒有參與，不影響你的帳'];
 }
 
@@ -105,3 +115,12 @@ export function Field({ label, children, htmlFor }: { label: string; children: R
 
 const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 export const shortDate = md;
+
+/** 群組類型的說明：旅程顯示日期與幣別 */
+export function kindLabel(g: Pick<SplitGroup, 'kind' | 'startDate' | 'endDate' | 'currency'>) {
+  if (g.kind === 'trip') {
+    const dates = g.startDate && g.endDate ? `${md(g.startDate)}–${md(g.endDate)}・` : '';
+    return `旅程・${dates}${getCurrency(g.currency).name}`;
+  }
+  return g.kind === 'event' ? '活動' : '日常';
+}

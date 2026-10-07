@@ -1,8 +1,8 @@
 'use client';
 
-import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, CreditCard, Eye, EyeOff, Info, Landmark, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, CreditCard, Eye, EyeOff, Info, Landmark, Plane, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
-import { accountSummary, budgetFor, budgetPace, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
+import { accountSummary, budgetFor, budgetPace, countsForBudget, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
 import { useAccounts, useBudgets, useSplitGroups, useTransactions } from '@/lib/data';
 import { daysInMonth, greeting, longDate, monthKeyOf, toISODate } from '@/lib/dates';
 import { money, signedBalance } from '@/lib/money';
@@ -66,10 +66,12 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
   const month = monthKeyOf(now);
   const today = toISODate(now);
   const totals = monthTotals(txs, month);
-  const todaySpent = txs.filter((t) => t.type === 'EXPENSE' && t.date === today).reduce((s, t) => s + t.amount, 0);
+  // 今日額度只看算進每月預算的支出；旅程設定不算進預算的另外提示
+  const todaySpent = txs.filter((t) => countsForBudget(t) && t.date === today).reduce((s, t) => s + t.amount, 0);
+  const todayTrip = txs.filter((t) => t.type === 'EXPENSE' && t.excludeFromBudget && t.date === today).reduce((s, t) => s + t.amount, 0);
   const calendar = { day: now.getDate(), daysInMonth: daysInMonth(now) };
-  const daily = budget ? dailyBudget({ budget, monthExpense: totals.expense, todaySpent, ...calendar }) : null;
-  const pace = budget ? budgetPace({ budget, monthExpense: totals.expense, ...calendar }) : null;
+  const daily = budget ? dailyBudget({ budget, monthExpense: totals.budgetExpense, todaySpent, ...calendar }) : null;
+  const pace = budget ? budgetPace({ budget, monthExpense: totals.budgetExpense, ...calendar }) : null;
   const assets = accountSummary(accounts);
   const monthName = new Intl.DateTimeFormat('en', { month: 'long' }).format(now);
 
@@ -95,6 +97,7 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
           <h2 id="today-title" className="m-0 text-body-s tracking-[.18em] text-muted">今天花了</h2>
           <BigMoney value={todaySpent} className="text-display-xl leading-[1.15]" />
           <p className="text-body-s leading-[1.8]">{mood}</p>
+          {todayTrip > 0 && <p className="caption leading-[1.7]">另有旅程花費 {money(todayTrip, hidden)}，不算進今日額度</p>}
         </>}
         bottom={daily && chip ? <>
           <div aria-hidden className="h-[var(--bar-h)] overflow-hidden rounded-full bg-fill">
@@ -144,6 +147,12 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
               {pace.onTrack ? '跟時間進度差不多，剛剛好' : `比時間進度快 ${pace.diff}%，留意一下就好`}
             </p>
           </div>
+        )}
+        {totals.excluded > 0 && (
+          <p className="flex items-center gap-2 border-t border-line pt-3.5 text-caption text-muted">
+            <Plane size={16} strokeWidth={1.5} aria-hidden />
+            <span>支出含旅程花費 <span className="num">{money(totals.excluded, hidden)}</span>，不算進每月預算</span>
+          </p>
         )}
         {totals.transfer > 0 && (
           <p className="flex items-center gap-2 border-t border-line pt-3.5 text-caption text-muted">

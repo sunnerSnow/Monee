@@ -37,7 +37,7 @@ export function ReportsScreen() {
     ['支出', money(totals.expense, hidden)],
     ['收入', money(totals.income, hidden)],
     ['結餘', `${totals.income - totals.expense < 0 && !hidden ? '−' : ''}${money(totals.income - totals.expense, hidden)}`],
-    budget ? ['預算已用', `${Math.round((totals.expense / budget) * 100)}%`] : ['交易筆數', `${txs.filter((t) => t.date.startsWith(month)).length} 筆`],
+    budget ? ['預算已用', `${Math.round((totals.budgetExpense / budget) * 100)}%`] : ['交易筆數', `${txs.filter((t) => t.date.startsWith(month)).length} 筆`],
   ];
 
   return (
@@ -89,7 +89,7 @@ export function ReportsScreen() {
       <section aria-labelledby="trend-title" className="card flex flex-col gap-4 p-5">
         <div className="flex items-baseline justify-between gap-2">
           <h2 id="trend-title" className="h-sec">每月支出<span className="en">Monthly</span></h2>
-          {hasAnyBudget && <span className="caption">虛線＝當月預算</span>}
+          {hasAnyBudget && <span className="caption">虛線＝當月預算{series.some((p) => p.value !== p.budgetValue) ? '（不含旅程）' : ''}</span>}
         </div>
         {series.every((p) => p.value === 0) ? (
           <EmptyBox title="還沒有資料">記帳一段時間後，這裡會顯示每月支出的變化。</EmptyBox>
@@ -117,7 +117,7 @@ export function ReportsScreen() {
                       {hasAnyBudget && <td className="num border-b border-line px-1 py-2 text-right">{p.budget === null ? '—' : money(p.budget, hidden)}</td>}
                       {hasAnyBudget && (
                         <td className="num border-b border-line px-1 py-2 text-right">
-                          {p.budget === null ? '—' : hidden ? MASK : `${p.value > p.budget ? '+' : '−'}${formatMoney(p.value - p.budget)}`}
+                          {p.budget === null ? '—' : hidden ? MASK : `${p.budgetValue > p.budget ? '+' : '−'}${formatMoney(p.budgetValue - p.budget)}`}
                         </td>
                       )}
                     </tr>

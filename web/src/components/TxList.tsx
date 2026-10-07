@@ -1,6 +1,7 @@
 'use client';
 
 import { groupByDay, visibleTransactions } from '@/lib/budget';
+import { formatForeign } from '@/lib/currency';
 import { getCategory } from '@/lib/categories';
 import { dayLabel } from '@/lib/dates';
 import { money, transactionAmount } from '@/lib/money';
@@ -35,7 +36,11 @@ export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, A
           <span className="truncate text-body">{title}</span>
           <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>
         </span>
-        <span className={`num flex-none text-body ${t.type === 'TRANSFER' ? 'text-muted' : ''}`}>{transactionAmount(t, hidden)}</span>
+        <span className="flex flex-none flex-col items-end gap-0.5">
+          <span className={`num text-body ${t.type === 'TRANSFER' ? 'text-muted' : ''}`}>{transactionAmount(t, hidden)}</span>
+          {/* 旅程的外幣花費：下面小字顯示原幣 */}
+          {t.currency && t.originalAmount ? <span className="num text-caption text-muted">{hidden ? '••••' : formatForeign(t.originalAmount, t.currency)}</span> : null}
+        </span>
       </button>
     </li>
   );

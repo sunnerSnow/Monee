@@ -64,15 +64,26 @@ export interface MonthTotals {
   expense: number;
   income: number;
   transfer: number;
+  /** 算進每月預算的支出（扣掉設定「不算進每月預算」的旅程花費） */
+  budgetExpense: number;
+  /** 不算進每月預算的旅程花費 */
+  excluded: number;
 }
+
+/** 算進每月預算的支出：旅程設定不算進預算的不算 */
+export const countsForBudget = (t: Transaction) => t.type === 'EXPENSE' && !t.excludeFromBudget;
 
 /** 轉帳另外計，不算進支出或收入 */
 export function monthTotals(txs: Transaction[], key: string): MonthTotals {
   const inMonth = txs.filter((t) => monthKey(t.date) === key);
+  const expense = sum(inMonth.filter((t) => t.type === 'EXPENSE'));
+  const budgetExpense = sum(inMonth.filter(countsForBudget));
   return {
-    expense: sum(inMonth.filter((t) => t.type === 'EXPENSE')),
+    expense,
     income: sum(inMonth.filter((t) => t.type === 'INCOME')),
     transfer: sum(inMonth.filter((t) => t.type === 'TRANSFER')),
+    budgetExpense,
+    excluded: expense - budgetExpense,
   };
 }
 
@@ -88,7 +99,9 @@ export function expenseByCategory(txs: Transaction[], key: string) {
 export function monthlyExpenses(txs: Transaction[], endKey: string, count: number) {
   return Array.from({ length: count }, (_, i) => {
     const key = shiftMonth(endKey, i - count + 1);
-    return { key, value: monthTotals(txs, key).expense };
+    const t = monthTotals(txs, key);
+    // value 是總支出（直條）；budgetValue 是拿來跟預算比的部分
+    return { key, value: t.expense, budgetValue: t.budgetExpense };
   });
 }
 

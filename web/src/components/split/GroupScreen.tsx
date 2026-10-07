@@ -1,15 +1,19 @@
 'use client';
 
-import { ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plus, Share2 } from 'lucide-react';
+import { ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plane, Plus, Share2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { getCategory } from '@/lib/categories';
 import { useAccounts, useDeleteSettlement, useSplitGroups } from '@/lib/data';
-import { dayLabel } from '@/lib/dates';
+import { formatForeign, getCurrency } from '@/lib/currency';
+import { dayLabel, toISODate } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
-import { balances, isEmptyGroup, meOf, memberName, modeText, myShare, openExpenses, openSettlements, suggestTransfers, waitingClaims } from '@/lib/split';
-import type { SplitGroup } from '@/lib/types';
+import {
+  balances, isEmptyGroup, isTrip, meOf, memberName, modeText, myShare, myTripSpend, openExpenses, openSettlements, originalShareOf, suggestTransfers, tripDay,
+  tripLength, waitingClaims,
+} from '@/lib/split';
+import type { SplitExpense, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
@@ -50,6 +54,29 @@ export function GroupScreen({ id }: { id: string }) {
   // 剛建好的群組還沒有花費，不是「已結清」
   const empty = isEmptyGroup(g);
 
+  if (isTrip(g)) {
+    // 一個人的旅程沒有結算可看
+    const solo = g.members.length === 1;
+    return (
+      <>
+        {header}
+        <TripHero g={g} mine={mine} />
+        <InboxBanner count={waitingClaims(g).length} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
+        {solo ? <div className="flex flex-col gap-5"><Expenses g={g} /></div> : (
+          <>
+            <div role="tablist" aria-label="旅程內容" className="seg-tabs">
+              <button type="button" role="tab" id="tab-expenses" aria-selected={tab === 'expenses'} aria-controls="panel-expenses" onClick={() => setTab('expenses')} className="press">花費 {list.length}</button>
+              <button type="button" role="tab" id="tab-settle" aria-selected={tab === 'settle'} aria-controls="panel-settle" onClick={() => setTab('settle')} className="press">結算</button>
+            </div>
+            {tab === 'expenses'
+              ? <div role="tabpanel" id="panel-expenses" aria-labelledby="tab-expenses" className="flex flex-col gap-5"><Expenses g={g} /></div>
+              : <div role="tabpanel" id="panel-settle" aria-labelledby="tab-settle" className="flex flex-col gap-5"><Settle g={g} net={net} /></div>}
+          </>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       {header}
@@ -80,6 +107,67 @@ export function GroupScreen({ id }: { id: string }) {
   );
 }
 
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+/** 旅程摘要：日期與第幾天、你花了多少、旅程預算還剩多少 */
+function TripHero({ g, mine }: { g: SplitGroup; mine: number }) {
+  const now = useNow();
+  const hidden = useHidden();
+  const today = now ? toISODate(now) : null;
+  const spent = myTripSpend(g);
+  const total = g.expenses.reduce((s, e) => s + e.amount, 0);
+  const day = today ? tripDay(g, today) : null;
+  const len = tripLength(g);
+  const cur = getCurrency(g.currency);
+  const status = !g.startDate || !g.endDate || !today ? ''
+    : today < g.startDate ? `還有 ${daysBetween(today, g.startDate)} 天出發`
+      : day ? `第 ${day} 天・共 ${len} 天` : '旅程結束了';
+  const used = g.budget ? Math.round((spent / g.budget) * 100) : 0;
+  const left = g.budget ? g.budget - spent : 0;
+
+  return (
+    <section aria-label="旅程摘要" className="card flex flex-col gap-3 p-5">
+      <span className="caption flex flex-wrap items-center gap-x-1.5">
+        <Plane size={14} strokeWidth={1.5} aria-hidden />
+        {g.startDate && g.endDate ? `${shortDate(g.startDate)}–${shortDate(g.endDate)}・` : ''}{cur.place}・{cur.name}{status ? `・${status}` : ''}
+      </span>
+      <div className="flex flex-col gap-1">
+        <span className="caption">你在這趟旅程花了</span>
+        <p className="display m-0 text-display-m leading-[1.2]"><small>$</small>{hidden ? '••••' : spent.toLocaleString('en-US')}</p>
+      </div>
+      {g.budget && (
+        <div className="flex flex-col gap-2">
+          <div aria-hidden className="h-[var(--bar-h)] overflow-hidden rounded-full bg-fill">
+            <i className={`block h-full rounded-full ${left < 0 ? 'bg-alert' : used >= 80 ? 'bg-warn' : 'bg-fg'}`} style={{ width: `${Math.min(100, used)}%` }} />
+          </div>
+          <div className="flex justify-between gap-2 text-caption text-muted">
+            <span>旅程預算 <span className="num">{money(g.budget, hidden)}</span></span>
+            <span className={left < 0 ? 'text-alert' : ''}>{left < 0 ? `超出 ${money(-left, hidden)}` : `還剩 ${money(left, hidden)}`}</span>
+          </div>
+        </div>
+      )}
+      {g.members.length > 1 && (
+        <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+          <Avatars members={g.members} />
+          <span className="caption truncate">
+            {mine > 0 ? `朋友欠你 ${money(mine, hidden)}` : mine < 0 ? `你要付 ${money(-mine, hidden)}` : '大家都結清了'}・總花費 {money(total, hidden)}
+          </span>
+        </div>
+      )}
+      {g.excludeFromBudget && <p className="caption">不算進每月預算</p>}
+    </section>
+  );
+}
+
+/** 外幣花費的原幣金額，台幣的回傳 null */
+const originalOf = (e: SplitExpense) => (e.currency !== 'TWD' && e.originalAmount ? formatForeign(e.originalAmount, e.currency) : null);
+/** 你那份的原幣金額 */
+const myOriginal = (g: SplitGroup, e: SplitExpense) => {
+  const me = meOf(g);
+  const v = me ? originalShareOf(e, me.id) : null;
+  return v === null ? null : formatForeign(v, e.currency);
+};
+
 function Expenses({ g }: { g: SplitGroup }) {
   const now = useNow();
   const hidden = useHidden();
@@ -96,26 +184,36 @@ function Expenses({ g }: { g: SplitGroup }) {
       {list.length === 0 && (g.rounds.length
         ? <EmptyBox title="目前沒有未結清的花費">{shortDate(g.rounds[0].closedAt)} 全部結清了。新的花費記在這裡，之前的收在下面。</EmptyBox>
         : <EmptyBox title="還沒有花費">出去玩的一整天可以一筆一筆記，每筆可以是不同人先付，最後再一起結算。</EmptyBox>)}
-      {[...days].map(([date, items]) => (
-        <section key={date} aria-label={now ? dayLabel(date, now) : date} className="flex flex-col gap-1.5">
+      {[...days].map(([date, items]) => {
+        const label = now ? dayLabel(date, now) : date;
+        const day = isTrip(g) ? tripDay(g, date) : null;
+        return (
+        <section key={date} aria-label={label} className="flex flex-col gap-1.5">
           <div className="flex justify-between gap-2 px-1 text-caption tracking-[.08em] text-muted">
-            <span>{now ? dayLabel(date, now) : date}</span>
+            <span>{day ? `第 ${day} 天・` : ''}{label}</span>
             <span className="num">{money(items.reduce((s, e) => s + e.amount, 0), hidden)}</span>
           </div>
           <ul className="card py-1">
             {items.map((e) => {
               const Icon = getCategory(e.categoryId).icon;
               const share = myShare(g, e);
+              const original = originalOf(e);
+              const solo = g.members.length === 1;
+              const sub = solo
+                ? [getCategory(e.categoryId).name, hidden ? null : original, e.time].filter(Boolean).join('・')
+                : `${memberName(g, e.payerId)}付 ${hidden ? '••••' : original ?? money(e.amount, hidden)}・${modeText(e)}`;
               return (
                 <li key={e.id}>
                   <button type="button" onClick={() => openSheet({ kind: 'splitDetail', groupId: g.id, expenseId: e.id })} aria-haspopup="dialog" className="row press">
                     <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-body">{e.title}</span>
-                      <span className="truncate text-caption tracking-[.06em] text-muted">{memberName(g, e.payerId)}付 {money(e.amount, hidden)}・{modeText(e)}</span>
+                      <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>
                     </span>
                     <span className="flex flex-none flex-col items-end gap-0.5">
-                      {share ? <><span className="num text-body">{money(share, hidden)}</span><span className="caption">你的部分</span></> : <span className="caption">沒參與</span>}
+                      {share
+                        ? <><span className="num text-body">{money(share, hidden)}</span><span className="caption num">{original ? (hidden ? '••••' : myOriginal(g, e)) : solo ? '' : '你的部分'}</span></>
+                        : <span className="caption">沒參與</span>}
                     </span>
                   </button>
                 </li>
@@ -123,7 +221,8 @@ function Expenses({ g }: { g: SplitGroup }) {
             })}
           </ul>
         </section>
-      ))}
+        );
+      })}
       {g.rounds.length > 0 && (
         <section aria-labelledby="rounds-title" className="flex flex-col gap-2.5">
           <h2 id="rounds-title" className="h-sec px-1">已結清的紀錄<span className="en">History</span></h2>

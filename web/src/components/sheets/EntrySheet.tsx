@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, getCategory } from '@/lib/categories';
-import { useAccounts, useAddTransaction, useDeleteTransaction, useTransactions, useUpdateTransaction } from '@/lib/data';
+import { useAccounts, useAddTransaction, useDeleteTransaction, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
+import { activeTrip } from '@/lib/split';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import type { Transaction, TransactionType } from '@/lib/types';
@@ -58,7 +59,12 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const [date, setDate] = useState(() => editing?.date ?? toISODate(new Date()));
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [splitOn, setSplitOn] = useState(false);
+  const { data: groups = [] } = useSplitGroups();
+  // 旅程期間打開記一筆：直接記到這趟旅程（可以關掉分帳開關改記一般支出）
+  const trip = editing ? undefined : activeTrip(groups, toISODate(new Date()));
+  const [splitOff, setSplitOff] = useState(false);
+  const [splitOnManual, setSplitOnManual] = useState(false);
+  const splitOn = splitOnManual || (Boolean(trip) && !splitOff);
   const splitToggled = useRef(false);
 
   // 切換分帳時畫面整個換掉，把焦點放回開關
@@ -68,7 +74,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   }, [splitOn]);
   const toggleSplit = (on: boolean) => {
     splitToggled.current = true;
-    setSplitOn(on);
+    setSplitOnManual(on);
+    setSplitOff(!on);
   };
 
   // 朋友往來由分帳管理；投資帳戶由 Monee Invest 同步，只能當轉入對象；編輯舊交易時保留它原本的帳戶
@@ -186,8 +193,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     return (
       <>
         {header}
-        <SplitSwitch on onChange={toggleSplit} />
-        <SplitEntryPanel initial={{ amount, title: note, categoryId, date }} onDone={onClose} />
+        <SplitSwitch on onChange={toggleSplit} trip={trip?.name} />
+        <SplitEntryPanel initial={{ amount, title: note, categoryId, date }} onDone={onClose} defaultGroupId={trip?.id} />
       </>
     );
   }
@@ -196,7 +203,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     <>
       {header}
       {!editing && <AiEntryBar accounts={usable} onDraft={applyDraft} />}
-      {!editing && type === 'EXPENSE' && <SplitSwitch on={false} onChange={toggleSplit} />}
+      {!editing && type === 'EXPENSE' && <SplitSwitch on={false} onChange={toggleSplit} trip={trip?.name} />}
 
       {chips(TYPES.map(([id, label]) => ({ id, label })), type, (id) => switchType(id as TransactionType), '類型')}
 

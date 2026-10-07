@@ -5,7 +5,7 @@ import { monthLabel } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
 
 /** budget 是該月自己的預算（從某月起生效，各月可能不同）；沒有預算為 null */
-interface Point { key: string; value: number; budget: number | null }
+interface Point { key: string; value: number; budget: number | null; /** 跟預算比的部分（扣掉不算進預算的旅程） */ budgetValue?: number }
 
 // 圖表規格（dataviz）：單一系列一個顏色、直條 ≤ 24px、頂端 4px 圓角、細線格線、預算用每月一段的虛線
 const W = 310;
@@ -34,7 +34,7 @@ export function MonthlyChart({ points, currentKey, hidden }: {
   const tip = (p: Point) => {
     const note = p.key === currentKey
       ? '，月份進行中'
-      : p.budget && p.value > p.budget ? `，超出預算 ${money(p.value - p.budget, hidden)}` : '';
+      : p.budget && (p.budgetValue ?? p.value) > p.budget ? `，超出預算 ${money((p.budgetValue ?? p.value) - p.budget, hidden)}` : '';
     const budgetText = p.budget ? `（預算 ${money(p.budget, hidden)}）` : '';
     return `${monthLabel(p.key)}支出 ${money(p.value, hidden)}${budgetText}${note}`;
   };

@@ -103,7 +103,7 @@ describe('monthTotals', () => {
       tx({ type: 'TRANSFER', amount: 10000, categoryId: 'transfer', targetAccountId: 'invest' }),
       tx({ date: '2026-09-30', amount: 999 }),
     ];
-    expect(monthTotals(txs, '2026-10')).toEqual({ expense: 260, income: 48000, transfer: 10000 });
+    expect(monthTotals(txs, '2026-10')).toEqual({ expense: 260, income: 48000, transfer: 10000, budgetExpense: 260, excluded: 0 });
   });
 });
 
@@ -127,9 +127,9 @@ describe('monthlyExpenses', () => {
   it('跨年也能往前推', () => {
     const txs = [tx({ date: '2026-01-05', amount: 100 }), tx({ date: '2025-12-31', amount: 50 })];
     expect(monthlyExpenses(txs, '2026-01', 3)).toEqual([
-      { key: '2025-11', value: 0 },
-      { key: '2025-12', value: 50 },
-      { key: '2026-01', value: 100 },
+      { key: '2025-11', value: 0, budgetValue: 0 },
+      { key: '2025-12', value: 50, budgetValue: 50 },
+      { key: '2026-01', value: 100, budgetValue: 100 },
     ]);
   });
 });
@@ -166,6 +166,18 @@ describe('accountSummary', () => {
     expect([owed.assets, owed.liabilities, owed.net]).toEqual([1730, 0, 1730]);
     const owe = accountSummary([account({ type: 'BANK', currentBalance: 1000 }), account({ type: 'FRIENDS', currentBalance: -170 })]);
     expect([owe.assets, owe.liabilities, owe.net]).toEqual([1000, -170, 830]);
+  });
+});
+
+describe('旅程花費不算進每月預算', () => {
+  it('總支出照算，跟預算比的部分扣掉旅程', () => {
+    const base = { date: '2026-10-03', time: null, categoryId: 'food', sourceAccountId: 'card', targetAccountId: null, note: null, createdAt: '' };
+    const t = monthTotals([
+      { ...base, id: 'a', type: 'EXPENSE', amount: 300 },
+      { ...base, id: 'b', type: 'EXPENSE', amount: 600, excludeFromBudget: true, currency: 'JPY', originalAmount: 3000 },
+      { ...base, id: 'c', type: 'INCOME', amount: 1000 },
+    ], '2026-10');
+    expect([t.expense, t.budgetExpense, t.excluded, t.income]).toEqual([900, 300, 600, 1000]);
   });
 });
 

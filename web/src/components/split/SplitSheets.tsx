@@ -4,6 +4,7 @@ import { Info, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { getCategory } from '@/lib/categories';
+import { CURRENCIES, formatForeign } from '@/lib/currency';
 import {
   useAccounts, useCreateSplitGroup, useDeleteSplitExpense, useDeleteSplitGroup, useReopenRound, useSettle, useSplitGroups, useUpdateSplitGroup,
 } from '@/lib/data';
@@ -21,8 +22,14 @@ import { SplitExpenseForm } from './SplitExpenseForm';
 const TITLE_ID = 'split-sheet-title';
 const KINDS: { id: SplitKind; label: string }[] = [
   { id: 'daily', label: '日常（室友、午餐團）' },
-  { id: 'event', label: '活動・旅程' },
+  { id: 'event', label: '活動（出遊一天）' },
+  { id: 'trip', label: '旅程（有日期、外幣）' },
 ];
+const plusDays = (iso: string, n: number) => {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return toISODate(d);
+};
 
 /** 分帳的所有底部面板：新增／編輯花費、花費明細、還款、群組設定、結清紀錄 */
 export function SplitSheets() {
@@ -41,7 +48,7 @@ function SplitSheetBody() {
   const close = useUi((s) => s.closeSheet);
   const { data: groups, isPending } = useSplitGroups();
 
-  if (sheet.kind === 'splitGroup') return <GroupForm groupId={sheet.groupId} />;
+  if (sheet.kind === 'splitGroup') return <GroupForm groupId={sheet.groupId} initialKind={sheet.groupKind} />;
   if (isPending) return <div aria-busy="true" className="skeleton h-48" />;
   if (sheet.kind === 'splitInbox') return <InboxSheet groups={groups ?? []} groupId={sheet.groupId} />;
   const g = 'groupId' in sheet ? groups?.find((x) => x.id === sheet.groupId) : undefined;
@@ -108,7 +115,10 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
       {e.roundId && <p className="caption -mt-2 flex items-center gap-1.5"><Info size={14} strokeWidth={1.5} aria-hidden />這筆已經結清，只能查看。</p>}
       <div className="flex items-baseline justify-between gap-3 rounded-sm bg-fill px-4 py-3.5">
         <span className="caption">{memberName(g, e.payerId)}付{payerAcct ? `（${payerAcct}）` : ''}</span>
-        <span className="num text-[18px] font-light">{formatMoney(e.amount)}</span>
+        <span className="flex flex-col items-end">
+          <span className="num text-[18px] font-light">{e.currency !== 'TWD' && e.originalAmount ? formatForeign(e.originalAmount, e.currency) : formatMoney(e.amount)}</span>
+          {e.currency !== 'TWD' && e.fxRate && <span className="num text-caption text-muted">≈ {formatMoney(e.amount)}・匯率 {e.fxRate}</span>}
+        </span>
       </div>
       <Field label={modeText(e)}>
         <ul className="card py-1">
@@ -287,7 +297,7 @@ function RoundSheet({ g, roundId }: { g: SplitGroup; roundId: string }) {
 }
 
 /** 建立群組（沒有 groupId）或群組設定 */
-function GroupForm({ groupId }: { groupId?: string }) {
+function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: SplitKind }) {
   const router = useRouter();
   const close = useUi((s) => s.closeSheet);
   const showToast = useUi((s) => s.showToast);
@@ -297,7 +307,14 @@ function GroupForm({ groupId }: { groupId?: string }) {
   const remove = useDeleteSplitGroup();
   const g = groupId ? groups?.find((x) => x.id === groupId) : undefined;
   const [name, setName] = useState(g?.name ?? '');
-  const [kind, setKind] = useState<SplitKind>(g?.kind ?? 'daily');
+  const [kind, setKind] = useState<SplitKind>(g?.kind ?? initialKind ?? 'daily');
+  // 旅程：預設今天出發、五天四夜、日本
+  const [startDate, setStartDate] = useState(g?.startDate ?? toISODate(new Date()));
+  const [endDate, setEndDate] = useState(g?.endDate ?? plusDays(toISODate(new Date()), 4));
+  const [currency, setCurrency] = useState(g?.kind === 'trip' ? g.currency : 'JPY');
+  const [budget, setBudget] = useState(g?.budget ? String(g.budget) : '');
+  const [exclude, setExclude] = useState(g ? g.excludeFromBudget : true);
+  const trip = kind === 'trip';
   const [rows, setRows] = useState(() => (g ? g.members.filter((m) => !m.isMe).map((m) => ({ id: m.id as string | null, name: m.name, locked: memberInvolved(g, m.id) })) : []));
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -316,18 +333,24 @@ function GroupForm({ groupId }: { groupId?: string }) {
 
   const save = async () => {
     const names = rows.map((r) => r.name.trim());
-    const problem = !name.trim() ? '群組名稱不能空白'
-      : !names.length ? '至少要有一位朋友'
+    const problem = !name.trim() ? (trip ? '旅程名稱不能空白' : '群組名稱不能空白')
+      : trip && (!startDate || !endDate) ? '請選出發和回來的日期'
+        : trip && endDate < startDate ? '回來的日期不能早於出發日期'
+          : !names.length && !trip ? '至少要有一位朋友'
         : names.some((n) => !n) ? '成員名字不能空白'
           : names.includes('我') || new Set(names).size !== names.length ? '成員名字重複了' : '';
     if (problem) return setError(problem);
+    const input = {
+      name: name.trim(), kind, startDate: trip ? startDate : null, endDate: trip ? endDate : null, currency: trip ? currency : 'TWD',
+      budget: trip && parseInt(budget, 10) > 0 ? parseInt(budget, 10) : null, excludeFromBudget: trip && exclude,
+    };
     try {
       if (g) {
-        await update.mutateAsync({ groupId: g.id, name: name.trim(), kind, members: rows.map((r) => ({ id: r.id, name: r.name.trim() })) });
+        await update.mutateAsync({ ...input, groupId: g.id, members: rows.map((r) => ({ id: r.id, name: r.name.trim() })) });
         close();
         showToast('已儲存群組設定');
       } else {
-        const id = await create.mutateAsync({ name: name.trim(), kind, members: names });
+        const id = await create.mutateAsync({ ...input, members: names });
         close();
         router.push(`/split/${id}`);
         showToast(`已建立「${name.trim()}」，可以開始記花費了`);
@@ -353,14 +376,50 @@ function GroupForm({ groupId }: { groupId?: string }) {
   const busy = create.isPending || update.isPending || remove.isPending;
   return (
     <>
-      <SheetHeader id={TITLE_ID} title={g ? '群組設定' : '建立群組'} en={g ? 'Settings' : 'New group'} sub={g ? g.name : '室友、午餐團、一起出遊的朋友都可以'} onClose={close} />
-      <Field label="群組名稱" htmlFor="group-name">
-        <input id="group-name" data-autofocus value={name} onChange={(e) => { setName(e.target.value); setError(''); }} maxLength={30} placeholder="例如：墾丁三天兩夜" autoComplete="off" className="field-input" />
+      <SheetHeader
+        id={TITLE_ID}
+        title={g ? (trip ? '旅程設定' : '群組設定') : trip ? '建立旅程' : '建立群組'}
+        en={g ? 'Settings' : trip ? 'New trip' : 'New group'}
+        sub={g ? g.name : trip ? '有日期和外幣，一個人或跟朋友都可以' : '室友、午餐團、一起出遊的朋友都可以'}
+        onClose={close}
+      />
+      <Field label={trip ? '旅程名稱' : '群組名稱'} htmlFor="group-name">
+        <input id="group-name" data-autofocus value={name} onChange={(e) => { setName(e.target.value); setError(''); }} maxLength={30} placeholder={trip ? '例如：東京五日遊' : '例如：墾丁三天兩夜'} autoComplete="off" className="field-input" />
       </Field>
       <Field label="類型">
         <Pills items={KINDS} value={kind} onPick={setKind} label="類型" wrap />
       </Field>
-      <Field label="成員（只要名字，不用帳號）">
+      {trip && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="出發" htmlFor="trip-start">
+              <input id="trip-start" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); if (e.target.value > endDate) setEndDate(e.target.value); setError(''); }} className="field-input px-3" />
+            </Field>
+            <Field label="回來" htmlFor="trip-end">
+              <input id="trip-end" type="date" value={endDate} min={startDate} onChange={(e) => { setEndDate(e.target.value); setError(''); }} className="field-input px-3" />
+            </Field>
+          </div>
+          <Field label="目的地與幣別" htmlFor="trip-currency">
+            <select id="trip-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="field-input appearance-none">
+              {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.place}・{c.name} {c.code}</option>)}
+            </select>
+          </Field>
+          <Field label="旅程預算（台幣，可不填）" htmlFor="trip-budget">
+            <div className="flex items-baseline gap-1.5 rounded-full border border-line bg-surface px-4">
+              <span className="num text-muted">$</span>
+              <input id="trip-budget" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="例如 30000" autoComplete="off" className="num h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none" />
+            </div>
+          </Field>
+          <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-2">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-body">不算進每月預算</span>
+              <span className="caption leading-[1.7]">旅程花費另外看旅程預算，首頁的今日額度不受影響；報表的總支出照樣會算</span>
+            </span>
+            <button type="button" role="switch" aria-checked={exclude} aria-label="不算進每月預算" onClick={() => setExclude(!exclude)} className="switch" />
+          </div>
+        </>
+      )}
+      <Field label={trip ? '一起去的朋友（一個人旅行就不用加）' : '成員（只要名字，不用帳號）'}>
         <ul className="card py-1">
           <li className="flex min-h-14 items-center gap-3 px-4 py-1.5">
             <span aria-hidden className="av me">我</span>

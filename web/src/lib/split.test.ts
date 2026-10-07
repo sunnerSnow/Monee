@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  allocate, balances, friendTotals, initialOf, isSettled, memberInvolved, myNet, myShare, parseMemberNames, publicAsGroup, splitAmounts,
-  splitProblem, suggestTransfers, waitingClaims,
+  activeTrip, allocate, balances, friendTotals, initialOf, isSettled, memberInvolved, myNet, myShare, myTripSpend, originalShareOf, parseMemberNames, publicAsGroup,
+  splitAmounts,
+  splitProblem, suggestTransfers, tripDay, tripLength, waitingClaims,
 } from './split';
 import type { SplitExpense, SplitGroup } from './types';
 
@@ -15,11 +16,13 @@ let n = 0;
 const ex = (payerId: string, amount: number, amounts: Record<string, number>, roundId: string | null = null): SplitExpense => ({
   id: `e${++n}`, roundId, date: '2026-10-03', time: null, title: 't', categoryId: 'food', amount, payerId,
   accountId: payerId === 'me' ? 'cathay' : null, mode: 'exact', weights: amounts, amounts, createdAt: '',
+  currency: 'TWD', originalAmount: null, fxRate: null,
 });
 const all = (v: number) => ({ me: v, ming: v, hua: v, mei: v });
 // 原型的週六陽明山：6 筆、4 個人輪流先付
 const trip = (): SplitGroup => ({
   id: 'g', name: '週六陽明山', kind: 'event', createdAt: '', members, settlements: [], rounds: [], shareToken: null, claims: [],
+  startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false,
   expenses: [
     ex('ming', 360, all(90)),
     ex('me', 200, all(50)),
@@ -109,8 +112,8 @@ describe('分享頁', () => {
   it('朋友看到的資料轉成群組後，結算跟擁有者看到的一樣；只算等待中的通知', () => {
     const g = trip();
     const view = {
-      group: { id: g.id, name: g.name, kind: g.kind }, owner: { name: 'Yuki', bank: null, line: null }, members: g.members, rounds: [],
-      expenses: g.expenses.map(({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts }) => ({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts })),
+      group: { id: g.id, name: g.name, kind: g.kind, startDate: null, endDate: null, currency: 'TWD' }, owner: { name: 'Yuki', bank: null, line: null }, members: g.members, rounds: [],
+      expenses: g.expenses.map(({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts }) => ({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts, currency: 'TWD', originalAmount: null })),
       settlements: [],
       claims: [
         { id: 'c1', fromId: 'mei', toId: 'me', amount: 550, status: 'waiting' as const, createdAt: '' },
@@ -120,6 +123,31 @@ describe('分享頁', () => {
     const pg = publicAsGroup(view);
     expect(balances(pg)).toEqual(balances(g));
     expect(waitingClaims(pg).map((c) => c.id)).toEqual(['c1']);
+  });
+});
+
+describe('旅程', () => {
+  const tokyo = (): SplitGroup => ({ ...trip(), id: 't', kind: 'trip', startDate: '2026-11-03', endDate: '2026-11-08', currency: 'JPY', budget: 30000, excludeFromBudget: true });
+  it('今天在旅程日期內才算進行中；第幾天、總天數', () => {
+    expect(activeTrip([trip(), tokyo()], '2026-11-05')?.id).toBe('t');
+    expect(activeTrip([tokyo()], '2026-11-09')).toBeUndefined();
+    expect(activeTrip([trip()], '2026-11-05')).toBeUndefined();
+    expect(tripDay(tokyo(), '2026-11-03')).toBe(1);
+    expect(tripDay(tokyo(), '2026-11-08')).toBe(6);
+    expect(tripDay(tokyo(), '2026-11-09')).toBeNull();
+    expect(tripLength(tokyo())).toBe(6);
+  });
+  it('原幣金額直接照權重分原幣總額，不從台幣反推', () => {
+    const e = { currency: 'JPY', originalAmount: 15400, amount: 3099, amounts: { me: 1550, ming: 1549 }, weights: { me: 1, ming: 1 } };
+    expect(originalShareOf(e, 'me')).toBe(7700);
+    expect(originalShareOf({ ...e, originalAmount: 15401 }, 'me')).toBe(7701);
+    expect(originalShareOf({ ...e, currency: 'USD', originalAmount: 25.01, weights: { me: 2, ming: 1 } }, 'me')).toBe(16.67);
+    expect(originalShareOf({ ...e, currency: 'TWD', originalAmount: null }, 'me')).toBeNull();
+  });
+  it('旅程裡你花了多少：你的部分，含已結清的', () => {
+    const g = tokyo();
+    g.expenses.push(ex('me', 500, { me: 500 }, 'r-old'));
+    expect(myTripSpend(g)).toBe(1310 + 500);
   });
 });
 
