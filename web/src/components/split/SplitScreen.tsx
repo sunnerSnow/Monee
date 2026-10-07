@@ -4,10 +4,10 @@ import { ChevronLeft, Info, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useSplitGroups } from '@/lib/data';
 import { money } from '@/lib/money';
-import { friendTotals, isEmptyGroup, isSettled, myNet, openExpenses } from '@/lib/split';
+import { friendTotals, isEmptyGroup, isSettled, myNet, openExpenses, waitingClaims } from '@/lib/split';
 import { useUi } from '@/lib/ui-store';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
-import { Avatars, OweText, shortDate } from './parts';
+import { Avatars, InboxBanner, OweText, shortDate } from './parts';
 
 const kindText = (kind: string) => (kind === 'event' ? '活動・旅程' : '日常');
 
@@ -52,6 +52,8 @@ export function SplitScreen() {
         <div className="flex flex-col gap-1 rounded-sm bg-cream px-3.5 py-3"><span className="caption">朋友欠你</span><span className="num text-[16px]">{money(totals.recv, hidden)}</span></div>
         <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3"><span className="caption">你欠朋友</span><span className="num text-[16px]">{money(totals.pay, hidden)}</span></div>
       </div>
+
+      <InboxBanner count={groups.flatMap(waitingClaims).length} onOpen={() => openSheet({ kind: 'splitInbox' })} />
 
       <section aria-labelledby="groups-title" className="flex flex-col gap-2.5">
         <h2 id="groups-title" className="h-sec px-1">群組<span className="en">Groups</span></h2>

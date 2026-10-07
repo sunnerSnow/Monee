@@ -14,6 +14,8 @@ export type SheetState =
   | { kind: 'splitSettle'; groupId: string; fromId: string; toId: string; amount: number }
   | { kind: 'splitGroup'; groupId?: string }
   | { kind: 'splitRound'; groupId: string; roundId: string }
+  | { kind: 'splitShare'; groupId: string }
+  | { kind: 'splitInbox'; groupId?: string }
   | null;
 
 /** layout.tsx 的行內腳本也讀這個 key，兩邊要一致 */

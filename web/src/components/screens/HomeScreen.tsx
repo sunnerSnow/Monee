@@ -3,13 +3,15 @@
 import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, CreditCard, Eye, EyeOff, Info, Landmark, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
 import { accountSummary, budgetFor, budgetPace, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
-import { useAccounts, useBudgets, useTransactions } from '@/lib/data';
+import { useAccounts, useBudgets, useSplitGroups, useTransactions } from '@/lib/data';
 import { daysInMonth, greeting, longDate, monthKeyOf, toISODate } from '@/lib/dates';
 import { money, signedBalance } from '@/lib/money';
+import { waitingClaims } from '@/lib/split';
 import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { TxGroups } from '../TxList';
+import { InboxBanner } from '../split/parts';
 import { Avatar, BigMoney, EmptyBox, ErrorBox, HeroCard, LoadingBlocks, SectionHeader, useHidden } from '../ui';
 
 const MORE = 'press inline-flex min-h-11 items-center gap-1 px-1 text-body-s tracking-[.08em]';
@@ -106,6 +108,8 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
           <Link href="/settings" className="btn-secondary press self-start">設定每月預算<ArrowRight size={16} strokeWidth={1.5} aria-hidden /></Link>
         )}
       />
+
+      <SplitInbox />
 
       <section aria-labelledby="month-title" className="card flex flex-col gap-4 p-5">
         <div className="flex items-baseline justify-between gap-2">
@@ -265,4 +269,11 @@ function Onboarding({ now, accounts, budget }: { now: Date; accounts: Account[];
       </section>
     </>
   );
+}
+
+/** 朋友在分享連結說已付款：首頁也提醒，點了直接確認 */
+function SplitInbox() {
+  const { data: groups = [] } = useSplitGroups();
+  const openSheet = useUi((s) => s.openSheet);
+  return <InboxBanner count={groups.flatMap(waitingClaims).length} onOpen={() => openSheet({ kind: 'splitInbox' })} />;
 }

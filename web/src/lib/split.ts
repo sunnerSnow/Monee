@@ -1,6 +1,6 @@
 // 分帳的計算：分攤、淨額、建議還款。純函式，畫面、示範模式與測試共用。
 // 資料庫的 split_balances 用同樣的規則算淨額（supabase/migrations/20261008000001_split.sql）。
-import type { SplitExpense, SplitGroup, SplitMember, SplitMode, SplitSettlement } from './types';
+import type { PublicSplit, SplitExpense, SplitGroup, SplitMember, SplitMode, SplitSettlement } from './types';
 
 const sumOf = (list: number[]) => list.reduce((s, v) => s + v, 0);
 
@@ -91,6 +91,18 @@ export function suggestTransfers(net: Record<string, number>): Transfer[] {
 
 /** 已結清：目前沒有未結清的花費，而且結算過（剛建好的空群組不算） */
 export const isSettled = (g: SplitGroup) => !openExpenses(g).length && g.rounds.length > 0;
+
+/** 朋友在分享頁按了「我已付款」、還沒確認的 */
+export const waitingClaims = (g: Pick<SplitGroup, 'claims'>) => g.claims.filter((c) => c.status === 'waiting');
+
+/** 分享頁拿到的資料轉成 SplitGroup，才能共用 balances、suggestTransfers */
+export function publicAsGroup(v: PublicSplit): SplitGroup {
+  return {
+    id: v.group.id, name: v.group.name, kind: v.group.kind, createdAt: '', shareToken: null, claims: v.claims, members: v.members, rounds: v.rounds,
+    expenses: v.expenses.map((e) => ({ ...e, amount: Number(e.amount), time: null, accountId: null, weights: {}, createdAt: '' })),
+    settlements: v.settlements.map((s) => ({ ...s, amount: Number(s.amount), accountId: null, createdAt: '' })),
+  };
+}
 
 /** 剛建好、還沒記過任何花費的群組：不要顯示「已結清」 */
 export const isEmptyGroup = (g: SplitGroup) => g.expenses.length === 0;

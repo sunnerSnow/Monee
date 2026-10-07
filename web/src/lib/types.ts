@@ -46,6 +46,10 @@ export interface Transaction {
 
 export interface Profile {
   pnlColor: PnlColor;
+  /** 分帳分享頁上朋友看到的你的名字與收款方式 */
+  displayName: string | null;
+  payBank: string | null;
+  payLine: string | null;
 }
 
 /** 預算紀錄：從 month（YYYY-MM）起生效；amount 為 null 代表從那個月起不設預算 */
@@ -103,11 +107,24 @@ export interface SplitRound {
   closedAt: string;
 }
 
+/** 朋友在分享頁按「我已付款」：等你確認 */
+export interface SplitClaim {
+  id: string;
+  fromId: string;
+  toId: string;
+  amount: number;
+  status: 'waiting' | 'confirmed' | 'rejected';
+  createdAt: string;
+}
+
 export interface SplitGroup {
   id: string;
   name: string;
   kind: SplitKind;
   createdAt: string;
+  /** 分享連結的 token；null 代表沒有分享 */
+  shareToken: string | null;
+  claims: SplitClaim[];
   members: SplitMember[];
   /** 包含已結清的；用 lib/split.ts 的 openExpenses 取還沒結清的 */
   expenses: SplitExpense[];
@@ -129,6 +146,17 @@ export interface NewSplitExpense {
   mode: SplitMode;
   weights: Record<string, number>;
   amounts: Record<string, number>;
+}
+
+/** 朋友點分享連結看到的資料（split_public_view 回傳） */
+export interface PublicSplit {
+  group: { id: string; name: string; kind: SplitKind };
+  owner: { name: string; bank: string | null; line: string | null };
+  members: SplitMember[];
+  expenses: Pick<SplitExpense, 'id' | 'roundId' | 'date' | 'title' | 'categoryId' | 'amount' | 'payerId' | 'mode' | 'amounts'>[];
+  settlements: Pick<SplitSettlement, 'id' | 'roundId' | 'fromId' | 'toId' | 'amount' | 'date'>[];
+  rounds: SplitRound[];
+  claims: SplitClaim[];
 }
 
 export interface NewSplitSettlement {

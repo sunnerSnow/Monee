@@ -15,6 +15,7 @@ import { useUi } from '@/lib/ui-store';
 import { Sheet, SheetHeader } from '../Sheet';
 import { EmptyBox } from '../ui';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts, receivingAccounts, shortDate } from './parts';
+import { InboxSheet, ShareSheet } from './ShareSheets';
 import { SplitExpenseForm } from './SplitExpenseForm';
 
 const TITLE_ID = 'split-sheet-title';
@@ -42,6 +43,7 @@ function SplitSheetBody() {
 
   if (sheet.kind === 'splitGroup') return <GroupForm groupId={sheet.groupId} />;
   if (isPending) return <div aria-busy="true" className="skeleton h-48" />;
+  if (sheet.kind === 'splitInbox') return <InboxSheet groups={groups ?? []} groupId={sheet.groupId} />;
   const g = 'groupId' in sheet ? groups?.find((x) => x.id === sheet.groupId) : undefined;
   if (!g) {
     return (
@@ -56,6 +58,7 @@ function SplitSheetBody() {
     case 'splitDetail': return <DetailSheet g={g} expenseId={sheet.expenseId} />;
     case 'splitSettle': return <SettleSheet g={g} fromId={sheet.fromId} toId={sheet.toId} amount={sheet.amount} />;
     case 'splitRound': return <RoundSheet g={g} roundId={sheet.roundId} />;
+    case 'splitShare': return <ShareSheet g={g} />;
     default: return null;
   }
 }

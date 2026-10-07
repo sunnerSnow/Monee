@@ -1,5 +1,6 @@
 'use client';
 
+import { Inbox } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { getCategory } from '@/lib/categories';
 import { formatMoney, money } from '@/lib/money';
@@ -51,6 +52,18 @@ export function effectLines(group: SplitGroup, e: Pick<SplitExpense, 'amount' | 
   const payer = group.members.find((m) => m.id === e.payerId)?.name ?? '朋友';
   if (mine) return [<>{payer}先付，你這次不用掏錢</>, <>你的支出 {b(mine)}（{cat}）</>, <>欠 {payer} {b(mine)}，記在朋友往來</>];
   return ['你沒有參與，不影響你的帳'];
+}
+
+/** 朋友說已付款、等你確認的提示；點了打開待確認 */
+export function InboxBanner({ count, onOpen }: { count: number; onOpen: () => void }) {
+  if (!count) return null;
+  return (
+    <button type="button" onClick={onOpen} aria-haspopup="dialog" className="press flex min-h-14 w-full items-center gap-3 rounded-lg bg-brand px-4 py-3 text-left text-body-s tracking-[.06em] text-ink">
+      <Inbox size={20} strokeWidth={1.5} aria-hidden />
+      <span className="flex-1">有 {count} 件分帳等你確認</span>
+      <span className="num inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-ink px-1.5 text-[12px] text-brand">{count}</span>
+    </button>
+  );
 }
 
 export function EffectBox({ lines }: { lines: ReactNode[] }) {

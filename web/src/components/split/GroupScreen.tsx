@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plus } from 'lucide-react';
+import { ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plus, Share2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -8,12 +8,12 @@ import { getCategory } from '@/lib/categories';
 import { useAccounts, useDeleteSettlement, useSplitGroups } from '@/lib/data';
 import { dayLabel } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
-import { balances, isEmptyGroup, meOf, memberName, modeText, myShare, openExpenses, openSettlements, suggestTransfers } from '@/lib/split';
+import { balances, isEmptyGroup, meOf, memberName, modeText, myShare, openExpenses, openSettlements, suggestTransfers, waitingClaims } from '@/lib/split';
 import type { SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
-import { Avatars, MemberAvatar, memberLabel, shortDate } from './parts';
+import { Avatars, InboxBanner, MemberAvatar, memberLabel, shortDate } from './parts';
 
 export function GroupScreen({ id }: { id: string }) {
   const groupsQ = useSplitGroups();
@@ -27,9 +27,14 @@ export function GroupScreen({ id }: { id: string }) {
       <Link href="/split" aria-label="返回分帳" className="icon-btn ghost press"><ChevronLeft size={20} strokeWidth={1.5} aria-hidden /></Link>
       <h1 className="h-page min-w-0 flex-1 truncate">{g?.name ?? '分帳'}</h1>
       {g && (
-        <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupId: g.id })} aria-label="群組設定" aria-haspopup="dialog" className="icon-btn press">
-          <Ellipsis size={20} strokeWidth={1.5} aria-hidden />
-        </button>
+        <>
+          <button type="button" onClick={() => openSheet({ kind: 'splitShare', groupId: g.id })} aria-label={g.shareToken ? '分享給朋友（分享中）' : '分享給朋友'} aria-haspopup="dialog" className={`icon-btn press ${g.shareToken ? 'border-transparent bg-brand text-ink' : ''}`}>
+            <Share2 size={18} strokeWidth={1.5} aria-hidden />
+          </button>
+          <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupId: g.id })} aria-label="群組設定" aria-haspopup="dialog" className="icon-btn press">
+            <Ellipsis size={20} strokeWidth={1.5} aria-hidden />
+          </button>
+        </>
       )}
     </header>
   );
@@ -60,6 +65,8 @@ export function GroupScreen({ id }: { id: string }) {
           </span>
         </div>
       </section>
+
+      <InboxBanner count={waitingClaims(g).length} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
 
       <div role="tablist" aria-label="群組內容" className="seg-tabs">
         <button type="button" role="tab" id="tab-expenses" aria-selected={tab === 'expenses'} aria-controls="panel-expenses" onClick={() => setTab('expenses')} className="press">花費 {list.length}</button>
@@ -249,16 +256,19 @@ function Settle({ g, net }: { g: SplitGroup; net: Record<string, number> }) {
         <p className="caption -mt-1 px-1">{transfers.length} 筆轉帳就能全部結清（不用每筆花費各自還）</p>
         <ul className="flex flex-col gap-2">
           {transfers.map((t) => {
-            const label = t.toId === me.id ? '記錄已收款' : t.fromId === me.id ? '我已付款' : '標記已付';
+            // 朋友已經在分享頁說付了：直接去待確認
+            const claimed = waitingClaims(g).find((c) => c.fromId === t.fromId && c.toId === t.toId);
+            const label = claimed ? '確認' : t.toId === me.id ? '記錄已收款' : t.fromId === me.id ? '我已付款' : '標記已付';
             return (
               <li key={`${t.fromId}-${t.toId}`} className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-4 py-3">
                 <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-body-s">
                   {memberName(g, t.fromId)}<ArrowRight size={14} strokeWidth={1.5} aria-label="付給" className="text-muted" />{memberName(g, t.toId)}
+                  {claimed && <span className="rounded-full bg-warn-tint px-2 py-px text-[11px] text-warn-fg">說已付 {money(claimed.amount, hidden)}</span>}
                 </span>
                 <span className="num text-body">{money(t.amount, hidden)}</span>
                 <button
                   type="button"
-                  onClick={() => openSheet({ kind: 'splitSettle', groupId: g.id, fromId: t.fromId, toId: t.toId, amount: t.amount })}
+                  onClick={() => openSheet(claimed ? { kind: 'splitInbox', groupId: g.id } : { kind: 'splitSettle', groupId: g.id, fromId: t.fromId, toId: t.toId, amount: t.amount })}
                   aria-haspopup="dialog"
                   className="btn-secondary press min-h-10 px-3 text-caption"
                 >

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  allocate, balances, friendTotals, initialOf, isSettled, memberInvolved, myNet, myShare, parseMemberNames, splitAmounts,
-  splitProblem, suggestTransfers,
+  allocate, balances, friendTotals, initialOf, isSettled, memberInvolved, myNet, myShare, parseMemberNames, publicAsGroup, splitAmounts,
+  splitProblem, suggestTransfers, waitingClaims,
 } from './split';
 import type { SplitExpense, SplitGroup } from './types';
 
@@ -19,7 +19,7 @@ const ex = (payerId: string, amount: number, amounts: Record<string, number>, ro
 const all = (v: number) => ({ me: v, ming: v, hua: v, mei: v });
 // 原型的週六陽明山：6 筆、4 個人輪流先付
 const trip = (): SplitGroup => ({
-  id: 'g', name: '週六陽明山', kind: 'event', createdAt: '', members, settlements: [], rounds: [],
+  id: 'g', name: '週六陽明山', kind: 'event', createdAt: '', members, settlements: [], rounds: [], shareToken: null, claims: [],
   expenses: [
     ex('ming', 360, all(90)),
     ex('me', 200, all(50)),
@@ -102,6 +102,24 @@ describe('群組狀態', () => {
     expect(myShare(trip(), trip().expenses[2])).toBe(520);
     expect(memberInvolved(trip(), 'mei')).toBe(true);
     expect(memberInvolved({ ...trip(), members: [...members, { id: 'new', name: '胖虎', isMe: false }] }, 'new')).toBe(false);
+  });
+});
+
+describe('分享頁', () => {
+  it('朋友看到的資料轉成群組後，結算跟擁有者看到的一樣；只算等待中的通知', () => {
+    const g = trip();
+    const view = {
+      group: { id: g.id, name: g.name, kind: g.kind }, owner: { name: 'Yuki', bank: null, line: null }, members: g.members, rounds: [],
+      expenses: g.expenses.map(({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts }) => ({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts })),
+      settlements: [],
+      claims: [
+        { id: 'c1', fromId: 'mei', toId: 'me', amount: 550, status: 'waiting' as const, createdAt: '' },
+        { id: 'c2', fromId: 'ming', toId: 'me', amount: 180, status: 'rejected' as const, createdAt: '' },
+      ],
+    };
+    const pg = publicAsGroup(view);
+    expect(balances(pg)).toEqual(balances(g));
+    expect(waitingClaims(pg).map((c) => c.id)).toEqual(['c1']);
   });
 });
 

@@ -5,7 +5,7 @@ import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categor
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
 import { balances, meOf, memberInvolved, openExpenses, splitAmounts } from './split';
 import type {
-  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, SplitExpense, SplitGroup, SplitKind,
+  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, PublicSplit, SplitExpense, SplitGroup, SplitKind,
   SplitSettlement, Transaction,
 } from './types';
 
@@ -72,7 +72,7 @@ function seed() {
     { month: shiftMonth(current, -5), amount: 22000 },
     { month: shiftMonth(current, -2), amount: 24000 },
   ];
-  return { accounts, txs, budgets, profile: { pnlColor: 'red_up' } as Profile, split: seedSplit(day) };
+  return { accounts, txs, budgets, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki' } as Profile, split: seedSplit(day) };
 }
 
 type Store = ReturnType<typeof seed>;
@@ -171,7 +171,7 @@ export const demo = {
     if (!friends.length) throw new Error('至少要有一位朋友');
     const gid = id('g');
     db().split.unshift({
-      id: gid, name: name.trim(), kind, createdAt: new Date().toISOString(), expenses: [], settlements: [], rounds: [],
+      id: gid, name: name.trim(), kind, createdAt: new Date().toISOString(), expenses: [], settlements: [], rounds: [], shareToken: null, claims: [],
       members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n) => ({ id: id('m'), name: n, isMe: false }))],
     });
     return gid;
@@ -249,6 +249,57 @@ export const demo = {
     g.settlements = g.settlements.filter((st) => st.id !== settlementId);
     s.txs = s.txs.filter((t) => t.splitSettlementId !== settlementId);
   },
+  // ---------- 分享連結 ----------
+  async shareGroup(groupId: string, reset: boolean) {
+    await pause();
+    const g = group(groupId);
+    if (!g.shareToken || reset) g.shareToken = Array.from({ length: 24 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+    return g.shareToken;
+  },
+  async stopShare(groupId: string) {
+    await pause();
+    group(groupId).shareToken = null;
+  },
+  async confirmClaim(v: { claimId: string; accountId: string | null; date: string; time: string | null }) {
+    const g = db().split.find((x) => x.claims.some((c) => c.id === v.claimId && c.status === 'waiting'));
+    const c = g?.claims.find((x) => x.id === v.claimId);
+    if (!g || !c) throw new Error('找不到這筆通知，可能已經處理過了');
+    const closed = await demo.settle({ groupId: g.id, fromId: c.fromId, toId: c.toId, amount: c.amount, accountId: v.accountId, date: v.date, time: v.time });
+    c.status = 'confirmed';
+    return closed;
+  },
+  async rejectClaim(claimId: string) {
+    await pause();
+    const c = db().split.flatMap((g) => g.claims).find((x) => x.id === claimId && x.status === 'waiting');
+    if (!c) throw new Error('找不到這筆通知，可能已經處理過了');
+    c.status = 'rejected';
+  },
+  /** 朋友看到的資料：跟 split_public_view 一樣，不含帳戶與交易 */
+  async publicView(token: string): Promise<PublicSplit | null> {
+    await pause();
+    const g = db().split.find((x) => x.shareToken === token);
+    if (!g) return null;
+    const p = db().profile;
+    return structuredClone({
+      group: { id: g.id, name: g.name, kind: g.kind },
+      owner: { name: p.displayName || '朋友', bank: p.payBank, line: p.payLine },
+      members: g.members,
+      expenses: g.expenses.map(({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts }) => ({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts })),
+      settlements: g.settlements.map(({ id: sid, roundId, fromId, toId, amount, date }) => ({ id: sid, roundId, fromId, toId, amount, date })),
+      rounds: g.rounds,
+      claims: g.claims,
+    });
+  },
+  async publicClaim(token: string, v: { fromId: string; toId: string; amount: number }) {
+    await pause();
+    const g = db().split.find((x) => x.shareToken === token);
+    if (!g) throw new Error('分享連結已失效，請跟分享的人要新的連結');
+    const me = meOf(g)!;
+    if (v.fromId === me.id || v.fromId === v.toId) throw new Error('成員不在這個群組');
+    const hit = g.claims.find((c) => c.fromId === v.fromId && c.toId === v.toId && c.status === 'waiting');
+    if (hit) Object.assign(hit, { amount: v.amount, createdAt: new Date().toISOString() });
+    else g.claims.unshift({ id: id('c'), fromId: v.fromId, toId: v.toId, amount: v.amount, status: 'waiting', createdAt: new Date().toISOString() });
+  },
   async reopenRound(roundId: string) {
     await pause();
     const g = db().split.find((x) => x.rounds.some((r) => r.id === roundId));
@@ -319,7 +370,7 @@ type SeedOpts = { mode?: 'equal' | 'exact' | 'shares'; weights?: number[]; accou
 /** 範例群組：一天 6 筆的出遊、每月結清的室友與午餐團、整個結清的烤肉 */
 function seedSplit(day: (offset: number) => string): SplitGroup[] {
   const mk = (gid: string, name: string, kind: SplitKind, friends: string[], created: number): SplitGroup => ({
-    id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [],
+    id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [], shareToken: null, claims: [],
     members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n, i) => ({ id: `${gid}-${i}`, name: n, isMe: false }))],
   });
   const mid = (g: SplitGroup, n: string) => g.members.find((m) => m.name === n)!.id;
@@ -346,6 +397,8 @@ function seedSplit(day: (offset: number) => string): SplitGroup[] {
   ex(trip, 4, '15:10', '擎天崗・咖啡', 'food', 480, '阿美', ['我', '小華', '阿美']);
   ex(trip, 4, '18:30', '晚餐・士林夜市', 'food', 1200, '小華', all);
   ex(trip, 4, '20:50', '計程車回家', 'transit', 380, '小明', ['我', '小明'], { mode: 'shares' });
+  // 示範分享連結：/s/demo0trip000000000000000 可以直接打開朋友看到的頁面
+  trip.shareToken = 'demo0trip000000000000000';
 
   const room = mk('g-room', '室友', 'daily', ['阿凱'], 60);
   room.rounds.push({ id: 'r-room', closedAt: day(7) });
@@ -355,6 +408,9 @@ function seedSplit(day: (offset: number) => string): SplitGroup[] {
   ex(room, 6, '20:10', '這個月電費', 'other', 1860, '我', ['我', '阿凱'], { account: 'esun' });
   ex(room, 4, '19:30', '衛生紙・洗碗精', 'daily', 389, '阿凱', ['我', '阿凱']);
   ex(room, 2, '10:00', '網路費', 'other', 599, '我', ['我', '阿凱']);
+  // 示範待確認：阿凱在分享頁按了「我已付款」
+  room.shareToken = 'demo0room000000000000000';
+  room.claims.push({ id: 'c-room', fromId: mid(room, '阿凱'), toId: mid(room, '我'), amount: 1034, status: 'waiting', createdAt: `${day(0)}T09:00:00Z` });
 
   const team = ['我', 'Joy', 'Ken', 'Mia'];
   const lunch = mk('g-lunch', '公司午餐團', 'daily', ['Joy', 'Ken', 'Mia'], 40);

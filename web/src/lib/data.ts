@@ -7,8 +7,8 @@ import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
 import { demo, isDemo } from './demo';
 import { createClient } from './supabase/client';
 import type {
-  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, PnlColor, Profile, SplitExpense, SplitGroup,
-  SplitKind, SplitSettlement, Transaction,
+  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, PnlColor, Profile, PublicSplit, SplitClaim,
+  SplitExpense, SplitGroup, SplitKind, SplitSettlement, Transaction,
 } from './types';
 
 /** 首頁、明細與報表需要的歷史月數（含當月） */
@@ -123,10 +123,10 @@ export function useProfile() {
     queryKey: keys.profile,
     queryFn: async (): Promise<Profile> => {
       if (isDemo) return demo.profile();
-      const row = await unwrap<{ pnl_color: PnlColor } | null>(
-        createClient().from('profiles').select('pnl_color').maybeSingle(),
+      const row = await unwrap<{ pnl_color: PnlColor; display_name: string | null; pay_bank: string | null; pay_line: string | null } | null>(
+        createClient().from('profiles').select('pnl_color, display_name, pay_bank, pay_line').maybeSingle(),
       );
-      return { pnlColor: row?.pnl_color ?? 'red_up' };
+      return { pnlColor: row?.pnl_color ?? 'red_up', displayName: row?.display_name ?? null, payBank: row?.pay_bank ?? null, payLine: row?.pay_line ?? null };
     },
   });
 }
@@ -276,6 +276,9 @@ export function useUpdateProfile() {
       if (!data.user) throw new Error('登入已過期，請重新登入');
       const values: Record<string, unknown> = { user_id: data.user.id };
       if (patch.pnlColor) values.pnl_color = patch.pnlColor;
+      if ('displayName' in patch) values.display_name = patch.displayName || null;
+      if ('payBank' in patch) values.pay_bank = patch.payBank || null;
+      if ('payLine' in patch) values.pay_line = patch.payLine || null;
       await unwrap(supabase.from('profiles').upsert(values).select('user_id'));
     },
     onSuccess: () => invalidate(keys.profile),
@@ -310,7 +313,9 @@ interface SplitGroupRow {
   name: string;
   kind: SplitKind;
   created_at: string;
+  share_token: string | null;
   members: { id: string; name: string; is_me: boolean; created_at: string }[];
+  claims: { id: string; from_id: string; to_id: string; amount: number | string; status: SplitClaim['status']; created_at: string }[];
   expenses: {
     id: string; round_id: string | null; date: string; time: string | null; title: string; category_id: string;
     amount: number | string; payer_id: string; account_id: string | null; mode: SplitExpense['mode'];
@@ -330,6 +335,10 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
   name: r.name,
   kind: r.kind,
   createdAt: r.created_at,
+  shareToken: r.share_token,
+  claims: (r.claims ?? [])
+    .map((c): SplitClaim => ({ id: c.id, fromId: c.from_id, toId: c.to_id, amount: Number(c.amount), status: c.status, createdAt: c.created_at }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   // 你排第一，朋友照加入順序（平分的零頭也照這個順序給）
   members: [...r.members]
     .sort((a, b) => Number(b.is_me) - Number(a.is_me) || a.created_at.localeCompare(b.created_at))
@@ -360,7 +369,7 @@ export function useSplitGroups() {
       const rows = await unwrap<SplitGroupRow[]>(
         createClient()
           .from('split_groups')
-          .select('id, name, kind, created_at, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at)')
+          .select('id, name, kind, created_at, share_token, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at)')
           .order('created_at', { ascending: false }),
       );
       return rows.map(toSplitGroup);
@@ -468,5 +477,75 @@ export function useReopenRound() {
       await rpc('split_reopen_round', { p_round: roundId });
     },
     onSuccess: () => invalidate(keys.split),
+  });
+}
+
+// ---------- 分帳：分享連結 ----------
+
+/** 開始分享（reset 為 true 時換一條新連結，舊的立刻失效）；回傳 token */
+export function useShareGroup() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ groupId, reset }: { groupId: string; reset: boolean }) => {
+      if (isDemo) return demo.shareGroup(groupId, reset);
+      return rpc<string>('split_share_group', { p_group: groupId, p_reset: reset });
+    },
+    onSuccess: () => invalidate(keys.split),
+  });
+}
+
+export function useStopShare() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (groupId: string) => {
+      if (isDemo) return demo.stopShare(groupId);
+      await rpc('split_stop_share', { p_group: groupId });
+    },
+    onSuccess: () => invalidate(keys.split),
+  });
+}
+
+/** 確認朋友說的付款：寫入還款；回傳這次是否剛好全部結清 */
+export function useConfirmClaim() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (v: { claimId: string; accountId: string | null; date: string; time: string | null }) => {
+      if (isDemo) return demo.confirmClaim(v);
+      return rpc<boolean>('split_confirm_claim', { p_claim: v.claimId, p_account: v.accountId, p_date: v.date, p_time: v.time });
+    },
+    onSuccess: () => invalidate(...SPLIT_TOUCHES),
+  });
+}
+
+export function useRejectClaim() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (claimId: string) => {
+      if (isDemo) return demo.rejectClaim(claimId);
+      await rpc('split_reject_claim', { p_claim: claimId });
+    },
+    onSuccess: () => invalidate(keys.split),
+  });
+}
+
+/** 朋友點分享連結：不用登入就能讀；連結失效時回傳 null */
+export function usePublicSplit(token: string) {
+  return useQuery({
+    queryKey: ['public-split', token],
+    queryFn: async (): Promise<PublicSplit | null> => {
+      if (isDemo) return demo.publicView(token);
+      return rpc<PublicSplit | null>('split_public_view', { p_token: token });
+    },
+  });
+}
+
+export function usePublicClaim(token: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { fromId: string; toId: string; amount: number }) => {
+      if (isDemo) return demo.publicClaim(token, v);
+      await rpc('split_public_claim', { p_token: token, p_from: v.fromId, p_to: v.toId, p_amount: v.amount });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['public-split', token] }),
   });
 }

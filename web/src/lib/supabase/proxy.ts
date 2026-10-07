@@ -2,7 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './env';
 
-const PUBLIC_PATHS = ['/login', '/auth'];
+// /s/<token>：朋友點分帳分享連結，不用登入
+const PUBLIC_PATHS = ['/login', '/auth', '/s'];
 
 /** 每次請求更新登入 cookie，並把未登入的人導到登入頁 */
 export async function updateSession(request: NextRequest) {
