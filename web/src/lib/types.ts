@@ -98,6 +98,8 @@ export interface SplitExpense {
   originalAmount: number | null;
   fxRate: number | null;
   createdAt: string;
+  /** 朋友從分享連結記的：那位朋友的成員 id；你自己記的是 null */
+  addedBy?: string | null;
 }
 
 export interface SplitSettlement {
@@ -126,6 +128,25 @@ export interface SplitClaim {
   createdAt: string;
 }
 
+/** 朋友從分享連結新增、跟你有關的花費：等你確認才寫進花費與個人帳（一律平分） */
+export interface SplitProposal {
+  id: string;
+  /** 哪位朋友記的 */
+  addedBy: string;
+  date: string;
+  title: string;
+  categoryId: string;
+  /** 台幣；外幣時是換算後的金額 */
+  amount: number;
+  payerId: string;
+  weights: Record<string, number>;
+  amounts: Record<string, number>;
+  currency: string;
+  originalAmount: number | null;
+  status: 'waiting' | 'confirmed' | 'rejected';
+  createdAt: string;
+}
+
 export interface SplitGroup {
   id: string;
   name: string;
@@ -139,7 +160,10 @@ export interface SplitGroup {
   currency: string;
   budget: number | null;
   excludeFromBudget: boolean;
+  /** 朋友可以從分享連結新增花費 */
+  allowFriendAdd: boolean;
   claims: SplitClaim[];
+  proposals: SplitProposal[];
   members: SplitMember[];
   /** 包含已結清的；用 lib/split.ts 的 openExpenses 取還沒結清的 */
   expenses: SplitExpense[];
@@ -181,13 +205,31 @@ export interface SplitGroupInput {
 
 /** 朋友點分享連結看到的資料（split_public_view 回傳） */
 export interface PublicSplit {
-  group: { id: string; name: string; kind: SplitKind; startDate: string | null; endDate: string | null; currency: string };
+  group: { id: string; name: string; kind: SplitKind; startDate: string | null; endDate: string | null; currency: string; allowFriendAdd?: boolean };
   owner: { name: string; bank: string | null; line: string | null };
   members: SplitMember[];
-  expenses: (Pick<SplitExpense, 'id' | 'roundId' | 'date' | 'title' | 'categoryId' | 'amount' | 'payerId' | 'mode' | 'amounts' | 'currency' | 'originalAmount'> & { weights?: Record<string, number> })[];
+  expenses: (Pick<SplitExpense, 'id' | 'roundId' | 'date' | 'title' | 'categoryId' | 'amount' | 'payerId' | 'mode' | 'amounts' | 'currency' | 'originalAmount' | 'addedBy'> & { weights?: Record<string, number> })[];
   settlements: Pick<SplitSettlement, 'id' | 'roundId' | 'fromId' | 'toId' | 'amount' | 'date'>[];
   rounds: SplitRound[];
   claims: SplitClaim[];
+  /** 等分享的人確認、或被退回的（7 天內） */
+  proposals?: SplitProposal[];
+}
+
+/** 朋友在分享頁新增一筆（一律平分）；外幣時 amount、amounts 是換算後的台幣 */
+export interface NewFriendExpense {
+  memberId: string;
+  date: string;
+  title: string;
+  categoryId: string;
+  amount: number;
+  payerId: string;
+  weights: Record<string, number>;
+  amounts: Record<string, number>;
+  currency: string;
+  originalAmount: number | null;
+  fxRate: number | null;
+  originalShares: Record<string, number> | null;
 }
 
 export interface NewSplitSettlement {

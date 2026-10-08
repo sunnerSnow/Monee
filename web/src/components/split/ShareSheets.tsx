@@ -2,16 +2,21 @@
 
 import { Copy, Info, Share2 } from 'lucide-react';
 import { useState } from 'react';
+import { categoriesFor, getCategory } from '@/lib/categories';
 import { copyText } from '@/lib/clipboard';
-import { useAccounts, useConfirmClaim, useProfile, useRejectClaim, useShareGroup, useStopShare, useUpdateProfile } from '@/lib/data';
+import { formatForeign } from '@/lib/currency';
+import {
+  useAccounts, useConfirmClaim, useConfirmProposal, useProfile, useRejectClaim, useRejectProposal, useSetFriendAdd, useShareGroup, useStopShare,
+  useUpdateProfile,
+} from '@/lib/data';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
-import { meOf, memberName, waitingClaims } from '@/lib/split';
-import type { SplitClaim, SplitGroup } from '@/lib/types';
+import { meOf, memberName, myShare, waitingClaims, waitingProposals } from '@/lib/split';
+import type { SplitClaim, SplitGroup, SplitProposal } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { SheetHeader } from '../Sheet';
 import { EmptyBox } from '../ui';
-import { Field, Pills, receivingAccounts } from './parts';
+import { EffectBox, Field, Pills, effectLines, payableAccounts, receivingAccounts, shortDate } from './parts';
 
 export const SHARE_TITLE_ID = 'split-sheet-title';
 
@@ -31,6 +36,7 @@ function ShareForm({ g, initial }: { g: SplitGroup; initial: { name: string; ban
   const share = useShareGroup();
   const stop = useStopShare();
   const updateProfile = useUpdateProfile();
+  const friendAdd = useSetFriendAdd();
   const [name, setName] = useState(initial.name);
   const [bank, setBank] = useState(initial.bank);
   const [line, setLine] = useState(initial.line);
@@ -39,7 +45,7 @@ function ShareForm({ g, initial }: { g: SplitGroup; initial: { name: string; ban
   const dirty = name.trim() !== initial.name || bank.trim() !== initial.bank || line.trim() !== initial.line;
   const url = g.shareToken && typeof window !== 'undefined' ? `${window.location.origin}/s/${g.shareToken}` : '';
   const intro = `${name.trim() || '我'} 邀請你看「${g.name}」的分帳，點連結就能看要付誰多少，不用下載：`;
-  const busy = share.isPending || stop.isPending || updateProfile.isPending;
+  const busy = share.isPending || stop.isPending || updateProfile.isPending || friendAdd.isPending;
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   const saveProfile = async () => {
@@ -61,7 +67,7 @@ function ShareForm({ g, initial }: { g: SplitGroup; initial: { name: string; ban
   return (
     <>
       <SheetHeader id={SHARE_TITLE_ID} title="分享給朋友" en="Share" sub={g.name} onClose={close} />
-      <p className="-mt-2 text-body-s leading-[1.8] text-muted">朋友點連結就能看這個群組的帳、知道要付誰多少，付完按「我已付款」，你確認後才會記帳。不用下載、不用註冊。</p>
+      <p className="-mt-2 text-body-s leading-[1.8] text-muted">朋友點連結就能看這個群組的帳、知道要付誰多少，付完按「我已付款」，你確認後才會記帳。{g.allowFriendAdd ? '朋友也可以自己記花費，跟你有關的一樣要你確認。' : ''}不用下載、不用註冊。</p>
 
       <Field label="你在朋友頁上的名字" htmlFor="share-name">
         <input id="share-name" data-autofocus value={name} onChange={(e) => setName(e.target.value)} maxLength={20} placeholder="例如：Yuki" autoComplete="off" className="field-input" />
@@ -110,6 +116,21 @@ function ShareForm({ g, initial }: { g: SplitGroup; initial: { name: string; ban
               其他分享方式
             </button>
           )}
+          <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-2">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-body">朋友可以新增花費</span>
+              <span className="caption leading-[1.7]">誰先付都能自己記；跟你有關的要你確認，朋友之間的直接記進群組</span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={g.allowFriendAdd}
+              aria-label="朋友可以新增花費"
+              onClick={() => run(() => friendAdd.mutateAsync({ groupId: g.id, allow: !g.allowFriendAdd }), g.allowFriendAdd ? '已關閉，朋友只能看帳、說已付款' : '已開放朋友新增花費')}
+              disabled={busy}
+              className="switch"
+            />
+          </div>
           <p className="flex items-start gap-2 px-1 text-caption leading-[1.7] text-muted">
             <Info size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 flex-none" />
             <span>朋友只看得到這個群組的花費與結算，看不到你的個人記帳。連結外流的話，重設後舊連結立刻失效。</span>
@@ -141,17 +162,84 @@ function ShareForm({ g, initial }: { g: SplitGroup; initial: { name: string; ban
   );
 }
 
-/** 待確認：朋友在分享頁按了「我已付款」，你確認後才寫進還款與個人帳 */
+/** 待確認：朋友在分享頁新增了跟你有關的花費、或按了「我已付款」，你確認後才寫進群組與個人帳 */
 export function InboxSheet({ groups, groupId }: { groups: SplitGroup[]; groupId?: string }) {
   const close = useUi((s) => s.closeSheet);
-  const items = groups.filter((g) => !groupId || g.id === groupId).flatMap((g) => waitingClaims(g).map((c) => ({ g, c })));
+  const list = groups.filter((g) => !groupId || g.id === groupId);
+  const proposals = list.flatMap((g) => waitingProposals(g).map((p) => ({ g, p })));
+  const claims = list.flatMap((g) => waitingClaims(g).map((c) => ({ g, c })));
+  const isLast = proposals.length + claims.length === 1;
   return (
     <>
-      <SheetHeader id={SHARE_TITLE_ID} title="待確認" en="Inbox" sub="朋友說已付款，要你確認才會記帳" onClose={close} />
-      {items.length
-        ? items.map(({ g, c }) => <ClaimItem key={c.id} g={g} c={c} isLast={items.length === 1} />)
-        : <EmptyBox title="都處理好了">朋友在分享連結按「我已付款」時，會出現在這裡。</EmptyBox>}
+      <SheetHeader id={SHARE_TITLE_ID} title="待確認" en="Inbox" sub="朋友新增的花費、說已付款，都要你確認才會記帳" onClose={close} />
+      {proposals.map(({ g, p }) => <ProposalItem key={p.id} g={g} p={p} isLast={isLast} />)}
+      {claims.map(({ g, c }) => <ClaimItem key={c.id} g={g} c={c} isLast={isLast} />)}
+      {!proposals.length && !claims.length && <EmptyBox title="都處理好了">朋友從分享連結新增花費、或按「我已付款」時，會出現在這裡。</EmptyBox>}
     </>
+  );
+}
+
+/** 朋友新增、跟你有關的花費：可以改分類；你先付的要選付款帳戶。確認後照一般花費寫進群組與你的帳 */
+function ProposalItem({ g, p, isLast }: { g: SplitGroup; p: SplitProposal; isLast: boolean }) {
+  const close = useUi((s) => s.closeSheet);
+  const showToast = useUi((s) => s.showToast);
+  const { data: accounts = [] } = useAccounts();
+  const confirm = useConfirmProposal();
+  const reject = useRejectProposal();
+  const me = meOf(g)!;
+  const youPaid = p.payerId === me.id;
+  const payable = payableAccounts(accounts);
+  const [categoryId, setCategoryId] = useState(getCategory(p.categoryId).type === 'EXPENSE' ? getCategory(p.categoryId).id : 'other');
+  const [accountId, setAccountId] = useState(payable[0]?.id ?? '');
+  const [error, setError] = useState('');
+  const mine = myShare(g, p);
+  const original = p.currency !== 'TWD' && p.originalAmount ? formatForeign(p.originalAmount, p.currency) : undefined;
+  const busy = confirm.isPending || reject.isPending;
+  const acct = accountId || payable[0]?.id || '';
+
+  const doConfirm = async () => {
+    if (youPaid && !acct) return setError('請先新增付款帳戶');
+    try {
+      await confirm.mutateAsync({ proposalId: p.id, categoryId, accountId: youPaid ? acct : null });
+      showToast(`已記入：${p.title}${mine ? `，你的部分 ${formatMoney(mine)}` : ''}`);
+      if (isLast) close();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '操作失敗，請再試一次');
+    }
+  };
+  const doReject = async () => {
+    try {
+      await reject.mutateAsync(p.id);
+      showToast(`已退回，${memberName(g, p.addedBy)}在分享頁會看到`);
+      if (isLast) close();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '操作失敗，請再試一次');
+    }
+  };
+
+  return (
+    <div className="card flex flex-col gap-3 p-4">
+      <p className="text-body-s leading-[1.8]">
+        <b className="font-medium">{memberName(g, p.addedBy)}</b> 在「{g.name}」新增了「{p.title} <span className="num">{original ?? formatMoney(p.amount)}</span>」（{shortDate(p.date)}），
+        {youPaid ? '說是你先付的' : `${memberName(g, p.payerId)}先付`}{mine ? <>，你的部分 <b className="num font-normal">{formatMoney(mine)}</b></> : ''}。
+      </p>
+      <Field label="分類">
+        <Pills items={categoriesFor('EXPENSE').map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
+      </Field>
+      {youPaid && (
+        <Field label="從哪個帳戶付">
+          {payable.length
+            ? <Pills items={payable.map((a) => ({ id: a.id, label: a.name }))} value={acct} onPick={setAccountId} label="付款帳戶" wrap />
+            : <p className="text-body-s text-muted">還沒有帳戶，請先到資產頁新增。</p>}
+        </Field>
+      )}
+      <EffectBox lines={effectLines(g, { amount: p.amount, amounts: p.amounts, payerId: p.payerId, accountId: acct, categoryId }, accounts, original)} />
+      {error && <p role="alert" className="text-caption text-alert">{error}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={doReject} disabled={busy} className="btn-secondary press">有問題，退回</button>
+        <button type="button" onClick={doConfirm} disabled={busy} className="btn-primary press min-h-11">記入我的帳</button>
+      </div>
+    </div>
   );
 }
 

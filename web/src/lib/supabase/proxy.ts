@@ -4,6 +4,8 @@ import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './env';
 
 // /s/<token>：朋友點分帳分享連結，不用登入
 const PUBLIC_PATHS = ['/login', '/auth', '/s'];
+// 朋友在分享頁記外幣花費要參考匯率；匯率是公開資料，不含任何人的帳
+const PUBLIC_APIS = ['/api/fx'];
 
 /** 每次請求更新登入 cookie，並把未登入的人導到登入頁 */
 export async function updateSession(request: NextRequest) {
@@ -39,7 +41,7 @@ export async function updateSession(request: NextRequest) {
   };
 
   // API 是給前端 fetch 用的，未登入回 401，導到登入頁的話前端只會拿到一頁 HTML
-  if (!signedIn && pathname.startsWith('/api/')) return NextResponse.json({ error: '登入已過期，請重新登入' }, { status: 401 });
+  if (!signedIn && pathname.startsWith('/api/') && !PUBLIC_APIS.includes(pathname)) return NextResponse.json({ error: '登入已過期，請重新登入' }, { status: 401 });
   if (!signedIn && !isPublic) return redirectTo('/login');
   if (signedIn && pathname === '/login') return redirectTo('/');
   return response;

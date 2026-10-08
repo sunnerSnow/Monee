@@ -6,7 +6,7 @@ import { accountSummary, budgetFor, budgetPace, countsForBudget, dailyBudget, mo
 import { useAccounts, useBudgets, useSplitGroups, useTransactions } from '@/lib/data';
 import { daysInMonth, greeting, longDate, monthKeyOf, toISODate } from '@/lib/dates';
 import { money, signedBalance } from '@/lib/money';
-import { waitingClaims } from '@/lib/split';
+import { inboxCount } from '@/lib/split';
 import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
@@ -280,9 +280,9 @@ function Onboarding({ now, accounts, budget }: { now: Date; accounts: Account[];
   );
 }
 
-/** 朋友在分享連結說已付款：首頁也提醒，點了直接確認 */
+/** 朋友在分享連結說已付款、新增了跟你有關的花費：首頁也提醒，點了直接確認 */
 function SplitInbox() {
   const { data: groups = [] } = useSplitGroups();
   const openSheet = useUi((s) => s.openSheet);
-  return <InboxBanner count={groups.flatMap(waitingClaims).length} onOpen={() => openSheet({ kind: 'splitInbox' })} />;
+  return <InboxBanner count={groups.reduce((s, g) => s + inboxCount(g), 0)} onOpen={() => openSheet({ kind: 'splitInbox' })} />;
 }

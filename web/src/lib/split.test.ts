@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeTrip, allocate, balances, friendTotals, initialOf, isSettled, memberInvolved, myNet, myShare, myTripSpend, originalShareOf, parseMemberNames, publicAsGroup,
-  splitAmounts,
-  splitProblem, suggestTransfers, tripDay, tripLength, waitingClaims,
+  activeTrip, allocate, balances, friendTotals, inboxCount, initialOf, involves, isSettled, memberInvolved, myNet, myShare, myTripSpend, originalShareOf,
+  parseMemberNames, publicAsGroup, splitAmounts, splitProblem, suggestTransfers, tripDay, tripLength, waitingClaims, waitingProposals,
 } from './split';
 import type { SplitExpense, SplitGroup } from './types';
 
@@ -21,8 +20,8 @@ const ex = (payerId: string, amount: number, amounts: Record<string, number>, ro
 const all = (v: number) => ({ me: v, ming: v, hua: v, mei: v });
 // 原型的週六陽明山：6 筆、4 個人輪流先付
 const trip = (): SplitGroup => ({
-  id: 'g', name: '週六陽明山', kind: 'event', createdAt: '', members, settlements: [], rounds: [], shareToken: null, claims: [],
-  startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false,
+  id: 'g', name: '週六陽明山', kind: 'event', createdAt: '', members, settlements: [], rounds: [], shareToken: null, claims: [], proposals: [],
+  startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false, allowFriendAdd: true,
   expenses: [
     ex('ming', 360, all(90)),
     ex('me', 200, all(50)),
@@ -123,6 +122,48 @@ describe('分享頁', () => {
     const pg = publicAsGroup(view);
     expect(balances(pg)).toEqual(balances(g));
     expect(waitingClaims(pg).map((c) => c.id)).toEqual(['c1']);
+    // 還沒跑 Phase ④ SQL 的舊資料沒有這兩個欄位：當作不開放、沒有待確認
+    expect(pg.allowFriendAdd).toBe(false);
+    expect(pg.proposals).toEqual([]);
+  });
+});
+
+describe('朋友新增花費', () => {
+  const proposal = (id: string, status: 'waiting' | 'confirmed' | 'rejected') => ({
+    id, addedBy: 'ming', date: '2026-10-03', title: '回程加油', categoryId: 'transit', amount: 600, payerId: 'ming',
+    weights: all(1), amounts: all(150), currency: 'TWD', originalAmount: null, status, createdAt: '',
+  });
+
+  it('跟某人有關：他先付的，或有分到他', () => {
+    expect(involves({ payerId: 'me', amounts: { ming: 300 } }, 'me')).toBe(true);
+    expect(involves({ payerId: 'ming', amounts: { me: 150, ming: 150 } }, 'me')).toBe(true);
+    expect(involves({ payerId: 'ming', amounts: { hua: 150, ming: 150, me: 0 } }, 'me')).toBe(false);
+  });
+
+  it('待確認的件數：說已付款加上新增的花費，只算等待中的', () => {
+    const g = {
+      ...trip(),
+      claims: [{ id: 'c1', fromId: 'mei', toId: 'me', amount: 550, status: 'waiting' as const, createdAt: '' }],
+      proposals: [proposal('p1', 'waiting'), proposal('p2', 'confirmed'), proposal('p3', 'rejected')],
+    };
+    expect(waitingProposals(g).map((p) => p.id)).toEqual(['p1']);
+    expect(inboxCount(g)).toBe(2);
+  });
+
+  it('等確認的花費不算進結算，確認前後朋友看到的淨額不變', () => {
+    const g = trip();
+    const view = {
+      group: { id: g.id, name: g.name, kind: g.kind, startDate: null, endDate: null, currency: 'TWD', allowFriendAdd: true },
+      owner: { name: 'Yuki', bank: null, line: null }, members: g.members, rounds: [], settlements: [], claims: [],
+      expenses: g.expenses.map(({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts }) => ({ id, roundId, date, title, categoryId, amount, payerId, mode, amounts, currency: 'TWD', originalAmount: null })),
+      // jsonb 的數字可能是字串
+      proposals: [{ ...proposal('p1', 'waiting'), amount: '600' as unknown as number, amounts: { me: '150', ming: '150', hua: '150', mei: '150' } as unknown as Record<string, number> }],
+    };
+    const pg = publicAsGroup(view);
+    expect(pg.allowFriendAdd).toBe(true);
+    expect(pg.proposals[0].amount).toBe(600);
+    expect(pg.proposals[0].amounts.me).toBe(150);
+    expect(balances(pg)).toEqual(balances(g));
   });
 });
 

@@ -10,8 +10,8 @@ import { formatForeign, getCurrency } from '@/lib/currency';
 import { dayLabel, toISODate } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
 import {
-  balances, isEmptyGroup, isTrip, meOf, memberName, modeText, myShare, myTripSpend, openExpenses, openSettlements, originalShareOf, suggestTransfers, tripDay,
-  tripLength, waitingClaims,
+  balances, inboxCount, isEmptyGroup, isTrip, meOf, memberName, modeText, myShare, myTripSpend, openExpenses, openSettlements, originalShareOf, suggestTransfers,
+  tripDay, tripLength, waitingClaims,
 } from '@/lib/split';
 import type { SplitExpense, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
@@ -61,7 +61,7 @@ export function GroupScreen({ id }: { id: string }) {
       <>
         {header}
         <TripHero g={g} mine={mine} />
-        <InboxBanner count={waitingClaims(g).length} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
+        <InboxBanner count={inboxCount(g)} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
         {solo ? <div className="flex flex-col gap-5"><Expenses g={g} /></div> : (
           <>
             <div role="tablist" aria-label="旅程內容" className="seg-tabs">
@@ -93,7 +93,7 @@ export function GroupScreen({ id }: { id: string }) {
         </div>
       </section>
 
-      <InboxBanner count={waitingClaims(g).length} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
+      <InboxBanner count={inboxCount(g)} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
 
       <div role="tablist" aria-label="群組內容" className="seg-tabs">
         <button type="button" role="tab" id="tab-expenses" aria-selected={tab === 'expenses'} aria-controls="panel-expenses" onClick={() => setTab('expenses')} className="press">花費 {list.length}</button>

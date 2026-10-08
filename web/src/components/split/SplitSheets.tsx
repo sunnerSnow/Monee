@@ -114,6 +114,7 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
     <>
       <SheetHeader id={TITLE_ID} title={e.title} en="Expense" sub={`${shortDate(e.date)}${e.time ? ` ${e.time}` : ''}・${g.name}`} onClose={close} />
       {e.roundId && <p className="caption -mt-2 flex items-center gap-1.5"><Info size={14} strokeWidth={1.5} aria-hidden />這筆已經結清，只能查看。</p>}
+      {e.addedBy && <p className="caption -mt-2">{memberName(g, e.addedBy)} 從分享連結記的</p>}
       <div className="flex items-baseline justify-between gap-3 rounded-sm bg-fill px-4 py-3.5">
         <span className="caption">{memberName(g, e.payerId)}付{payerAcct ? `（${payerAcct}）` : ''}</span>
         <span className="flex flex-col items-end">

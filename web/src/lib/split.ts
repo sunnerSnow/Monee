@@ -95,15 +95,29 @@ export const isSettled = (g: SplitGroup) => !openExpenses(g).length && g.rounds.
 
 /** 朋友在分享頁按了「我已付款」、還沒確認的 */
 export const waitingClaims = (g: Pick<SplitGroup, 'claims'>) => g.claims.filter((c) => c.status === 'waiting');
+/** 朋友從分享頁新增、跟你有關、還沒確認的花費 */
+export const waitingProposals = (g: Pick<SplitGroup, 'proposals'>) => g.proposals.filter((p) => p.status === 'waiting');
+/** 待確認的件數：說已付款＋新增的花費 */
+export const inboxCount = (g: Pick<SplitGroup, 'claims' | 'proposals'>) => waitingClaims(g).length + waitingProposals(g).length;
+
+/** 這筆花費跟這個人有沒有關係：他先付的，或有分到他 */
+export const involves = (e: Pick<SplitExpense, 'payerId' | 'amounts'>, memberId: string) => e.payerId === memberId || (e.amounts[memberId] ?? 0) > 0;
+
+const numbers = (o: Record<string, number | string> | null | undefined) => Object.fromEntries(Object.entries(o ?? {}).map(([k, v]) => [k, Number(v)]));
 
 /** 分享頁拿到的資料轉成 SplitGroup，才能共用 balances、suggestTransfers */
 export function publicAsGroup(v: PublicSplit): SplitGroup {
   return {
     id: v.group.id, name: v.group.name, kind: v.group.kind, createdAt: '', shareToken: null, claims: v.claims, members: v.members, rounds: v.rounds,
     startDate: v.group.startDate ?? null, endDate: v.group.endDate ?? null, currency: v.group.currency ?? 'TWD', budget: null, excludeFromBudget: false,
+    allowFriendAdd: v.group.allowFriendAdd ?? false,
+    proposals: (v.proposals ?? []).map((p) => ({
+      ...p, amount: Number(p.amount), amounts: numbers(p.amounts), weights: numbers(p.weights),
+      originalAmount: p.originalAmount != null ? Number(p.originalAmount) : null,
+    })),
     expenses: v.expenses.map((e) => ({
       ...e, amount: Number(e.amount), currency: e.currency ?? 'TWD', originalAmount: e.originalAmount != null ? Number(e.originalAmount) : null,
-      fxRate: null, time: null, accountId: null, weights: e.weights ?? {}, createdAt: '',
+      fxRate: null, time: null, accountId: null, weights: e.weights ?? {}, createdAt: '', addedBy: e.addedBy ?? null,
     })),
     settlements: v.settlements.map((s) => ({ ...s, amount: Number(s.amount), accountId: null, createdAt: '' })),
   };

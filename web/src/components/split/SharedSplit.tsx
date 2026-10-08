@@ -1,15 +1,18 @@
 'use client';
 
-import { Check, Copy, Info } from 'lucide-react';
+import { Check, Copy, Info, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { getCategory } from '@/lib/categories';
 import { copyText } from '@/lib/clipboard';
 import { formatForeign } from '@/lib/currency';
-import { usePublicClaim, usePublicSplit } from '@/lib/data';
+import { usePublicClaim, usePublicRemove, usePublicSplit } from '@/lib/data';
 import { formatMoney } from '@/lib/money';
-import { balances, initialOf, modeText, openExpenses, originalShareOf, publicAsGroup, suggestTransfers, type Transfer } from '@/lib/split';
-import type { PublicSplit, SplitMember } from '@/lib/types';
+import {
+  balances, initialOf, involves, modeText, openExpenses, originalShareOf, publicAsGroup, suggestTransfers, waitingProposals, type Transfer,
+} from '@/lib/split';
+import type { PublicSplit, SplitGroup, SplitMember } from '@/lib/types';
+import { FriendExpenseForm } from './FriendExpenseForm';
 import { kindLabel, shortDate } from './parts';
 
 const whoKey = (token: string) => `monee-share-${token}`;
@@ -123,17 +126,36 @@ function FriendView({ view, token, me, onSwitch }: { view: PublicSplit; token: s
   const past = g.expenses.filter((e) => e.roundId);
   const rejected = view.claims.filter((c) => c.fromId === me.id && c.status === 'rejected');
   const [toast, setToast] = useState('');
+  const [adding, setAdding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const heading = useRef<HTMLDivElement>(null);
 
-  // 選完名字後把焦點移到標題，報讀器知道畫面換了
-  useEffect(() => { heading.current?.querySelector('h1')?.focus(); }, []);
+  // 選完名字、或從新增表單回來，把焦點移到標題，報讀器知道畫面換了
+  useEffect(() => { if (!adding) heading.current?.querySelector('h1')?.focus(); }, [adding]);
 
   const notify = (msg: string) => {
     setToast(msg);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast(''), 2400);
   };
+  const toastBox = (
+    <div role="status" aria-live="polite" className={`fixed bottom-8 left-1/2 z-30 max-w-[calc(100%-40px)] -translate-x-1/2 truncate rounded-full bg-fg px-[18px] py-2.5 text-body-s text-surface transition-opacity ${toast ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+      {toast}
+    </div>
+  );
+  const openForm = (open: boolean) => {
+    setAdding(open);
+    window.scrollTo({ top: 0 });
+  };
+
+  if (adding) {
+    return (
+      <>
+        <FriendExpenseForm g={g} token={token} me={me} ownerName={view.owner.name} onCancel={() => openForm(false)} onDone={(msg) => { openForm(false); notify(msg); }} />
+        {toastBox}
+      </>
+    );
+  }
 
   return (
     <>
@@ -178,6 +200,14 @@ function FriendView({ view, token, me, onSwitch }: { view: PublicSplit; token: s
         <PayCard key={t.toId} view={view} token={token} me={me} t={t} toOwner={t.toId === owner.id} toName={nameOf(t.toId)} onNotify={notify} />
       ))}
 
+      {view.group.allowFriendAdd && (
+        <button type="button" onClick={() => openForm(true)} className="press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]">
+          <Plus size={18} strokeWidth={1.5} aria-hidden />新增一筆（誰先付的都可以記）
+        </button>
+      )}
+
+      <FriendAdded g={g} token={token} me={me} ownerName={view.owner.name} nameOf={nameOf} onNotify={notify} />
+
       <section aria-labelledby="mine-title" className="flex flex-col gap-2.5">
         <div className="flex items-baseline justify-between px-1">
           <h2 id="mine-title" className="h-sec">你的花費</h2>
@@ -209,10 +239,88 @@ function FriendView({ view, token, me, onSwitch }: { view: PublicSplit; token: s
       {past.length > 0 && <ExpenseTable title={`之前已結清 ${g.rounds.length} 次・${past.length} 筆`} rows={past} nameOf={nameOf} />}
 
       <Footer />
-      <div role="status" aria-live="polite" className={`fixed bottom-8 left-1/2 z-30 max-w-[calc(100%-40px)] -translate-x-1/2 truncate rounded-full bg-fg px-[18px] py-2.5 text-body-s text-surface transition-opacity ${toast ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
-        {toast}
-      </div>
+      {toastBox}
     </>
+  );
+}
+
+/**
+ * 從分享頁記的花費：所有人送出、等分享的人確認的；你被退回的；你記的朋友之間花費（還沒結清）。
+ * 你記的都可以撤回；已經確認進分享的人帳上的，只能請他改。
+ */
+function FriendAdded({ g, token, me, ownerName, nameOf, onNotify }: {
+  g: SplitGroup;
+  token: string;
+  me: SplitMember;
+  ownerName: string;
+  nameOf: (id: string) => string;
+  onNotify: (msg: string) => void;
+}) {
+  const remove = usePublicRemove(token);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const owner = g.members.find((m) => m.isMe)!;
+  const rows = [
+    ...waitingProposals(g).map((p) => ({ ...p, state: 'waiting' as const })),
+    ...g.proposals.filter((p) => p.status === 'rejected' && p.addedBy === me.id).map((p) => ({ ...p, state: 'rejected' as const })),
+    ...openExpenses(g).filter((e) => e.addedBy === me.id && !involves(e, owner.id)).map((e) => ({ ...e, addedBy: me.id, state: 'added' as const })),
+  ];
+  if (!rows.length) return null;
+
+  const withdraw = async (id: string, title: string) => {
+    setError('');
+    try {
+      await remove.mutateAsync({ memberId: me.id, id });
+      setConfirmId(null);
+      onNotify(`已撤回「${title}」`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '撤回失敗，請再試一次');
+    }
+  };
+  const status = { waiting: `等 ${ownerName} 確認`, rejected: `${ownerName} 說有問題，退回了`, added: '已記進群組' };
+
+  return (
+    <section aria-labelledby="added-title" className="flex flex-col gap-2.5">
+      <h2 id="added-title" className="h-sec px-1">從這裡記的花費</h2>
+      <ul className="card py-1">
+        {rows.map((r) => {
+          const mine = r.addedBy === me.id;
+          const amountText = r.currency !== 'TWD' && r.originalAmount ? formatForeign(r.originalAmount, r.currency) : formatMoney(r.amount);
+          return (
+            <li key={r.id} className="flex flex-col gap-2 border-t border-line px-4 py-3 first:border-t-0">
+              <div className="flex items-center gap-3">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-body">{r.title}</span>
+                  <span className="truncate text-caption tracking-[.06em] text-muted">
+                    {shortDate(r.date)}・{mine ? '你' : nameOf(r.addedBy)}記的・{nameOf(r.payerId)}付 {amountText}
+                  </span>
+                </span>
+                <span className={`flex-none rounded-full px-2 py-px text-[11px] ${r.state === 'rejected' ? 'bg-alert-tint text-alert' : r.state === 'waiting' ? 'bg-warn-tint text-warn-fg' : 'bg-fill text-muted'}`}>
+                  {status[r.state]}
+                </span>
+              </div>
+              {mine && (confirmId === r.id ? (
+                <div role="alertdialog" aria-label={`撤回「${r.title}」`} className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setConfirmId(null)} className="btn-secondary press min-h-10" autoFocus>取消</button>
+                  <button type="button" onClick={() => withdraw(r.id, r.title)} disabled={remove.isPending} className="btn-secondary press min-h-10 border-alert text-alert">
+                    {remove.isPending ? '撤回中…' : '確定撤回'}
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setConfirmId(r.id)} className="caption press min-h-10 self-start underline">
+                  {r.state === 'rejected' ? '刪掉這筆，重新記' : '撤回'}
+                </button>
+              ))}
+            </li>
+          );
+        })}
+      </ul>
+      {error && <p role="alert" className="px-1 text-caption text-alert">{error}</p>}
+      <p className="flex items-start gap-2 px-1 text-caption leading-[1.7] text-muted">
+        <Info size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 flex-none" />
+        <span>等確認的花費還不會算進上面的結算。{ownerName} 確認後，記錯了要請 {ownerName} 修改。</span>
+      </p>
+    </section>
   );
 }
 

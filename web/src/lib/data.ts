@@ -8,8 +8,8 @@ import { SAMPLE_RATES, type FxRates } from './currency';
 import { demo, isDemo } from './demo';
 import { createClient } from './supabase/client';
 import type {
-  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, PnlColor, Profile, PublicSplit, SplitClaim,
-  SplitExpense, SplitGroup, SplitGroupInput, SplitKind, SplitSettlement, Transaction,
+  Account, BudgetEntry, NewAccount, NewFriendExpense, NewSplitExpense, NewSplitSettlement, NewTransaction, PnlColor, Profile, PublicSplit, SplitClaim,
+  SplitExpense, SplitGroup, SplitGroupInput, SplitKind, SplitProposal, SplitSettlement, Transaction,
 } from './types';
 
 /** 首頁、明細與報表需要的歷史月數（含當月） */
@@ -326,13 +326,19 @@ interface SplitGroupRow {
   currency: string | null;
   budget: number | string | null;
   exclude_from_budget: boolean | null;
+  allow_friend_add: boolean | null;
   members: { id: string; name: string; is_me: boolean; created_at: string }[];
   claims: { id: string; from_id: string; to_id: string; amount: number | string; status: SplitClaim['status']; created_at: string }[];
+  proposals: {
+    id: string; added_by: string; date: string; title: string; category_id: string; amount: number | string; payer_id: string;
+    weights: Record<string, number | string>; amounts: Record<string, number | string>; currency: string;
+    original_amount: number | string | null; status: SplitProposal['status']; created_at: string;
+  }[] | null;
   expenses: {
     id: string; round_id: string | null; date: string; time: string | null; title: string; category_id: string;
     amount: number | string; payer_id: string; account_id: string | null; mode: SplitExpense['mode'];
     weights: Record<string, number | string>; amounts: Record<string, number | string>; created_at: string;
-    currency: string | null; original_amount: number | string | null; fx_rate: number | string | null;
+    currency: string | null; original_amount: number | string | null; fx_rate: number | string | null; added_by?: string | null;
   }[];
   settlements: {
     id: string; round_id: string | null; from_id: string; to_id: string; amount: number | string;
@@ -354,8 +360,16 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
   currency: r.currency ?? 'TWD',
   budget: r.budget != null ? Number(r.budget) : null,
   excludeFromBudget: Boolean(r.exclude_from_budget),
+  allowFriendAdd: Boolean(r.allow_friend_add),
   claims: (r.claims ?? [])
     .map((c): SplitClaim => ({ id: c.id, fromId: c.from_id, toId: c.to_id, amount: Number(c.amount), status: c.status, createdAt: c.created_at }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  proposals: (r.proposals ?? [])
+    .map((p): SplitProposal => ({
+      id: p.id, addedBy: p.added_by, date: p.date, title: p.title, categoryId: p.category_id, amount: Number(p.amount), payerId: p.payer_id,
+      weights: numbers(p.weights), amounts: numbers(p.amounts), currency: p.currency,
+      originalAmount: p.original_amount != null ? Number(p.original_amount) : null, status: p.status, createdAt: p.created_at,
+    }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   // 你排第一，朋友照加入順序（平分的零頭也照這個順序給）
   members: [...r.members]
@@ -367,7 +381,7 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
       amount: Number(e.amount), payerId: e.payer_id, accountId: e.account_id, mode: e.mode,
       weights: numbers(e.weights), amounts: numbers(e.amounts), createdAt: e.created_at,
       currency: e.currency ?? 'TWD', originalAmount: e.original_amount != null ? Number(e.original_amount) : null,
-      fxRate: e.fx_rate != null ? Number(e.fx_rate) : null,
+      fxRate: e.fx_rate != null ? Number(e.fx_rate) : null, addedBy: e.added_by ?? null,
     }))
     .sort((a, b) => `${b.date} ${b.time ?? ''} ${b.createdAt}`.localeCompare(`${a.date} ${a.time ?? ''} ${a.createdAt}`)),
   settlements: r.settlements
@@ -389,7 +403,7 @@ export function useSplitGroups() {
       const rows = await unwrap<SplitGroupRow[]>(
         createClient()
           .from('split_groups')
-          .select('id, name, kind, created_at, share_token, start_date, end_date, currency, budget, exclude_from_budget, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at)')
+          .select('id, name, kind, created_at, share_token, start_date, end_date, currency, budget, exclude_from_budget, allow_friend_add, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at), proposals:split_proposals(id, added_by, date, title, category_id, amount, payer_id, weights, amounts, currency, original_amount, status, created_at)')
           .order('created_at', { ascending: false }),
       );
       return rows.map(toSplitGroup);
@@ -556,6 +570,42 @@ export function useRejectClaim() {
   });
 }
 
+/** 朋友可以從分享連結新增花費（開關） */
+export function useSetFriendAdd() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ groupId, allow }: { groupId: string; allow: boolean }) => {
+      if (isDemo) return demo.setFriendAdd(groupId, allow);
+      const rows = await unwrap<{ id: string }[]>(createClient().from('split_groups').update({ allow_friend_add: allow }).eq('id', groupId).select('id'));
+      if (!rows.length) throw new Error('找不到這個群組');
+    },
+    onSuccess: () => invalidate(keys.split),
+  });
+}
+
+/** 確認朋友新增的花費：寫進群組與個人帳（可以改分類；你先付時要選付款帳戶） */
+export function useConfirmProposal() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (v: { proposalId: string; categoryId: string; accountId: string | null }) => {
+      if (isDemo) return demo.confirmProposal(v);
+      return rpc<string>('split_confirm_proposal', { p_proposal: v.proposalId, p_category: v.categoryId, p_account: v.accountId });
+    },
+    onSuccess: () => invalidate(...SPLIT_TOUCHES),
+  });
+}
+
+export function useRejectProposal() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (proposalId: string) => {
+      if (isDemo) return demo.rejectProposal(proposalId);
+      await rpc('split_reject_proposal', { p_proposal: proposalId });
+    },
+    onSuccess: () => invalidate(keys.split),
+  });
+}
+
 /** 朋友點分享連結：不用登入就能讀；連結失效時回傳 null */
 export function usePublicSplit(token: string) {
   return useQuery({
@@ -573,6 +623,34 @@ export function usePublicClaim(token: string) {
     mutationFn: async (v: { fromId: string; toId: string; amount: number }) => {
       if (isDemo) return demo.publicClaim(token, v);
       await rpc('split_public_claim', { p_token: token, p_from: v.fromId, p_to: v.toId, p_amount: v.amount });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['public-split', token] }),
+  });
+}
+
+/** 朋友新增一筆；回傳 pending 為 true 代表跟分享的人有關，要等對方確認 */
+export function usePublicAddExpense(token: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (e: NewFriendExpense): Promise<{ id: string; pending: boolean }> => {
+      if (isDemo) return demo.publicAddExpense(token, e);
+      return rpc('split_public_add_expense', {
+        p_token: token, p_member: e.memberId, p_date: e.date, p_title: e.title, p_category: e.categoryId, p_amount: e.amount,
+        p_payer: e.payerId, p_weights: e.weights, p_amounts: e.amounts, p_currency: e.currency, p_original_amount: e.originalAmount,
+        p_fx_rate: e.fxRate, p_original_shares: e.originalShares,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['public-split', token] }),
+  });
+}
+
+/** 朋友撤回自己記的：還沒確認的、被退回的，或跟分享的人無關的花費 */
+export function usePublicRemove(token: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { memberId: string; id: string }) => {
+      if (isDemo) return demo.publicRemove(token, v);
+      await rpc('split_public_remove', { p_token: token, p_member: v.memberId, p_id: v.id });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['public-split', token] }),
   });

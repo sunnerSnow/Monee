@@ -4,7 +4,7 @@ import { ChevronLeft, Info, Plane, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useSplitGroups } from '@/lib/data';
 import { money } from '@/lib/money';
-import { friendTotals, isEmptyGroup, isSettled, myNet, openExpenses, waitingClaims } from '@/lib/split';
+import { friendTotals, inboxCount, isEmptyGroup, isSettled, myNet, openExpenses } from '@/lib/split';
 import { useUi } from '@/lib/ui-store';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
 import { Avatars, InboxBanner, OweText, kindLabel, shortDate } from './parts';
@@ -57,7 +57,7 @@ export function SplitScreen() {
         <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3"><span className="caption">你欠朋友</span><span className="num text-[16px]">{money(totals.pay, hidden)}</span></div>
       </div>
 
-      <InboxBanner count={groups.flatMap(waitingClaims).length} onOpen={() => openSheet({ kind: 'splitInbox' })} />
+      <InboxBanner count={groups.reduce((s, g) => s + inboxCount(g), 0)} onOpen={() => openSheet({ kind: 'splitInbox' })} />
 
       <section aria-labelledby="groups-title" className="flex flex-col gap-2.5">
         <h2 id="groups-title" className="h-sec px-1">群組<span className="en">Groups</span></h2>

@@ -4,10 +4,10 @@ import { reconcileDiff } from './budget';
 import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
-import { balances, meOf, memberInvolved, openExpenses, originalShareOf, splitAmounts } from './split';
+import { balances, involves, meOf, memberInvolved, openExpenses, originalShareOf, splitAmounts } from './split';
 import type {
-  Account, BudgetEntry, NewAccount, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, PublicSplit, SplitExpense, SplitGroup, SplitGroupInput, SplitKind,
-  SplitSettlement, Transaction,
+  Account, BudgetEntry, NewAccount, NewFriendExpense, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, PublicSplit, SplitExpense, SplitGroup,
+  SplitGroupInput, SplitKind, SplitSettlement, Transaction,
 } from './types';
 
 export const isDemo = process.env.NEXT_PUBLIC_MONEE_DEMO === '1';
@@ -173,7 +173,7 @@ export const demo = {
     const gid = id('g');
     db().split.unshift({
       id: gid, name: input.name.trim(), kind: input.kind, createdAt: new Date().toISOString(), expenses: [], settlements: [], rounds: [],
-      shareToken: null, claims: [], ...tripFields(input),
+      shareToken: null, claims: [], proposals: [], allowFriendAdd: true, ...tripFields(input),
       members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n) => ({ id: id('m'), name: n, isMe: false }))],
     });
     return gid;
@@ -280,6 +280,31 @@ export const demo = {
     if (!c) throw new Error('找不到這筆通知，可能已經處理過了');
     c.status = 'rejected';
   },
+  // ---------- 朋友新增花費 ----------
+  async setFriendAdd(groupId: string, allow: boolean) {
+    await pause();
+    group(groupId).allowFriendAdd = allow;
+  },
+  async confirmProposal(v: { proposalId: string; categoryId: string; accountId: string | null }) {
+    const g = db().split.find((x) => x.proposals.some((p) => p.id === v.proposalId && p.status === 'waiting'));
+    const p = g?.proposals.find((x) => x.id === v.proposalId);
+    if (!g || !p) throw new Error('找不到這筆花費，可能已經處理過了');
+    const foreign = p.currency !== 'TWD' && p.originalAmount;
+    const expenseId = await demo.saveSplitExpense({
+      groupId: g.id, date: p.date, time: null, title: p.title, categoryId: v.categoryId || p.categoryId, amount: p.amount, payerId: p.payerId,
+      accountId: v.accountId, mode: 'equal', weights: p.weights, amounts: p.amounts, currency: p.currency,
+      originalAmount: foreign ? p.originalAmount : null, fxRate: foreign ? p.amount / p.originalAmount! : null,
+    });
+    g.expenses.find((e) => e.id === expenseId)!.addedBy = p.addedBy;
+    p.status = 'confirmed';
+    return expenseId;
+  },
+  async rejectProposal(proposalId: string) {
+    await pause();
+    const p = db().split.flatMap((g) => g.proposals).find((x) => x.id === proposalId && x.status === 'waiting');
+    if (!p) throw new Error('找不到這筆花費，可能已經處理過了');
+    p.status = 'rejected';
+  },
   /** 朋友看到的資料：跟 split_public_view 一樣，不含帳戶與交易 */
   async publicView(token: string): Promise<PublicSplit | null> {
     await pause();
@@ -287,16 +312,52 @@ export const demo = {
     if (!g) return null;
     const p = db().profile;
     return structuredClone({
-      group: { id: g.id, name: g.name, kind: g.kind, startDate: g.startDate, endDate: g.endDate, currency: g.currency },
+      group: { id: g.id, name: g.name, kind: g.kind, startDate: g.startDate, endDate: g.endDate, currency: g.currency, allowFriendAdd: g.allowFriendAdd },
       owner: { name: p.displayName || '朋友', bank: p.payBank, line: p.payLine },
       members: g.members,
-      expenses: g.expenses.map(({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts, weights, currency, originalAmount }) => ({
-        id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts, weights, currency, originalAmount,
+      expenses: g.expenses.map(({ id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts, weights, currency, originalAmount, addedBy }) => ({
+        id: eid, roundId, date, title, categoryId, amount, payerId, mode, amounts, weights, currency, originalAmount, addedBy: addedBy ?? null,
       })),
       settlements: g.settlements.map(({ id: sid, roundId, fromId, toId, amount, date }) => ({ id: sid, roundId, fromId, toId, amount, date })),
       rounds: g.rounds,
       claims: g.claims,
+      proposals: g.proposals.filter((x) => x.status !== 'confirmed'),
     });
+  },
+  async publicAddExpense(token: string, e: NewFriendExpense) {
+    await pause();
+    const g = db().split.find((x) => x.shareToken === token);
+    if (!g) throw new Error('分享連結已失效，請跟分享的人要新的連結');
+    if (!g.allowFriendAdd) throw new Error('這個群組沒有開放朋友新增花費');
+    if (Object.values(e.amounts).reduce((a, b) => a + b, 0) !== e.amount) throw new Error('每個人分到的金額加起來要等於總金額');
+    const me = meOf(g)!;
+    const now = new Date().toISOString();
+    const foreign = e.currency !== 'TWD';
+    if (involves(e, me.id)) {
+      const pid = id('p');
+      g.proposals.unshift({
+        id: pid, addedBy: e.memberId, date: e.date, title: e.title.trim(), categoryId: e.categoryId, amount: e.amount, payerId: e.payerId,
+        weights: e.weights, amounts: e.amounts, currency: e.currency, originalAmount: foreign ? e.originalAmount : null, status: 'waiting', createdAt: now,
+      });
+      return { id: pid, pending: true };
+    }
+    const eid = id('se');
+    g.expenses.unshift({
+      id: eid, roundId: null, date: e.date, time: null, title: e.title.trim(), categoryId: e.categoryId, amount: e.amount, payerId: e.payerId,
+      accountId: null, mode: 'equal', weights: e.weights, amounts: e.amounts, currency: e.currency,
+      originalAmount: foreign ? e.originalAmount : null, fxRate: foreign ? e.fxRate : null, createdAt: now, addedBy: e.memberId,
+    });
+    return { id: eid, pending: false };
+  },
+  async publicRemove(token: string, v: { memberId: string; id: string }) {
+    await pause();
+    const g = db().split.find((x) => x.shareToken === token);
+    if (!g) throw new Error('分享連結已失效，請跟分享的人要新的連結');
+    const me = meOf(g)!;
+    const before = g.proposals.length + g.expenses.length;
+    g.proposals = g.proposals.filter((p) => !(p.id === v.id && p.addedBy === v.memberId && p.status !== 'confirmed'));
+    g.expenses = g.expenses.filter((e) => !(e.id === v.id && e.addedBy === v.memberId && !e.roundId && !involves(e, me.id)));
+    if (g.proposals.length + g.expenses.length === before) throw new Error('找不到這筆，可能已經確認或結清了');
   },
   async publicClaim(token: string, v: { fromId: string; toId: string; amount: number }) {
     await pause();
@@ -396,7 +457,8 @@ const NO_TRIP = { startDate: null, endDate: null, currency: 'TWD', budget: null,
 /** 範例群組：一天 6 筆的出遊、每月結清的室友與午餐團、整個結清的烤肉、進行中的東京旅程 */
 function seedSplit(day: (offset: number) => string): SplitGroup[] {
   const mk = (gid: string, name: string, kind: SplitKind, friends: string[], created: number): SplitGroup => ({
-    id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [], shareToken: null, claims: [], ...NO_TRIP,
+    id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [], shareToken: null, claims: [], proposals: [],
+    allowFriendAdd: true, ...NO_TRIP,
     members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n, i) => ({ id: `${gid}-${i}`, name: n, isMe: false }))],
   });
   const mid = (g: SplitGroup, n: string) => g.members.find((m) => m.name === n)!.id;
@@ -429,6 +491,12 @@ function seedSplit(day: (offset: number) => string): SplitGroup[] {
   ex(trip, 4, '20:50', '計程車回家', 'transit', 380, '小明', ['我', '小明'], { mode: 'shares' });
   // 示範分享連結：/s/demo0trip000000000000000 可以直接打開朋友看到的頁面
   trip.shareToken = 'demo0trip000000000000000';
+  // 示範待確認的花費：小明從分享頁補記回程加油，四個人平分
+  trip.proposals.push({
+    id: 'p-trip', addedBy: mid(trip, '小明'), date: day(4), title: '回程加油', categoryId: 'transit', amount: 600, payerId: mid(trip, '小明'),
+    weights: Object.fromEntries(all.map((n) => [mid(trip, n), 1])), amounts: Object.fromEntries(all.map((n) => [mid(trip, n), 150])),
+    currency: 'TWD', originalAmount: null, status: 'waiting', createdAt: `${day(0)}T10:00:00Z`,
+  });
 
   const room = mk('g-room', '室友', 'daily', ['阿凱'], 60);
   room.rounds.push({ id: 'r-room', closedAt: day(7) });
