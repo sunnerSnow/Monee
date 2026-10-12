@@ -292,21 +292,16 @@ export function useUpdateProfile() {
   });
 }
 
-/** 設定某月起的預算（amount 為 null 代表從那個月起不設預算）；同一個月重設會覆蓋 */
+/**
+ * 改預算：from（本月）起的紀錄整個換成 entries，之前的月份不動。
+ * entries 用 lib/budget.ts 的 planBudget 算；amount 為 null 代表從那個月起不設預算。
+ */
 export function useSetBudget() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (entry: BudgetEntry) => {
-      if (isDemo) return demo.setBudget(entry);
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) throw new Error('登入已過期，請重新登入');
-      await unwrap(
-        supabase
-          .from('budget_history')
-          .upsert({ user_id: data.user.id, effective_month: entry.month, amount: entry.amount }, { onConflict: 'user_id,effective_month' })
-          .select('effective_month'),
-      );
+    mutationFn: async ({ from, entries }: { from: string; entries: BudgetEntry[] }) => {
+      if (isDemo) return demo.replaceBudgets(from, entries);
+      await rpc('budget_replace_from', { p_from: from, p_entries: entries });
     },
     onSuccess: () => invalidate(keys.budgets),
   });
@@ -327,6 +322,7 @@ interface SplitGroupRow {
   budget: number | string | null;
   exclude_from_budget: boolean | null;
   allow_friend_add: boolean | null;
+  archived_at: string | null;
   members: { id: string; name: string; is_me: boolean; created_at: string }[];
   claims: { id: string; from_id: string; to_id: string; amount: number | string; status: SplitClaim['status']; created_at: string }[];
   proposals: {
@@ -361,6 +357,7 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
   budget: r.budget != null ? Number(r.budget) : null,
   excludeFromBudget: Boolean(r.exclude_from_budget),
   allowFriendAdd: Boolean(r.allow_friend_add),
+  archivedAt: r.archived_at,
   claims: (r.claims ?? [])
     .map((c): SplitClaim => ({ id: c.id, fromId: c.from_id, toId: c.to_id, amount: Number(c.amount), status: c.status, createdAt: c.created_at }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -403,7 +400,7 @@ export function useSplitGroups() {
       const rows = await unwrap<SplitGroupRow[]>(
         createClient()
           .from('split_groups')
-          .select('id, name, kind, created_at, share_token, start_date, end_date, currency, budget, exclude_from_budget, allow_friend_add, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at), proposals:split_proposals(id, added_by, date, title, category_id, amount, payer_id, weights, amounts, currency, original_amount, status, created_at)')
+          .select('id, name, kind, created_at, share_token, start_date, end_date, currency, budget, exclude_from_budget, allow_friend_add, archived_at, members:split_members(id, name, is_me, created_at), expenses:split_expenses(*), settlements:split_settlements(*), rounds:split_rounds(id, closed_at, created_at), claims:split_claims(id, from_id, to_id, amount, status, created_at), proposals:split_proposals(id, added_by, date, title, category_id, amount, payer_id, weights, amounts, currency, original_amount, status, created_at)')
           .order('created_at', { ascending: false }),
       );
       return rows.map(toSplitGroup);
@@ -449,14 +446,30 @@ export function useUpdateSplitGroup() {
   });
 }
 
+/** 刪除群組；有花費時要 force，連同花費、還款和你帳上的對應交易一起刪 */
 export function useDeleteSplitGroup() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (groupId: string) => {
-      if (isDemo) return demo.deleteSplitGroup(groupId);
-      await rpc('split_delete_group', { p_group: groupId });
+    mutationFn: async ({ groupId, force }: { groupId: string; force: boolean }) => {
+      if (isDemo) return demo.deleteSplitGroup(groupId, force);
+      await rpc('split_delete_group', { p_group: groupId, p_force: force });
     },
     onSuccess: () => invalidate(...SPLIT_TOUCHES),
+  });
+}
+
+/** 封存或取消封存：帳和明細都保留，只是從列表收起來 */
+export function useArchiveSplitGroup() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ groupId, archived }: { groupId: string; archived: boolean }) => {
+      if (isDemo) return demo.archiveSplitGroup(groupId, archived);
+      const rows = await unwrap<{ id: string }[]>(
+        createClient().from('split_groups').update({ archived_at: archived ? new Date().toISOString() : null }).eq('id', groupId).select('id'),
+      );
+      if (!rows.length) throw new Error('找不到這個群組，可能已經刪除');
+    },
+    onSuccess: () => invalidate(keys.split),
   });
 }
 

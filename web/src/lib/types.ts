@@ -162,6 +162,8 @@ export interface SplitGroup {
   excludeFromBudget: boolean;
   /** 朋友可以從分享連結新增花費 */
   allowFriendAdd: boolean;
+  /** 封存時間：從分帳列表收起來、記一筆不會選到它；null 代表沒有封存 */
+  archivedAt: string | null;
   claims: SplitClaim[];
   proposals: SplitProposal[];
   members: SplitMember[];

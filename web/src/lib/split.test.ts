@@ -21,7 +21,7 @@ const all = (v: number) => ({ me: v, ming: v, hua: v, mei: v });
 // 原型的週六陽明山：6 筆、4 個人輪流先付
 const trip = (): SplitGroup => ({
   id: 'g', name: '週六陽明山', kind: 'event', createdAt: '', members, settlements: [], rounds: [], shareToken: null, claims: [], proposals: [],
-  startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false, allowFriendAdd: true,
+  startDate: null, endDate: null, currency: 'TWD', budget: null, excludeFromBudget: false, allowFriendAdd: true, archivedAt: null,
   expenses: [
     ex('ming', 360, all(90)),
     ex('me', 200, all(50)),
@@ -173,6 +173,8 @@ describe('旅程', () => {
     expect(activeTrip([trip(), tokyo()], '2026-11-05')?.id).toBe('t');
     expect(activeTrip([tokyo()], '2026-11-09')).toBeUndefined();
     expect(activeTrip([trip()], '2026-11-05')).toBeUndefined();
+    // 封存的旅程不會自動記進去
+    expect(activeTrip([{ ...tokyo(), archivedAt: '2026-11-04T00:00:00Z' }], '2026-11-05')).toBeUndefined();
     expect(tripDay(tokyo(), '2026-11-03')).toBe(1);
     expect(tripDay(tokyo(), '2026-11-08')).toBe(6);
     expect(tripDay(tokyo(), '2026-11-09')).toBeNull();

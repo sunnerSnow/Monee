@@ -78,6 +78,7 @@ export function draftInstruction(accounts: DraftAccount[], today: string, contex
   const fallback = getCurrency(context?.currency ?? 'TWD');
   return `你是 Monee 記帳 App 的助理，負責把使用者的語音、文字或收據照片整理成「一筆」交易草稿；使用者確認後才會寫入。
 今天是 ${today}（週${weekday(today)}，台灣時間）。語音或文字沒提到幣別時，金額是${fallback.name}（${fallback.code}）。
+使用者在台灣，說的是台灣國語、用台灣用語（例如說「儲值」不說「充值」），「塊」「元」「塊錢」都是指金額。常常只講「品項＋金額」，例如「蛋 45」「咖啡 60」，這也是一筆記帳。
 
 帳戶（accountId、targetAccountId 只能用這些 id，判斷不出來就填 ${NONE}）：
 ${accountLines}
@@ -95,7 +96,7 @@ ${accountLines}
 5. note：${MAX_NOTE} 字以內的繁體中文，格式「店名或場合・品項」，例如「全聯・衛生紙、洗衣精」「午餐・拉麵」。外文收據要把品項翻成中文，店名有常見的中文名稱就用中文，例如「羅森・飯糰、綠茶」。
 6. rawInput：語音的逐字稿；收據則用繁體中文寫出店名、日期、品項與總計，外文的要翻譯。
 7. confidence：0 到 1，你對金額與分類有多確定。
-8. isTransaction：內容跟記帳無關、照片不是收據、或完全聽不清楚時填 false。${context ? splitRules(context) : ''}`;
+8. isTransaction：內容跟記帳無關、照片不是收據、或完全聽不清楚時填 false；聽得到金額就填 true，品項聽不清楚也照你聽到的寫進 note。${context ? splitRules(context) : ''}`;
 }
 
 export const SOURCE_PROMPT: Record<DraftSource, string> = {
@@ -155,12 +156,15 @@ export function sanitizeDraft(raw: unknown, { accounts, today, source, context }
   context?: DraftContext;
 }): AiDraftTransaction {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  if (r.isTransaction === false) throw new NotATransactionError(source);
-
-  const type: TransactionType = !context && (r.type === 'INCOME' || r.type === 'TRANSFER') ? r.type : 'EXPENSE';
   const currency = typeof r.currency === 'string' && CODES.has(r.currency) ? r.currency : context?.currency ?? 'TWD';
   const scale = 10 ** getCurrency(currency).decimals;
   const amount = typeof r.amount === 'number' && Number.isFinite(r.amount) && r.amount > 0 ? Math.min(Math.round(r.amount * scale) / scale, 99_999_999) : 0;
+  // 很短的一句（「蔥 19 塊」）AI 常聽不準品項，就判成不是記帳；有聽到金額就照樣給草稿，讓使用者改品項就好。
+  // 收據不一樣：照片不是收據時直接說，比給一張亂填的草稿好
+  const doubtful = r.isTransaction === false;
+  if (doubtful && (source === 'receipt' || !amount)) throw new NotATransactionError(source);
+
+  const type: TransactionType = !context && (r.type === 'INCOME' || r.type === 'TRANSFER') ? r.type : 'EXPENSE';
   const allowed = categoriesFor(type);
   const categoryId = allowed.some((c) => c.id === r.categoryId) ? (r.categoryId as string) : allowed[0].id;
 
@@ -172,7 +176,9 @@ export function sanitizeDraft(raw: unknown, { accounts, today, source, context }
     : null;
 
   const date = isISODate(r.date) && r.date <= today ? r.date : today;
-  const confidence = typeof r.confidence === 'number' && Number.isFinite(r.confidence) ? Math.min(Math.max(r.confidence, 0), 1) : 0.5;
+  const reported = typeof r.confidence === 'number' && Number.isFinite(r.confidence) ? Math.min(Math.max(r.confidence, 0), 1) : 0.5;
+  // AI 自己覺得不像記帳的，畫面要提醒使用者檢查
+  const confidence = doubtful ? Math.min(reported, 0.4) : reported;
   const payer = context?.members.length && typeof r.payer === 'string' && (r.payer === ME || context.members.includes(r.payer)) ? r.payer : null;
 
   return {
@@ -185,7 +191,8 @@ export function sanitizeDraft(raw: unknown, { accounts, today, source, context }
     suggestedAccountId: accountId,
     suggestedTargetAccountId: targetAccountId,
     suggestedDate: date,
-    suggestedNote: str(r.note, MAX_NOTE),
+    // 沒有店名時 AI 會寫成「・雞蛋」，去掉頭尾多的分隔點
+    suggestedNote: str(r.note, MAX_NOTE).replace(/^[・\s]+|[・\s]+$/g, ''),
     suggestedPayer: payer,
   };
 }

@@ -133,7 +133,10 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
         {budget && pace && (
           <div className="flex flex-col gap-2">
             <div className="flex justify-between gap-2 text-caption tracking-[.08em] text-muted">
-              <span>本月預算 <span className="num">{money(budget, hidden)}</span></span>
+              {/* 設定完「開始設定」就收起來了，從這裡回去改預算 */}
+              <Link href="/settings#s-budget" className="press -my-3 inline-flex min-h-11 items-center gap-1">
+                本月預算 <span className="num">{money(budget, hidden)}</span><ChevronRight size={14} strokeWidth={1.5} aria-hidden />
+              </Link>
               <span>已用 <span className="num">{pace.usedPct}%</span></span>
             </div>
             <div aria-hidden className="relative mt-5 h-[var(--bar-h)] rounded-full bg-fill">

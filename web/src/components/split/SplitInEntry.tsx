@@ -30,14 +30,16 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
   const create = useCreateSplitGroup();
   const showToast = useUi((s) => s.showToast);
   const openSheet = useUi((s) => s.openSheet);
-  const ordered = [...groups.filter((g) => !isSettled(g)), ...groups.filter(isSettled)];
+  // 封存的不列出來（從封存的群組頁進來記的除外）
+  const listed = groups.filter((g) => !g.archivedAt || g.id === defaultGroupId);
+  const ordered = [...listed.filter((g) => !isSettled(g)), ...listed.filter(isSettled)];
   const [groupId, setGroupId] = useState<string | null>(defaultGroupId ?? null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [names, setNames] = useState('');
   const [groupName, setGroupName] = useState('');
   const [error, setError] = useState('');
 
-  const showQuick = quickOpen || (!isPending && groups.length === 0);
+  const showQuick = quickOpen || (!isPending && listed.length === 0);
   const currentId = groupId ?? ordered[0]?.id ?? null;
   const g = groups.find((x) => x.id === currentId);
   const list = parseMemberNames(names);
@@ -107,7 +109,7 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
           </Field>
           {error && <p role="alert" className="text-caption text-alert">{error}</p>}
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setQuickOpen(false)} disabled={!groups.length} className="btn-secondary press min-h-12">取消</button>
+            <button type="button" onClick={() => setQuickOpen(false)} disabled={!listed.length} className="btn-secondary press min-h-12">取消</button>
             <button type="button" onClick={createGroup} disabled={!list.length || create.isPending} className="btn-primary press min-h-12">
               {create.isPending ? '建立中…' : '建立並選取'}
             </button>

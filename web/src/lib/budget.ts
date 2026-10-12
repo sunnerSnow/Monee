@@ -12,6 +12,37 @@ export function budgetFor(entries: BudgetEntry[], month: string): number | null 
   return found?.amount ?? null;
 }
 
+/** 改預算套用到哪些月份：從這個月起、只有這個月、從下個月起 */
+export type BudgetScope = 'from' | 'only' | 'next';
+
+/**
+ * 改預算後，本月（month）起的預算紀錄；過去的月份不動。
+ * 存的時候把本月起的紀錄整個換成這份（本月以前的保留）。
+ * - from：本月起每個月都是 amount，之後排好的蓋掉
+ * - only：只有本月是 amount，下個月起回到原本的；之後排好的保留
+ * - next：本月不變，下個月起每個月都是 amount，之後排好的蓋掉
+ * 跟前一個月一樣的紀錄是多餘的，不會留下。
+ */
+export function planBudget(entries: BudgetEntry[], month: string, amount: number | null, scope: BudgetScope): BudgetEntry[] {
+  const next = shiftMonth(month, 1);
+  const plan: BudgetEntry[] =
+    scope === 'from' ? [{ month, amount }]
+      : scope === 'next' ? [{ month, amount: budgetFor(entries, month) }, { month: next, amount }]
+        : [
+          { month, amount },
+          ...(entries.some((e) => e.month === next) ? [] : [{ month: next, amount: budgetFor(entries, next) }]),
+          ...entries.filter((e) => e.month >= next),
+        ];
+  const result: BudgetEntry[] = [];
+  let prev = budgetFor(entries.filter((e) => e.month < month), month);
+  for (const e of [...plan].sort((a, b) => a.month.localeCompare(b.month))) {
+    if (e.amount === prev) continue;
+    result.push({ month: e.month, amount: e.amount });
+    prev = e.amount;
+  }
+  return result;
+}
+
 export type BudgetStatus = 'ok' | 'tight' | 'over';
 
 export interface DailyBudget {

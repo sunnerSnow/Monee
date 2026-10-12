@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   accountSummary, budgetFor, budgetPace, dailyBudget, expenseByCategory, frequentEntries, groupByDay, monthTotals, visibleTransactions,
-  monthlyExpenses, reconcileDiff,
+  monthlyExpenses, planBudget, reconcileDiff,
 } from './budget';
-import type { Account, Transaction } from './types';
+import type { Account, BudgetEntry, Transaction } from './types';
 
 let n = 0;
 const tx = (p: Partial<Transaction>): Transaction => ({
@@ -47,6 +47,63 @@ describe('budgetFor', () => {
   });
   it('沒有任何紀錄', () => {
     expect(budgetFor([], '2026-10')).toBeNull();
+  });
+});
+
+describe('planBudget', () => {
+  // 5 月起 22,000、9 月起 24,000；現在是 10 月
+  const past = [{ month: '2026-05', amount: 22000 }, { month: '2026-09', amount: 24000 }];
+  const apply = (entries: BudgetEntry[], plan: BudgetEntry[]) => [...entries.filter((e) => e.month < '2026-10'), ...plan];
+
+  it('從這個月起：這個月和之後都是新的金額，之後排好的會被蓋掉', () => {
+    const entries = [...past, { month: '2026-12', amount: 30000 }];
+    const plan = planBudget(entries, '2026-10', 20000, 'from');
+    expect(plan).toEqual([{ month: '2026-10', amount: 20000 }]);
+    expect(budgetFor(apply(entries, plan), '2027-01')).toBe(20000);
+  });
+  it('只有這個月：下個月起回到原本的預算', () => {
+    const plan = planBudget(past, '2026-10', 30000, 'only');
+    expect(plan).toEqual([{ month: '2026-10', amount: 30000 }, { month: '2026-11', amount: 24000 }]);
+    expect(budgetFor(apply(past, plan), '2027-03')).toBe(24000);
+  });
+  it('只有這個月：之後已經排好的預算保留', () => {
+    const entries = [...past, { month: '2026-11', amount: 26000 }, { month: '2027-01', amount: 28000 }];
+    expect(planBudget(entries, '2026-10', 30000, 'only')).toEqual([
+      { month: '2026-10', amount: 30000 }, { month: '2026-11', amount: 26000 }, { month: '2027-01', amount: 28000 },
+    ]);
+  });
+  it('只有這個月：這個月原本就改過，下個月起回到改過的那個金額', () => {
+    const entries = [...past, { month: '2026-10', amount: 25000 }];
+    expect(planBudget(entries, '2026-10', 30000, 'only')).toEqual([{ month: '2026-10', amount: 30000 }, { month: '2026-11', amount: 25000 }]);
+  });
+  it('從下個月起：這個月不變', () => {
+    const entries = [...past, { month: '2026-10', amount: 25000 }, { month: '2027-02', amount: 30000 }];
+    const plan = planBudget(entries, '2026-10', 20000, 'next');
+    expect(plan).toEqual([{ month: '2026-10', amount: 25000 }, { month: '2026-11', amount: 20000 }]);
+    expect(budgetFor(apply(entries, plan), '2026-10')).toBe(25000);
+    expect(budgetFor(apply(entries, plan), '2027-03')).toBe(20000);
+  });
+  it('跟之前一樣的金額不多記一筆；改回原本的就清掉之後的紀錄', () => {
+    expect(planBudget(past, '2026-10', 24000, 'from')).toEqual([]);
+    expect(planBudget(past, '2026-10', 24000, 'next')).toEqual([]);
+    expect(planBudget([...past, { month: '2026-12', amount: 30000 }], '2026-10', 24000, 'from')).toEqual([]);
+  });
+  it('不設預算（null）', () => {
+    expect(planBudget(past, '2026-10', null, 'from')).toEqual([{ month: '2026-10', amount: null }]);
+    expect(planBudget(past, '2026-10', null, 'only')).toEqual([{ month: '2026-10', amount: null }, { month: '2026-11', amount: 24000 }]);
+  });
+  it('第一次設定：之前沒有預算', () => {
+    expect(planBudget([], '2026-10', 24000, 'from')).toEqual([{ month: '2026-10', amount: 24000 }]);
+    expect(planBudget([], '2026-10', 24000, 'only')).toEqual([{ month: '2026-10', amount: 24000 }, { month: '2026-11', amount: null }]);
+    expect(planBudget([], '2026-10', 24000, 'next')).toEqual([{ month: '2026-11', amount: 24000 }]);
+  });
+  it('過去的月份不會出現在結果裡', () => {
+    for (const scope of ['from', 'only', 'next'] as const) {
+      expect(planBudget(past, '2026-10', 20000, scope).every((e) => e.month >= '2026-10')).toBe(true);
+    }
+  });
+  it('跨年：12 月的下個月是隔年 1 月', () => {
+    expect(planBudget(past, '2026-12', 30000, 'only')).toEqual([{ month: '2026-12', amount: 30000 }, { month: '2027-01', amount: 24000 }]);
   });
 });
 

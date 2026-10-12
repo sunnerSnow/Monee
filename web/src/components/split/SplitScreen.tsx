@@ -45,8 +45,11 @@ export function SplitScreen() {
     );
   }
 
-  const open = groups.filter((g) => !isSettled(g));
-  const settled = groups.filter(isSettled);
+  // 封存的收到最下面；朋友欠你、待確認照樣算，帳還在
+  const active = groups.filter((g) => !g.archivedAt);
+  const archived = groups.filter((g) => g.archivedAt);
+  const open = active.filter((g) => !isSettled(g));
+  const settled = active.filter(isSettled);
   const totals = friendTotals(groups);
 
   return (
@@ -105,9 +108,34 @@ export function SplitScreen() {
         </details>
       )}
 
+      {archived.length > 0 && (
+        <details className="group">
+          <summary className="press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-1 text-body-s tracking-[.08em] [&::-webkit-details-marker]:hidden">
+            已封存 {archived.length} 個群組<span aria-hidden className="text-muted group-open:hidden">＋</span><span aria-hidden className="hidden text-muted group-open:inline">－</span>
+          </summary>
+          <ul className="card py-1">
+            {archived.map((g) => {
+              const net = myNet(g);
+              return (
+                <li key={g.id}>
+                  <Link href={`/split/${g.id}`} className="row press">
+                    <Avatars members={g.members.filter((m) => !m.isMe)} max={3} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-body">{g.name}</span>
+                      <span className="truncate text-caption tracking-[.06em] text-muted">{kindLabel(g)}・共 {g.expenses.length} 筆</span>
+                    </span>
+                    {net ? <OweText value={net} hidden={hidden} /> : <span className="flex-none text-caption text-muted">已封存</span>}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+
       <p className="flex items-start gap-2 px-1 text-caption leading-[1.7] text-muted">
         <Info size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 flex-none" />
-        <span>朋友只要名字，不用註冊。全部還清的群組會自動收到「已結清」，有新花費就會回到上面。</span>
+        <span>朋友只要名字，不用註冊。全部還清的群組會自動收到「已結清」，有新花費就會回到上面。用不到的群組，可以在群組右上角「⋯」封存或刪除。</span>
       </p>
     </>
   );

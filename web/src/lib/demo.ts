@@ -149,12 +149,11 @@ export const demo = {
     await pause();
     return db().budgets.map((b) => ({ ...b }));
   },
-  async setBudget(entry: BudgetEntry) {
+  async replaceBudgets(from: string, entries: BudgetEntry[]) {
     await pause();
-    const list = db().budgets;
-    const hit = list.find((b) => b.month === entry.month);
-    if (hit) hit.amount = entry.amount;
-    else list.push({ ...entry });
+    if (from < monthKeyOf(new Date())) throw new Error('過去月份的預算不能改');
+    const s = db();
+    s.budgets = [...s.budgets.filter((b) => b.month < from), ...entries.map((e) => ({ ...e }))];
   },
   async updateProfile(patch: Partial<Profile>) {
     await pause();
@@ -173,7 +172,7 @@ export const demo = {
     const gid = id('g');
     db().split.unshift({
       id: gid, name: input.name.trim(), kind: input.kind, createdAt: new Date().toISOString(), expenses: [], settlements: [], rounds: [],
-      shareToken: null, claims: [], proposals: [], allowFriendAdd: true, ...tripFields(input),
+      shareToken: null, claims: [], proposals: [], allowFriendAdd: true, archivedAt: null, ...tripFields(input),
       members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n) => ({ id: id('m'), name: n, isMe: false }))],
     });
     return gid;
@@ -194,10 +193,20 @@ export const demo = {
     const ids = new Set(g.expenses.map((e) => e.id));
     s.txs.forEach((t) => { if (t.type === 'EXPENSE' && t.splitExpenseId && ids.has(t.splitExpenseId)) t.excludeFromBudget = g.excludeFromBudget; });
   },
-  async deleteSplitGroup(groupId: string) {
+  async deleteSplitGroup(groupId: string, force: boolean) {
     await pause();
-    if (group(groupId).expenses.length) throw new Error('有花費紀錄的群組不能刪除');
-    db().split = db().split.filter((g) => g.id !== groupId);
+    const s = db();
+    const g = group(groupId);
+    if (!force && g.expenses.length) throw new Error('有花費紀錄的群組，要確認後才能刪除');
+    // 你帳上的對應交易一起刪（資料庫是 on delete cascade）
+    const expenseIds = new Set(g.expenses.map((e) => e.id));
+    const settlementIds = new Set(g.settlements.map((x) => x.id));
+    s.txs = s.txs.filter((t) => !(t.splitExpenseId && expenseIds.has(t.splitExpenseId)) && !(t.splitSettlementId && settlementIds.has(t.splitSettlementId)));
+    s.split = s.split.filter((x) => x.id !== groupId);
+  },
+  async archiveSplitGroup(groupId: string, archived: boolean) {
+    await pause();
+    group(groupId).archivedAt = archived ? new Date().toISOString() : null;
   },
   async saveSplitExpense(e: NewSplitExpense) {
     await pause();
@@ -458,7 +467,7 @@ const NO_TRIP = { startDate: null, endDate: null, currency: 'TWD', budget: null,
 function seedSplit(day: (offset: number) => string): SplitGroup[] {
   const mk = (gid: string, name: string, kind: SplitKind, friends: string[], created: number): SplitGroup => ({
     id: gid, name, kind, createdAt: `${day(created)}T00:00:00Z`, expenses: [], settlements: [], rounds: [], shareToken: null, claims: [], proposals: [],
-    allowFriendAdd: true, ...NO_TRIP,
+    allowFriendAdd: true, archivedAt: null, ...NO_TRIP,
     members: [{ id: `${gid}-me`, name: '我', isMe: true }, ...friends.map((n, i) => ({ id: `${gid}-${i}`, name: n, isMe: false }))],
   });
   const mid = (g: SplitGroup, n: string) => g.members.find((m) => m.name === n)!.id;

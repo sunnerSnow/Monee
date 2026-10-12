@@ -119,10 +119,11 @@ export function AssetsScreen() {
   );
 }
 
-/** 朋友往來：分帳的入口。列出還沒結清的群組，結清的收在分帳頁 */
+/** 朋友往來：分帳的入口。列出還沒結清的群組，結清和封存的收在分帳頁 */
 function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; balance: number; hidden: boolean }) {
-  const open = groups.filter((g) => !isSettled(g));
-  const settled = groups.length - open.length;
+  const active = groups.filter((g) => !g.archivedAt);
+  const open = active.filter((g) => !isSettled(g));
+  const settled = active.length - open.length;
   return (
     <section aria-labelledby="g-friends" className="flex flex-col gap-2">
       <h2 id="g-friends" className="flex items-baseline justify-between px-1 text-body-s font-normal tracking-[.1em] text-muted">
@@ -145,7 +146,7 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
             <Link href="/split" className="row press">
               <span aria-hidden className="ico"><Users size={20} strokeWidth={1.5} /></span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-body">{groups.length ? '都結清了' : '跟朋友分帳'}</span>
+                <span className="truncate text-body">{active.length ? '都結清了' : groups.length ? '沒有進行中的群組' : '跟朋友分帳'}</span>
                 <span className="truncate text-caption tracking-[.06em] text-muted">{groups.length ? '有新的一起付的花費，到分帳頁記' : '誰先付都能記，你的帳只算你的部分'}</span>
               </span>
               <ArrowRight size={18} strokeWidth={1.5} aria-hidden className="text-muted" />

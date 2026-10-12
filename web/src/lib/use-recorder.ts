@@ -6,6 +6,8 @@ export type RecorderState = 'idle' | 'starting' | 'recording';
 
 // 依序挑瀏覽器支援的格式：Chrome／Edge 是 webm，Safari 是 mp4，Firefox 是 ogg；三種 Gemini 都聽得懂
 const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'];
+// 按「說完了」後多錄一下，最後一個字才不會被切掉
+const TAIL_MS = 300;
 
 export const canRecord = () =>
   typeof window !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia) && typeof MediaRecorder !== 'undefined';
@@ -13,7 +15,8 @@ export const canRecord = () =>
 interface Session {
   recorder: MediaRecorder;
   stream: MediaStream;
-  timer: ReturnType<typeof setInterval>;
+  timer: ReturnType<typeof setInterval> | null;
+  tail: ReturnType<typeof setTimeout> | null;
   discard: boolean;
 }
 
@@ -39,7 +42,14 @@ export function useRecorder({ maxSeconds, onRecorded }: { maxSeconds: number; on
       return;
     }
     s.discard = discard;
-    if (s.recorder.state !== 'inactive') s.recorder.stop();
+    if (s.recorder.state === 'inactive') return;
+    if (discard) {
+      s.recorder.stop();
+    } else if (!s.tail) {
+      s.tail = setTimeout(() => {
+        if (s.recorder.state !== 'inactive') s.recorder.stop();
+      }, TAIL_MS);
+    }
   }, []);
 
   const start = useCallback(async () => {
@@ -71,29 +81,35 @@ export function useRecorder({ maxSeconds, onRecorded }: { maxSeconds: number; on
     const mimeType = MIME_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32_000 } : undefined);
     const chunks: Blob[] = [];
-    let elapsed = 0;
-    const timer = setInterval(() => {
-      elapsed += 1;
-      setSeconds(elapsed);
-      if (elapsed >= maxSeconds) finish(false);
-    }, 1000);
-    const s: Session = { recorder, stream, timer, discard: false };
+    const s: Session = { recorder, stream, timer: null, tail: null, discard: false };
     session.current = s;
 
+    // 真的開始錄了才顯示「聆聽中」、開始計時；手機開麥克風要一點時間，太早開口第一個字會被切掉
+    recorder.onstart = () => {
+      if (!alive.current || session.current !== s) return;
+      let elapsed = 0;
+      s.timer = setInterval(() => {
+        elapsed += 1;
+        setSeconds(elapsed);
+        if (elapsed >= maxSeconds) finish(false);
+      }, 1000);
+      setState('recording');
+    };
     recorder.ondataavailable = (e) => {
       if (e.data.size) chunks.push(e.data);
     };
     recorder.onstop = () => {
-      clearInterval(timer);
+      if (s.timer) clearInterval(s.timer);
+      if (s.tail) clearTimeout(s.tail);
       stream.getTracks().forEach((t) => t.stop());
       session.current = null;
+      if (!alive.current) return;
       setState('idle');
       setSeconds(0);
       if (!s.discard && chunks.length) onRecordedRef.current(new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' }));
     };
-    recorder.start();
     setSeconds(0);
-    setState('recording');
+    recorder.start();
   }, [finish, maxSeconds]);
 
   // 面板關掉時一定要放掉麥克風，不然手機上方的錄音指示會一直亮著
@@ -104,7 +120,8 @@ export function useRecorder({ maxSeconds, onRecorded }: { maxSeconds: number; on
       const s = session.current;
       if (!s) return;
       s.discard = true;
-      clearInterval(s.timer);
+      if (s.timer) clearInterval(s.timer);
+      if (s.tail) clearTimeout(s.tail);
       if (s.recorder.state !== 'inactive') s.recorder.stop();
       s.stream.getTracks().forEach((t) => t.stop());
     };

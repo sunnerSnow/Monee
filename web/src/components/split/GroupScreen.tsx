@@ -1,11 +1,11 @@
 'use client';
 
-import { ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plane, Plus, Share2 } from 'lucide-react';
+import { Archive, ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plane, Plus, Share2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { getCategory } from '@/lib/categories';
-import { useAccounts, useDeleteSettlement, useSplitGroups } from '@/lib/data';
+import { useAccounts, useArchiveSplitGroup, useDeleteSettlement, useSplitGroups } from '@/lib/data';
 import { formatForeign, getCurrency } from '@/lib/currency';
 import { dayLabel, toISODate } from '@/lib/dates';
 import { formatMoney, money } from '@/lib/money';
@@ -60,6 +60,7 @@ export function GroupScreen({ id }: { id: string }) {
     return (
       <>
         {header}
+        <ArchivedNote g={g} />
         <TripHero g={g} mine={mine} />
         <InboxBanner count={inboxCount(g)} onOpen={() => openSheet({ kind: 'splitInbox', groupId: g.id })} />
         {solo ? <div className="flex flex-col gap-5"><Expenses g={g} /></div> : (
@@ -80,6 +81,7 @@ export function GroupScreen({ id }: { id: string }) {
   return (
     <>
       {header}
+      <ArchivedNote g={g} />
       <section aria-label="你在這個群組" className="card flex flex-col gap-3 p-5">
         <span className="caption">{mine > 0 ? '朋友總共欠你' : mine < 0 ? '你總共要付' : '你在這個群組'}</span>
         <p className={`display m-0 text-display-m leading-[1.2] ${mine < 0 ? 'text-alert' : ''}`}>
@@ -104,6 +106,30 @@ export function GroupScreen({ id }: { id: string }) {
         ? <div role="tabpanel" id="panel-expenses" aria-labelledby="tab-expenses" className="flex flex-col gap-5"><Expenses g={g} /></div>
         : <div role="tabpanel" id="panel-settle" aria-labelledby="tab-settle" className="flex flex-col gap-5"><Settle g={g} net={net} /></div>}
     </>
+  );
+}
+
+/** 封存的群組：提醒一下，可以直接取消封存 */
+function ArchivedNote({ g }: { g: SplitGroup }) {
+  const archive = useArchiveSplitGroup();
+  const showToast = useUi((s) => s.showToast);
+  if (!g.archivedAt) return null;
+  const restore = async () => {
+    try {
+      await archive.mutateAsync({ groupId: g.id, archived: false });
+      showToast(`「${g.name}」回到分帳列表了`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '儲存失敗，請再試一次');
+    }
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-fill py-2 pr-2 pl-4">
+      <Archive size={18} strokeWidth={1.5} aria-hidden className="flex-none text-muted" />
+      <span className="flex-1 text-body-s leading-[1.7]">已封存，不會出現在分帳列表</span>
+      <button type="button" onClick={restore} disabled={archive.isPending} className="btn-secondary press flex-none">
+        {archive.isPending ? '處理中…' : '取消封存'}
+      </button>
+    </div>
   );
 }
 

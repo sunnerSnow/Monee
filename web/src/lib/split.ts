@@ -110,7 +110,7 @@ export function publicAsGroup(v: PublicSplit): SplitGroup {
   return {
     id: v.group.id, name: v.group.name, kind: v.group.kind, createdAt: '', shareToken: null, claims: v.claims, members: v.members, rounds: v.rounds,
     startDate: v.group.startDate ?? null, endDate: v.group.endDate ?? null, currency: v.group.currency ?? 'TWD', budget: null, excludeFromBudget: false,
-    allowFriendAdd: v.group.allowFriendAdd ?? false,
+    allowFriendAdd: v.group.allowFriendAdd ?? false, archivedAt: null,
     proposals: (v.proposals ?? []).map((p) => ({
       ...p, amount: Number(p.amount), amounts: numbers(p.amounts), weights: numbers(p.weights),
       originalAmount: p.originalAmount != null ? Number(p.originalAmount) : null,
@@ -126,10 +126,10 @@ export function publicAsGroup(v: PublicSplit): SplitGroup {
 // ---------- 旅程 ----------
 export const isTrip = (g: Pick<SplitGroup, 'kind'>) => g.kind === 'trip';
 
-/** 今天在旅程日期內的旅程（記一筆會自動記到這裡）；有好幾個時取最晚出發的 */
+/** 今天在旅程日期內的旅程（記一筆會自動記到這裡）；有好幾個時取最晚出發的，封存的不算 */
 export function activeTrip(groups: SplitGroup[], today: string): SplitGroup | undefined {
   return groups
-    .filter((g) => isTrip(g) && g.startDate && g.endDate && g.startDate <= today && today <= g.endDate)
+    .filter((g) => isTrip(g) && !g.archivedAt && g.startDate && g.endDate && g.startDate <= today && today <= g.endDate)
     .sort((a, b) => (b.startDate ?? '').localeCompare(a.startDate ?? ''))[0];
 }
 

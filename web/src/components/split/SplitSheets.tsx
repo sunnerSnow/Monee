@@ -1,16 +1,17 @@
 'use client';
 
-import { Info, Trash2, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Info, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { getCategory } from '@/lib/categories';
 import { CURRENCIES, formatForeign } from '@/lib/currency';
 import {
-  useAccounts, useCreateSplitGroup, useDeleteSplitExpense, useDeleteSplitGroup, useReopenRound, useSettle, useSplitGroups, useUpdateSplitGroup,
+  useAccounts, useArchiveSplitGroup, useCreateSplitGroup, useDeleteSplitExpense, useDeleteSplitGroup, useReopenRound, useSettle, useSplitGroups,
+  useUpdateSplitGroup,
 } from '@/lib/data';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
-import { initialOf, meOf, memberInvolved, memberName, modeText, myShare } from '@/lib/split';
+import { initialOf, meOf, memberInvolved, memberName, modeText, myNet, myShare } from '@/lib/split';
 import type { SplitGroup, SplitKind } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { Sheet, SheetHeader } from '../Sheet';
@@ -307,6 +308,7 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
   const create = useCreateSplitGroup();
   const update = useUpdateSplitGroup();
   const remove = useDeleteSplitGroup();
+  const archive = useArchiveSplitGroup();
   const g = groupId ? groups?.find((x) => x.id === groupId) : undefined;
   const [name, setName] = useState(g?.name ?? '');
   const [kind, setKind] = useState<SplitKind>(g?.kind ?? initialKind ?? 'daily');
@@ -365,7 +367,7 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
   const destroy = async () => {
     if (!g) return;
     try {
-      await remove.mutateAsync(g.id);
+      await remove.mutateAsync({ groupId: g.id, force: g.expenses.length > 0 });
       close();
       router.push('/split');
       showToast(`已刪除「${g.name}」`);
@@ -375,7 +377,30 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
     }
   };
 
-  const busy = create.isPending || update.isPending || remove.isPending;
+  const toggleArchive = async () => {
+    if (!g) return;
+    const archived = !g.archivedAt;
+    try {
+      await archive.mutateAsync({ groupId: g.id, archived });
+      close();
+      if (archived) {
+        router.push('/split');
+        showToast(`已封存「${g.name}」，帳都還在，分帳頁最下面找得到`);
+      } else {
+        showToast(`「${g.name}」回到分帳列表了`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '儲存失敗，請再試一次');
+    }
+  };
+
+  const busy = create.isPending || update.isPending || remove.isPending || archive.isPending;
+  // 刪除前寫清楚會刪掉什麼；還沒結清的另外提醒
+  const net = g ? myNet(g) : 0;
+  const deleteWarning = !g || !g.expenses.length ? '' : [
+    `${g.expenses.length} 筆花費${g.settlements.length ? `、${g.settlements.length} 筆還款` : ''}，連同你帳上對應的交易都會一起刪掉，無法復原。`,
+    net > 0 ? `還沒結清：朋友還欠你 ${formatMoney(net)}，刪掉後朋友往來就不會再記這筆。` : net < 0 ? `還沒結清：你還欠朋友 ${formatMoney(-net)}，刪掉後朋友往來就不會再記這筆。` : '',
+  ].join('');
   return (
     <>
       <SheetHeader
@@ -454,18 +479,29 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
       {g && (
         <section aria-labelledby="group-danger" className="flex flex-col gap-2 border-t border-line pt-4">
           <h3 id="group-danger" className="caption">管理</h3>
+          <button type="button" onClick={toggleArchive} disabled={busy} className="btn-secondary press w-full">
+            {g.archivedAt
+              ? <><ArchiveRestore size={16} strokeWidth={1.5} aria-hidden />取消封存</>
+              : <><Archive size={16} strokeWidth={1.5} aria-hidden />封存{g.kind === 'trip' ? '旅程' : '群組'}</>}
+          </button>
+          <p className="caption px-1 leading-[1.8]">
+            {g.archivedAt ? '取消封存後會回到分帳列表，記一筆也選得到。' : '封存後從分帳列表收起來，記一筆也不會選到；帳和明細都保留，隨時可以取消封存。'}
+          </p>
           {confirmDelete ? (
-            <div role="alertdialog" aria-labelledby="group-del-q" className="flex flex-col gap-3 rounded-sm bg-alert-tint p-4">
+            <div role="alertdialog" aria-labelledby="group-del-q" aria-describedby={deleteWarning ? 'group-del-d' : undefined} className="flex flex-col gap-3 rounded-sm bg-alert-tint p-4">
               <p id="group-del-q" className="text-body-s text-alert">確定刪除「{g.name}」？</p>
+              {deleteWarning && <p id="group-del-d" className="text-body-s leading-[1.8] text-alert">{deleteWarning}</p>}
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setConfirmDelete(false)} className="btn-secondary press" autoFocus>取消</button>
-                <button type="button" onClick={destroy} disabled={busy} className="btn-secondary press border-alert text-alert">刪除</button>
+                <button type="button" onClick={destroy} disabled={busy} className="btn-secondary press border-alert text-alert">{remove.isPending ? '刪除中…' : '刪除'}</button>
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => setConfirmDelete(true)} disabled={g.expenses.length > 0} className="btn-secondary press w-full text-alert">刪除群組</button>
+            <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className="btn-secondary press w-full text-alert">
+              <Trash2 size={16} strokeWidth={1.5} aria-hidden />刪除{g.kind === 'trip' ? '旅程' : '群組'}
+            </button>
           )}
-          <p className="caption px-1 leading-[1.8]">{g.expenses.length ? '有花費紀錄的群組不能刪除（會影響你的帳）。全部結清後會自動收到「已結清」，不會佔列表。' : '還沒有任何花費，可以直接刪除。'}</p>
+          <p className="caption px-1 leading-[1.8]">{g.expenses.length ? '刪除會連同花費、還款和你帳上的對應交易一起刪掉；只想收起來的話用封存。' : '還沒有任何花費，可以直接刪除。'}</p>
         </section>
       )}
     </>

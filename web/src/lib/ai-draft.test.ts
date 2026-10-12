@@ -43,8 +43,28 @@ describe('sanitizeDraft', () => {
   });
 
   it('不是記帳內容時丟出錯誤，訊息依來源不同', () => {
-    expect(() => sanitizeDraft({ ...base, isTransaction: false }, ctx)).toThrow(NotATransactionError);
+    expect(() => sanitizeDraft({ ...base, isTransaction: false, amount: 0 }, ctx)).toThrow(NotATransactionError);
+    expect(() => sanitizeDraft({ ...base, isTransaction: false, amount: 0 }, { ...ctx, source: 'text' })).toThrow(/看不出/);
+    // 照片不是收據：有金額也直接說
     expect(() => sanitizeDraft({ ...base, isTransaction: false }, { ...ctx, source: 'receipt' })).toThrow(/收據/);
+  });
+
+  it('語音很短、AI 聽不準品項而判成不是記帳時，有金額就照樣給草稿，信心壓低讓畫面提醒檢查', () => {
+    const d = sanitizeDraft({ ...base, isTransaction: false, rawInput: '從 19 塊', amount: 19, note: '從', confidence: 0.8 }, ctx);
+    expect(d).toMatchObject({ suggestedAmount: 19, suggestedNote: '從', rawInput: '從 19 塊' });
+    expect(d.confidence).toBeLessThanOrEqual(0.4);
+  });
+
+  it('沒有店名時去掉品項前面多的分隔點', () => {
+    expect(sanitizeDraft({ ...base, note: '・雞蛋' }, ctx).suggestedNote).toBe('雞蛋');
+    expect(sanitizeDraft({ ...base, note: ' ・19塊・ ' }, ctx).suggestedNote).toBe('19塊');
+    expect(sanitizeDraft({ ...base, note: '全聯・衛生紙' }, ctx).suggestedNote).toBe('全聯・衛生紙');
+  });
+
+  it('指示裡說明是台灣用語，「品項＋金額」的短句也算記帳', () => {
+    const text = draftInstruction([], '2026-10-07');
+    expect(text).toContain('台灣用語');
+    expect(text).toContain('聽得到金額就填 true');
   });
 
   it('金額取整數；沒有、負數或不是數字就是 0', () => {

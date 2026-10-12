@@ -123,7 +123,9 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
           <span role="status">{recorder.state === 'starting' ? '準備麥克風…' : '聆聽中'}</span>
           <span aria-hidden className="num ml-auto text-body-s text-muted">{clock(recorder.seconds)}{left <= 10 ? `・剩 ${left} 秒` : ''}</span>
         </div>
-        <p className="caption leading-[1.8]">說出品項、金額和付款方式，例如{example}。</p>
+        <p className="caption leading-[1.8]">
+          {recorder.state === 'starting' ? '看到「聆聽中」再開口。' : ''}說出品項、金額和付款方式，例如{example}。品項只有一個字時，前面加「買」比較聽得準，例如「買蔥 19 塊」。
+        </p>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={recorder.cancel} className="btn-secondary press">取消</button>
           <button type="button" onClick={recorder.stop} autoFocus className="btn-secondary press border-primary bg-primary text-on-primary">
@@ -222,7 +224,7 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
           {phase.note && <p className="caption leading-[1.8]">{phase.note}</p>}
           {(draft.confidence < LOW_CONFIDENCE || !draft.suggestedAmount) && (
             <p className="caption text-warn-fg">
-              {draft.suggestedAmount ? '有些地方不太確定，請檢查金額、分類和帳戶。' : '沒有聽到金額，請用下面的鍵盤輸入。'}
+              {draft.suggestedAmount ? '有些地方不太確定，請檢查品項、金額、分類和帳戶。' : '沒有聽到金額，請用下面的鍵盤輸入。'}
             </p>
           )}
         </div>
