@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  NotATransactionError, draftInstruction, draftSchema, isISODate, parseDraftAccounts, parseDraftContext, sanitizeDraft, type DraftAccount,
+  NotATransactionError, draftInstruction, draftSchema, isISODate, parseDraftAccounts, parseDraftContext, sanitizeDraft, voiceHint, type DraftAccount,
 } from './ai-draft';
 
 const accounts: DraftAccount[] = [
@@ -65,6 +65,14 @@ describe('sanitizeDraft', () => {
     const text = draftInstruction([], '2026-10-07');
     expect(text).toContain('台灣用語');
     expect(text).toContain('聽得到金額就填 true');
+  });
+
+  it('語音附上手機轉出來的字當參考；空白或不是文字就不附', () => {
+    expect(voiceHint('  蔥 19\n塊 ')).toContain('「蔥 19 塊」');
+    expect(voiceHint('   ')).toBeNull();
+    expect(voiceHint(null)).toBeNull();
+    expect(voiceHint(new Blob(['x']))).toBeNull();
+    expect(voiceHint('蔥'.repeat(500))!.length).toBeLessThan(300);
   });
 
   it('金額取整數；沒有、負數或不是數字就是 0', () => {

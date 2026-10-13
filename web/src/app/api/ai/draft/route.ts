@@ -1,7 +1,8 @@
 // AI 記帳草稿：收語音、收據照片或一句文字，請 Gemini 整理成交易草稿回傳。不寫資料庫，使用者確認後才由前端寫入。
 import { NextResponse } from 'next/server';
 import {
-  NotATransactionError, SOURCE_PROMPT, draftInstruction, draftSchema, isISODate, parseDraftAccounts, parseDraftContext, sanitizeDraft, type DraftSource,
+  NotATransactionError, SOURCE_PROMPT, draftInstruction, draftSchema, isISODate, parseDraftAccounts, parseDraftContext, sanitizeDraft, voiceHint,
+  type DraftSource,
 } from '@/lib/ai-draft';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createClient } from '@/lib/supabase/server';
@@ -130,6 +131,9 @@ export async function POST(request: Request) {
     const mimeType = file.type.split(';')[0].trim().toLowerCase();
     if (!MIME[source].includes(mimeType)) return fail(415, source === 'voice' ? '這個瀏覽器的錄音格式不支援' : '請上傳 JPG、PNG 或 HEIC 照片');
     parts.push({ inlineData: { mimeType, data: Buffer.from(await file.arrayBuffer()).toString('base64') } });
+    // 錄音時手機轉出來的字（有的瀏覽器才有）
+    const hint = source === 'voice' ? voiceHint(form.get('text')) : null;
+    if (hint) parts.push({ text: hint });
   }
 
   try {
