@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { requestDraft, shrinkImage } from '@/lib/ai-client';
 import type { AiDraftTransaction, DraftContext, DraftSource } from '@/lib/ai-draft';
 import type { Account } from '@/lib/types';
-import { useLiveTranscript } from '@/lib/use-live-transcript';
+import { canTranscribe, useLiveTranscript } from '@/lib/use-live-transcript';
 import { canRecord, useRecorder } from '@/lib/use-recorder';
 
 const MAX_SECONDS = 30;
@@ -20,22 +20,6 @@ type Phase =
   | { kind: 'error'; source: DraftSource; message: string };
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
-// 音量條：五條中間高、兩邊低，跟著音量長高；沒聲音時剩一點點
-const BAR_SHAPE = [0.55, 0.8, 1, 0.8, 0.55];
-function LevelBars({ level }: { level: number }) {
-  return (
-    <span aria-hidden className="flex h-5 w-[27px] flex-none items-center gap-[3px]">
-      {BAR_SHAPE.map((s, i) => (
-        <i
-          key={i}
-          className="block h-full w-[3px] rounded-full bg-alert transition-transform duration-100 ease-out motion-reduce:transition-none"
-          style={{ transform: `scaleY(${Math.max(0.15, Math.min(1, level * s * 1.6))})` }}
-        />
-      ))}
-    </span>
-  );
-}
 
 /**
  * 記一筆上方的 AI 入口：說一句、拍收據（不能錄音的瀏覽器改成打一句）。
@@ -52,7 +36,7 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
 }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [text, setText] = useState('');
-  const [voiceOk] = useState(canRecord);
+  const [voiceOk] = useState(() => canRecord() || canTranscribe());
   const fileInput = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController | null>(null);
   const draftCard = useRef<HTMLDivElement>(null);
@@ -82,41 +66,26 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
     }
   };
 
-  // 錄音時邊說邊顯示字（有的瀏覽器才有）；轉出來的字跟錄音一起送給 AI 當參考
-  const live = useLiveTranscript();
-
-  const onRecorded = async (audio: Blob) => {
-    // 先顯示「正在整理」，等手機轉完最後的字（最多 1.2 秒）再一起送出；等的時候按了取消就不送
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    setPhase({ kind: 'working', source: 'voice' });
-    const heard = await live.finish();
-    if (controller.signal.aborted) return;
-    run('voice', { file: audio, text: heard || undefined });
-  };
-
-  const recorder = useRecorder({ maxSeconds: MAX_SECONDS, onRecorded });
+  // 說一句：瀏覽器能轉字就邊說邊顯示字、說完把字交給 AI；不能（iPhone 主畫面 App、LINE）就錄音交給 AI 聽。
+  // 兩個不同時用麥克風，同時用的話手機上第二次會錄不到聲音
+  const live = useLiveTranscript({
+    maxSeconds: MAX_SECONDS,
+    onDone: (heard) => run('voice', { text: heard }),
+    onError: (message) => setPhase({ kind: 'error', source: 'voice', message }),
+  });
+  const recorder = useRecorder({ maxSeconds: MAX_SECONDS, onRecorded: (audio) => run('voice', { file: audio }) });
+  const transcribing = live.state !== 'idle';
 
   const startVoice = async () => {
     setPhase({ kind: 'idle' });
+    // 轉字要在按下的當下開始，Safari 才會動
+    if (canTranscribe()) return live.start();
     live.cancel();
     try {
-      // 先拿到麥克風開始錄，再開始轉字：轉字失敗也不會影響錄音
-      if (await recorder.start()) live.start();
+      await recorder.start();
     } catch (e) {
       setPhase({ kind: 'error', source: 'voice', message: e instanceof Error ? e.message : '無法開始錄音' });
     }
-  };
-
-  const doneSpeaking = () => {
-    live.stop();
-    recorder.stop();
-  };
-
-  const cancelVoice = () => {
-    live.cancel();
-    recorder.cancel();
   };
 
   const pickReceipt = () => fileInput.current?.click();
@@ -156,28 +125,30 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
     />
   );
 
-  if (recorder.state !== 'idle') {
-    const left = MAX_SECONDS - recorder.seconds;
-    const recording = recorder.state === 'recording';
+  if (transcribing || recorder.state !== 'idle') {
+    const seconds = transcribing ? live.seconds : recorder.seconds;
+    const left = MAX_SECONDS - seconds;
+    const listening = transcribing ? live.state === 'listening' : recorder.state === 'recording';
+    const finishing = live.state === 'finishing';
     return (
       <div className="card flex flex-col gap-3 rounded-sm p-4">
         <div className="flex items-center gap-2.5 text-body">
-          <LevelBars level={recording ? recorder.level : 0} />
+          <span aria-hidden className="size-2.5 rounded-full bg-alert animate-[pulse_1.2s_ease-in-out_infinite] motion-reduce:animate-none" />
           {/* 只播報狀態；秒數和轉出來的字一直在變，放進 live region 會讓報讀器一直念 */}
-          <span role="status">{recording ? '聆聽中' : '準備麥克風…'}</span>
-          <span aria-hidden className="num ml-auto text-body-s text-muted">{clock(recorder.seconds)}{left <= 10 ? `・剩 ${left} 秒` : ''}</span>
+          <span role="status">{finishing ? '收尾中…' : listening ? '聆聽中' : '準備麥克風…'}</span>
+          <span aria-hidden className="num ml-auto text-body-s text-muted">{clock(seconds)}{left <= 10 ? `・剩 ${left} 秒` : ''}</span>
         </div>
-        {(live.text || live.status === 'listening') && (
+        {transcribing && (
           <p aria-hidden className={`min-h-[52px] rounded-sm bg-fill px-4 py-3 leading-[1.7] ${live.text ? 'text-body' : 'text-body-s text-muted'}`}>
-            {live.text || (recording ? '說吧，你說的字會出現在這裡' : '…')}
+            {live.text || (listening ? '說吧，你說的字會出現在這裡' : '…')}
           </p>
         )}
         <p className="caption leading-[1.8]">
-          {recording ? '' : '看到「聆聽中」再開口。'}說出品項、金額和付款方式，例如{example}。品項只有一個字時，前面加「買」比較聽得準，例如「買蔥 19 塊」。
+          {listening ? '' : '看到「聆聽中」再開口。'}說出品項、金額和付款方式，例如{example}。{transcribing ? '說完停一下就會自動整理。' : '品項只有一個字時，前面加「買」比較聽得準，例如「買蔥 19 塊」。'}
         </p>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={cancelVoice} className="btn-secondary press">取消</button>
-          <button type="button" onClick={doneSpeaking} autoFocus className="btn-secondary press border-primary bg-primary text-on-primary">
+          <button type="button" onClick={transcribing ? live.cancel : recorder.cancel} className="btn-secondary press">取消</button>
+          <button type="button" onClick={transcribing ? live.stop : recorder.stop} disabled={finishing} autoFocus className="btn-secondary press border-primary bg-primary text-on-primary">
             說完了
           </button>
         </div>

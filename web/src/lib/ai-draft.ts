@@ -105,17 +105,8 @@ export const SOURCE_PROMPT: Record<DraftSource, string> = {
   text: '使用者輸入的記帳文字如下，請整理成交易草稿：',
 };
 
-const MAX_HINT = 200;
-
-/**
- * 錄音時手機邊聽邊轉出來的字（瀏覽器的語音辨識），跟錄音一起送給 AI 當參考：
- * 草稿才不會跟畫面上看到的字差太多；錄音沒錄到聲音時也還有東西可以整理。
- */
-export function voiceHint(text: unknown): string | null {
-  if (typeof text !== 'string') return null;
-  const t = text.replace(/\s+/g, ' ').trim().slice(0, MAX_HINT);
-  return t ? `手機邊錄邊轉出來的文字（可能有錯字或漏字）：「${t}」。請跟錄音對照著整理；錄音聽不清楚或沒有聲音時，就照這段文字整理。` : null;
-}
+/** 說一句、但手機已經邊說邊轉成字（瀏覽器的語音辨識）：送字不送錄音，提醒 AI 可能有同音字轉錯 */
+export const SPOKEN_TEXT_PROMPT = '使用者用說的記帳，手機已經轉成下面的文字（可能有同音字轉錯，請照記帳的常理判斷），請整理成交易草稿：';
 
 /** Gemini responseSchema（OpenAPI 子集）；分類、帳戶、幣別、付款人用 enum 限定，避免 AI 自己編 */
 export function draftSchema(accounts: DraftAccount[], context?: DraftContext) {

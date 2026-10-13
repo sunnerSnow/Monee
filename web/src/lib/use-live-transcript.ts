@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// 瀏覽器內建的語音辨識：錄音時邊說邊顯示字，讓人知道有在聽。
-// Chrome、Android、Safari 有；Firefox、LINE 內建瀏覽器、iPhone 加到主畫面的 App 沒有或不能用，就不顯示字，錄音照常。
-// 真正整理還是交給 Gemini 聽錄音，轉出來的字一起送過去當參考。
+// 瀏覽器內建的語音辨識：邊說邊顯示字，說完把字交給 AI 整理。
+// 不跟錄音同時用麥克風（兩個一起用，手機上第二次會錄不到聲音）；
+// 瀏覽器沒有這個功能（Firefox、LINE 內建瀏覽器、iPhone 加到主畫面的 App）就改用錄音交給 AI 聽。
 interface RecognitionResult {
-  readonly isFinal: boolean;
   readonly [index: number]: { readonly transcript: string } | undefined;
 }
 interface RecognitionEvent {
@@ -16,6 +15,7 @@ interface Recognition {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
+  onaudiostart: (() => void) | null;
   onresult: ((e: RecognitionEvent) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
@@ -31,98 +31,184 @@ const recognitionCtor = (): RecognitionCtor | undefined => {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 };
 
-// 按「說完了」後最多等這麼久拿最後的字，等不到就用目前轉出來的
-const FINISH_WAIT_MS = 1200;
+// 這個瀏覽器轉字失敗過（沒權限、不提供服務）：重新整理前都改用錄音
+let unavailable = false;
 
-export type LiveStatus = 'off' | 'listening' | 'failed';
+/** 可以邊說邊轉字；iPhone 加到主畫面的 App 有這個功能但不能用，直接改用錄音 */
+export function canTranscribe() {
+  if (unavailable || !recognitionCtor()) return false;
+  return (navigator as Navigator & { standalone?: boolean }).standalone !== true;
+}
 
-export function useLiveTranscript() {
+// 按「說完了」後等最後的字，等太久就用目前轉出來的
+const FINISH_WAIT_MS = 2000;
+
+const ERRORS: Record<string, string> = {
+  'no-speech': '沒有聽到聲音，看到「聆聽中」再開口試試',
+  'audio-capture': '找不到麥克風，可以改用打字',
+  network: '轉字需要網路，請檢查網路後再試，或改用打字',
+};
+// 這些錯誤代表這個瀏覽器不能轉字，之後改用錄音
+const UNAVAILABLE = new Set(['not-allowed', 'service-not-allowed', 'language-not-supported']);
+
+export type TranscribeState = 'idle' | 'starting' | 'listening' | 'finishing';
+
+/**
+ * 說一句：開始後邊說邊更新 text；說完（按「說完了」、停頓太久或滿 maxSeconds 秒）呼叫 onDone(轉出來的字)，
+ * 沒聽到或出錯呼叫 onError(訊息)，取消則都不呼叫。
+ */
+export function useLiveTranscript({ maxSeconds, onDone, onError }: {
+  maxSeconds: number;
+  onDone: (text: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [state, setState] = useState<TranscribeState>('idle');
   const [text, setText] = useState('');
-  const [status, setStatus] = useState<LiveStatus>('off');
+  const [seconds, setSeconds] = useState(0);
   const rec = useRef<Recognition | null>(null);
-  const ended = useRef<Promise<void> | null>(null);
   const latest = useRef('');
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbacks = useRef({ onDone, onError });
+
+  useEffect(() => {
+    callbacks.current = { onDone, onError };
+  }, [onDone, onError]);
+
+  const clearTimers = useCallback(() => {
+    if (timer.current) clearInterval(timer.current);
+    if (finishTimer.current) clearTimeout(finishTimer.current);
+    timer.current = null;
+    finishTimer.current = null;
+  }, []);
+
+  /** 結束這次：放掉辨識、回到 idle；轉出來的字留著，畫面「正在整理」時還看得到 */
+  const settle = useCallback((r: Recognition, error: string | null) => {
+    if (rec.current !== r) return;
+    rec.current = null;
+    clearTimers();
+    r.onresult = null;
+    r.onend = null;
+    r.onerror = null;
+    setState('idle');
+    setSeconds(0);
+    const heard = latest.current;
+    if (error && UNAVAILABLE.has(error)) {
+      unavailable = true;
+      callbacks.current.onError('這裡不能邊說邊轉字，再按一次「說一句」改用錄音');
+    } else if (heard) {
+      callbacks.current.onDone(heard);
+    } else {
+      callbacks.current.onError((error && ERRORS[error]) || '沒有聽到你說的話，看到「聆聽中」再開口試試');
+    }
+  }, [clearTimers]);
+
+  const stop = useCallback(() => {
+    const r = rec.current;
+    if (!r) return;
+    setState('finishing');
+    try {
+      r.stop();
+    } catch {
+      // 已經停了
+    }
+    // 有的瀏覽器停了不一定會通知，等太久就用目前轉出來的字
+    if (!finishTimer.current) {
+      finishTimer.current = setTimeout(() => {
+        try {
+          r.abort();
+        } catch {
+          // 已經停了
+        }
+        settle(r, null);
+      }, FINISH_WAIT_MS);
+    }
+  }, [settle]);
 
   const start = useCallback(() => {
     const Ctor = recognitionCtor();
+    if (!Ctor || rec.current) return;
     latest.current = '';
     setText('');
-    if (!Ctor || rec.current) return setStatus('off');
+    setSeconds(0);
     let r: Recognition;
     try {
       r = new Ctor();
     } catch {
-      return setStatus('failed');
+      unavailable = true;
+      callbacks.current.onError('這裡不能邊說邊轉字，再按一次「說一句」改用錄音');
+      return;
     }
     r.lang = 'zh-TW';
-    r.continuous = true;
+    // 記帳就一句話：說完停一下就自動結束（連續模式在 Android 上字會重複）
+    r.continuous = false;
     r.interimResults = true;
+    let error: string | null = null;
+    // 麥克風真的開始收音才顯示「聆聽中」、開始計時（沒有 audiostart 的瀏覽器，第一次出字時算）
+    const begin = () => {
+      if (rec.current !== r || timer.current) return;
+      setState((s) => (s === 'starting' ? 'listening' : s));
+      let elapsed = 0;
+      timer.current = setInterval(() => {
+        elapsed += 1;
+        setSeconds(elapsed);
+        if (elapsed >= maxSeconds) stop();
+      }, 1000);
+    };
+    r.onaudiostart = begin;
     r.onresult = (e) => {
+      begin();
       let t = '';
       for (let i = 0; i < e.results.length; i++) t += e.results[i][0]?.transcript ?? '';
       latest.current = t.trim();
       setText(latest.current);
     };
-    // 沒權限、iPhone 主畫面 App、沒網路…就不顯示字；沒聽到聲音（no-speech）不算失敗
     r.onerror = (e) => {
-      if (e.error !== 'no-speech' && e.error !== 'aborted') setStatus('failed');
+      error = e.error;
     };
-    ended.current = new Promise((resolve) => {
-      r.onend = () => {
-        if (rec.current === r) rec.current = null;
-        resolve();
-      };
-    });
+    // 說完停頓太久，瀏覽器會自己結束：當作說完了
+    r.onend = () => settle(r, error === 'aborted' ? null : error);
     rec.current = r;
-    setStatus('listening');
+    setState('starting');
     try {
       r.start();
     } catch {
       rec.current = null;
-      ended.current = null;
-      setStatus('failed');
+      setState('idle');
+      unavailable = true;
+      callbacks.current.onError('這裡不能邊說邊轉字，再按一次「說一句」改用錄音');
     }
-  }, []);
-
-  /** 不再聽，最後的字會在 finish() 拿到 */
-  const stop = useCallback(() => {
-    try {
-      rec.current?.stop();
-    } catch {
-      // 已經停了
-    }
-  }, []);
-
-  /** 停止並拿最後轉出來的字（最多等 1.2 秒）；沒有字就回傳空字串 */
-  const finish = useCallback(async () => {
-    stop();
-    if (ended.current) await Promise.race([ended.current, new Promise((resolve) => setTimeout(resolve, FINISH_WAIT_MS))]);
-    ended.current = null;
-    return latest.current;
-  }, [stop]);
+  }, [maxSeconds, settle, stop]);
 
   const cancel = useCallback(() => {
     const r = rec.current;
     rec.current = null;
-    ended.current = null;
+    clearTimers();
     latest.current = '';
     setText('');
-    setStatus('off');
+    setSeconds(0);
+    setState('idle');
     if (!r) return;
     r.onresult = null;
+    r.onend = null;
+    r.onerror = null;
     try {
       r.abort();
     } catch {
       // 已經停了
     }
-  }, []);
+  }, [clearTimers]);
 
   // 面板關掉時一定要停，不然手機會一直在聽
   useEffect(() => () => {
     const r = rec.current;
     rec.current = null;
+    if (timer.current) clearInterval(timer.current);
+    if (finishTimer.current) clearTimeout(finishTimer.current);
     if (!r) return;
     r.onresult = null;
+    r.onend = null;
+    r.onerror = null;
     try {
       r.abort();
     } catch {
@@ -130,5 +216,5 @@ export function useLiveTranscript() {
     }
   }, []);
 
-  return { text, status, start, stop, finish, cancel };
+  return { state, text, seconds, start, stop, cancel };
 }
