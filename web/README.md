@@ -3,7 +3,7 @@
 > 可愛輕量、懂你金流的個人生活財務助理。規格見 [`../monee_ux.md`](../monee_ux.md)，設計規範見 [`../design-system/monee/`](../design-system/monee/MASTER.md)。
 
 Phase 1（MVP）：手機網頁版的手動記帳、收支分類、內部轉帳、帳戶與校準餘額、首頁／明細／資產／報表／我的。
-Phase 2（進行中）：說一句、拍收據的 AI 記帳（Gemini 整理成草稿，確認後才寫入）；跟朋友分帳（第 ①②③④ 階段：自己記帳、分享連結、旅程與外幣、外文收據、朋友從連結新增花費）。
+Phase 2（進行中）：說一句、拍收據的 AI 記帳（Gemini 整理成草稿，確認後才寫入）；跟朋友分帳（第 ①②③④ 階段：自己記帳、分享連結、旅程與外幣、外文收據、朋友從連結新增花費）；匯出到 Google Sheets。
 
 ## 技術
 
@@ -48,6 +48,23 @@ npm run dev:demo
 - 預設用 `gemini-3.5-flash-lite`（實測語音、收據都約 2 秒），忙碌或額度用完時自動改用 `gemini-3.1-flash-lite`、`gemini-flash-lite-latest`。要換模型可設 `GEMINI_MODEL`（逗號分隔，依序嘗試）。
 - 免費方案的內容可能被 Google 用來改善服務；介意的話在 AI Studio 開啟付費（費用很低），付費方案不會拿來訓練。收據照片只送去辨識，不會存起來。
 
+### 匯出到 Google Sheets
+
+「我的 → 匯出到 Google Sheets」會在你自己的 Google 雲端硬碟建一份「Monee 記帳」試算表，之後每次按都更新同一份。要先在 Google Cloud 建一個 OAuth 用戶端（一次就好）：
+
+1. 到 [Google Cloud Console](https://console.cloud.google.com/) 建一個專案（例如叫 Monee）。
+2. **APIs & Services → Library**，搜尋並啟用 **Google Sheets API** 和 **Google Drive API** 兩個（Drive API 用來確認上次的試算表還在、沒被丟進垃圾桶）。
+3. **Google Auth Platform**（舊版叫 OAuth consent screen）：
+   - **Branding**：App name 填 Monee，填你的 Email。
+   - **Audience**：User type 選 External。狀態維持 Testing，在 **Test users** 加上你要用來匯出的 Gmail（只有加進去的帳號能授權）。
+   - **Data Access**：Add or remove scopes，勾 `.../auth/drive.file`（只能存取 Monee 自己建立的檔案）。
+4. **Clients → Create client**：Application type 選 **Web application**，**Authorized JavaScript origins** 加上 `http://localhost:3000` 和正式網址（例如 `https://monee-xxx.vercel.app`，不要加結尾的 `/`）。Redirect URIs 不用填。
+5. 複製 **Client ID**（`….apps.googleusercontent.com`），在 `.env.local` 加上 `NEXT_PUBLIC_GOOGLE_CLIENT_ID=…`；Vercel 也加同一個變數再重新部署。Client secret 用不到，不要放進任何地方。
+6. 到 Supabase 的 SQL Editor 執行 `supabase/migrations/20261014000000_sheets_export.sql`（記住匯出到哪一份試算表）。
+
+- 狀態是 Testing 時，Google 授權畫面會先顯示「Google 尚未驗證這個應用程式」，按「繼續」就好。要給別人用的話，到 Audience 按 **Publish app**；只用 `drive.file` 這種非敏感權限，通常不用等 Google 審核。
+- 在 LINE 內建瀏覽器裡 Google 不給登入，要改用 Safari 或 Chrome 打開。
+
 > Supabase 免費專案一週沒有任何存取會自動暫停，到後台按一下就能恢復。內建寄信服務（註冊確認信、重設密碼信）只寄給 Supabase 專案成員的 Email，而且每小時只能寄 2 封；要給別人用前，請在 Authentication → SMTP 換成自己的寄信服務。
 
 ## 指令
@@ -86,6 +103,8 @@ src/
     ai-client.ts        前端上傳（照片先縮小）；use-recorder.ts 錄音
     split.ts            分帳的分攤、淨額、建議還款、旅程（有測試）
     currency.ts         幣別、外幣顯示與換算（有測試）
+    sheets-export.ts    匯出到 Google Sheets 的內容：總覽、月報、明細、帳戶（有測試）
+    google-sheets.ts    Google 授權與寫入試算表（有測試，用假的 Google 回應）
     data.ts             Supabase 讀寫（React Query hooks）
     demo.ts             示範模式的範例資料
     ui-store.ts         面板、提示訊息、隱藏金額、深淺色
@@ -108,12 +127,13 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 - **AI 只產生草稿**：辨識結果直接填進同一個表單（上方顯示 AI 聽到／看到的內容），使用者檢查後按「記下」才寫入。伺服器會再檢查一次：分類、帳戶一定是現有的，金額照幣別取到該有的小數位，日期不晚於今天。不能錄音的瀏覽器會改成「打一句」。
 - **AI 認得幣別**：收據依店家所在國家判斷幣別（日本收據是日圓），外文品項翻成中文。分帳、旅程的新增花費也有「說一句／拍收據」，會多送成員名字與群組幣別，AI 才認得「小明付的」，沒說幣別時用旅程的當地貨幣。一般記帳只記台幣，外幣收據用今天的參考匯率換算，原幣金額寫進備註。
 - **錄音直接交給 Gemini**，不用瀏覽器的語音辨識：iPhone、Android、電腦的瀏覽器都能用，一次呼叫就完成聽寫與整理。最長 30 秒。麥克風真的開始錄才顯示「聆聽中」，按「說完了」後多錄 0.3 秒，頭尾的字才不會被切掉。瀏覽器有內建語音辨識（Android Chrome、Safari、電腦瀏覽器）時改用它邊說邊顯示字（`use-live-transcript.ts`），說完停一下自動結束，只把字送給 Gemini 整理；iPhone 加到主畫面的 App、LINE 內建瀏覽器沒有這個功能，照舊錄音交給 Gemini 聽。兩種不能同時用麥克風：同時用的話手機上第二次會錄不到聲音。瀏覽器的語音辨識會把聲音送到 Google（Chrome）或 Apple（Safari）轉字。很短的一句（「蔥 19 塊」）AI 常聽不準品項而判成不是記帳，有聽到金額就照樣給草稿、標成不太確定，讓使用者改品項就好。
+- **匯出到 Google Sheets**：瀏覽器向 Google 拿授權（Google Identity Services 的 token model，權限只有 `drive.file`：只能建立、讀寫 Monee 自己建立的檔案），直接呼叫 Sheets API 寫入，不經過我們的伺服器。授權只放在記憶體（約一小時內再按不用重新授權），資料庫只記試算表 id（`profiles.sheets_id`），換手機登入也會更新同一份。試算表有四張工作表：總覽（淨資產、本月收支、說明）、月報（每月收支、當月預算與預算已用、各分類支出）、明細（全部交易，不只最近 6 個月，含外幣與分帳群組）、帳戶。每次匯出只清掉並重寫這四張，使用者自己加的工作表不會動；被刪掉的工作表會補回來，整份被刪掉或丟進垃圾桶就建一份新的。文字一律照原樣寫入（`RAW`），朋友從分享連結記的品項寫成公式也不會被執行；日期寫成試算表的日期序號，可以排序、篩選。Google 的授權視窗必須在按鈕的 click 裡直接打開，所以進「我的」就先載入 Google 的程式。
 - **分類先固定**（`lib/categories.ts`），分類管理之後再做。
 - **字體**：英數 Lexend Exa 由 `next/font` 託管；中文 Noto Sans TC 有上百個分片，交給 `next/font` 下載時只要一片逾時就會讓建置失敗，所以改由瀏覽器向 Google Fonts 按需載入。
 
 ## 還沒做（依 monee_ux.md 路線圖）
 
-- Phase 2：Google Sheets 匯出、資料備份、收據照片存檔（目前辨識完就丟掉）
+- Phase 2：資料備份、收據照片存檔（目前辨識完就丟掉）
 - Phase 3：Monee Invest 同步投資快照
 - 外幣現金帳戶（例如錢包裡的日圓）
 - 分類管理、帳戶編輯／封存、帳戶排序

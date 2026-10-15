@@ -136,7 +136,7 @@ export function monthlyExpenses(txs: Transaction[], endKey: string, count: numbe
   });
 }
 
-export const sortNewestFirst = (txs: Transaction[]) =>
+export const sortNewestFirst = <T extends Transaction>(txs: T[]) =>
   [...txs].sort((a, b) =>
     `${b.date} ${b.time ?? ''} ${b.createdAt}`.localeCompare(`${a.date} ${a.time ?? ''} ${a.createdAt}`));
 

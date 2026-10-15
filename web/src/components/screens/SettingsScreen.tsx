@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut, Sheet as SheetIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -9,11 +9,13 @@ import { budgetFor, planBudget, type BudgetScope } from '@/lib/budget';
 import { useBudgets, useProfile, useSetBudget, useUpdateProfile, useUser } from '@/lib/data';
 import { monthKeyOf, monthLabel, monthTitle, shiftMonth } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
+import { forgetGoogleToken } from '@/lib/google-sheets';
 import { formatMoney, parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/client';
 import type { BudgetEntry, PnlColor } from '@/lib/types';
 import { useUi, type ThemePref } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
+import { SheetsExportRow } from '../SheetsExportRow';
 import { Avatar } from '../ui';
 
 const THEMES: [ThemePref, string][] = [['light', '淺色'], ['dark', '深色'], ['system', '跟隨系統']];
@@ -87,6 +89,7 @@ export function SettingsScreen() {
     setSigningOut(true);
     await createClient().auth.signOut();
     queryClient.clear();
+    forgetGoogleToken();
     router.replace('/login');
     router.refresh();
   };
@@ -196,15 +199,11 @@ export function SettingsScreen() {
       <section aria-labelledby="s-data" className="flex flex-col gap-2">
         <h2 id="s-data" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">資料</h2>
         <ul className="card">
-          {[
-            { icon: SheetIcon, label: '匯出到 Google Sheets' },
-            { icon: CloudUpload, label: '資料備份' },
-          ].map(({ icon: Icon, label }, i) => (
-            <li key={label} className={`flex min-h-14 items-center gap-3.5 px-5 py-2 text-body text-muted ${i ? 'border-t border-line' : ''}`}>
-              <span aria-hidden className="ico sm"><Icon size={16} strokeWidth={1.5} /></span>
-              {label}<span className="caption ml-auto">即將推出</span>
-            </li>
-          ))}
+          <SheetsExportRow />
+          <li className="flex min-h-14 items-center gap-3.5 border-t border-line px-5 py-2 text-body text-muted">
+            <span aria-hidden className="ico sm"><CloudUpload size={16} strokeWidth={1.5} /></span>
+            資料備份<span className="caption ml-auto">即將推出</span>
+          </li>
         </ul>
       </section>
 

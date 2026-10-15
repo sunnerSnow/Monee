@@ -4,6 +4,7 @@ import { reconcileDiff } from './budget';
 import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
+import type { ExportData } from './sheets-export';
 import { balances, involves, meOf, memberInvolved, openExpenses, originalShareOf, splitAmounts } from './split';
 import type {
   Account, BudgetEntry, NewAccount, NewFriendExpense, NewSplitExpense, NewSplitSettlement, NewTransaction, Profile, PublicSplit, SplitExpense, SplitGroup,
@@ -73,7 +74,7 @@ function seed() {
     { month: shiftMonth(current, -5), amount: 22000 },
     { month: shiftMonth(current, -2), amount: 24000 },
   ];
-  return { accounts, txs, budgets, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki' } as Profile, split: seedSplit(day) };
+  return { accounts, txs, budgets, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
 }
 
 type Store = ReturnType<typeof seed>;
@@ -158,6 +159,17 @@ export const demo = {
   async updateProfile(patch: Partial<Profile>) {
     await pause();
     Object.assign(db().profile, patch);
+  },
+  async exportData(): Promise<ExportData> {
+    await pause();
+    const { accounts, txs, budgets, split } = db();
+    const groupOf = new Map<string, string>();
+    split.forEach((g) => [...g.expenses, ...g.settlements].forEach((x) => groupOf.set(x.id, g.name)));
+    return {
+      transactions: txs.map((t) => ({ ...t, groupName: groupOf.get(t.splitExpenseId ?? t.splitSettlementId ?? '') ?? null })),
+      accounts: accounts.map((a) => ({ ...a, currency: 'TWD', icon: null, currentBalance: balanceOf(a, txs), archived: false })),
+      budgets: budgets.map((b) => ({ ...b })),
+    };
   },
 
   // ---------- 分帳：跟 supabase 的 split_* 函式同樣的規則 ----------

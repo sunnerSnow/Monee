@@ -55,6 +55,9 @@ export interface Profile {
   displayName: string | null;
   payBank: string | null;
   payLine: string | null;
+  /** 匯出到哪一份 Google 試算表；null 代表還沒匯出過 */
+  sheetsId: string | null;
+  sheetsExportedAt: string | null;
 }
 
 /** 預算紀錄：從 month（YYYY-MM）起生效；amount 為 null 代表從那個月起不設預算 */

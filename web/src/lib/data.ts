@@ -6,6 +6,7 @@ import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categor
 import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
 import { SAMPLE_RATES, type FxRates } from './currency';
 import { demo, isDemo } from './demo';
+import type { ExportData, ExportTransaction } from './sheets-export';
 import { createClient } from './supabase/client';
 import type {
   Account, BudgetEntry, NewAccount, NewFriendExpense, NewSplitExpense, NewSplitSettlement, NewTransaction, PnlColor, Profile, PublicSplit, SplitClaim,
@@ -130,10 +131,16 @@ export function useProfile() {
     queryKey: keys.profile,
     queryFn: async (): Promise<Profile> => {
       if (isDemo) return demo.profile();
-      const row = await unwrap<{ pnl_color: PnlColor; display_name: string | null; pay_bank: string | null; pay_line: string | null } | null>(
-        createClient().from('profiles').select('pnl_color, display_name, pay_bank, pay_line').maybeSingle(),
+      const row = await unwrap<{
+        pnl_color: PnlColor; display_name: string | null; pay_bank: string | null; pay_line: string | null;
+        sheets_id: string | null; sheets_exported_at: string | null;
+      } | null>(
+        createClient().from('profiles').select('pnl_color, display_name, pay_bank, pay_line, sheets_id, sheets_exported_at').maybeSingle(),
       );
-      return { pnlColor: row?.pnl_color ?? 'red_up', displayName: row?.display_name ?? null, payBank: row?.pay_bank ?? null, payLine: row?.pay_line ?? null };
+      return {
+        pnlColor: row?.pnl_color ?? 'red_up', displayName: row?.display_name ?? null, payBank: row?.pay_bank ?? null, payLine: row?.pay_line ?? null,
+        sheetsId: row?.sheets_id ?? null, sheetsExportedAt: row?.sheets_exported_at ?? null,
+      };
     },
   });
 }
@@ -161,6 +168,47 @@ export function useUser() {
       return data.user;
     },
   });
+}
+
+// ---------- 匯出 ----------
+
+type ExportTransactionRow = TransactionRow & {
+  split_expense: { group: { name: string } | null } | null;
+  split_settlement: { group: { name: string } | null } | null;
+};
+
+/** 匯出用：全部的交易（不只最近幾個月，附上分帳群組名稱）、全部帳戶（含封存）、預算 */
+export async function fetchExportData(): Promise<ExportData> {
+  if (isDemo) return demo.exportData();
+  const supabase = createClient();
+  const transactions: ExportTransaction[] = [];
+  // Supabase 一次最多回傳 1000 筆（看專案設定），一頁一頁拿到沒有為止
+  for (let from = 0; ; ) {
+    const rows = await unwrap<ExportTransactionRow[]>(
+      supabase
+        .from('transactions')
+        .select('*, split_expense:split_expenses(group:split_groups(name)), split_settlement:split_settlements(group:split_groups(name))')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, from + 999),
+    );
+    if (!rows.length) break;
+    transactions.push(...rows.map((r) => ({
+      ...toTransaction(r),
+      groupName: r.split_expense?.group?.name ?? r.split_settlement?.group?.name ?? null,
+    })));
+    from += rows.length;
+  }
+  const [accounts, budgets] = await Promise.all([
+    unwrap<(AccountRow & { archived: boolean })[]>(supabase.from('account_balances').select('*').order('sort_order').order('created_at')),
+    unwrap<{ effective_month: string; amount: number | string | null }[]>(supabase.from('budget_history').select('effective_month, amount')),
+  ]);
+  return {
+    transactions,
+    accounts: accounts.map((r) => ({ ...toAccount(r), archived: r.archived })),
+    budgets: budgets.map((r) => ({ month: r.effective_month, amount: r.amount != null ? Number(r.amount) : null })),
+  };
 }
 
 // ---------- 寫入 ----------
@@ -286,6 +334,8 @@ export function useUpdateProfile() {
       if ('displayName' in patch) values.display_name = patch.displayName || null;
       if ('payBank' in patch) values.pay_bank = patch.payBank || null;
       if ('payLine' in patch) values.pay_line = patch.payLine || null;
+      if ('sheetsId' in patch) values.sheets_id = patch.sheetsId || null;
+      if ('sheetsExportedAt' in patch) values.sheets_exported_at = patch.sheetsExportedAt || null;
       await unwrap(supabase.from('profiles').upsert(values).select('user_id'));
     },
     onSuccess: () => invalidate(keys.profile),
