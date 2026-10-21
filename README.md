@@ -4,6 +4,23 @@
 
 Monee 是給自己用的手機記帳網頁：說一句話或拍張收據就能記帳，跟朋友分帳、出國旅行記外幣，月底看報表，資料隨時可以匯出或備份。可以加到手機主畫面，用起來像 App。
 
+## 畫面
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/home.webp" width="240" alt="首頁：今日花費、角色與本月結餘"><br>首頁：今天還能花多少</td>
+    <td align="center" width="33%"><img src="docs/screenshots/entry.webp" width="240" alt="記一筆：說一句、拍收據或手動輸入"><br>記一筆：說一句、拍收據、手動</td>
+    <td align="center" width="33%"><img src="docs/screenshots/trip.webp" width="240" alt="旅程：外幣花費與旅程預算"><br>旅程：外幣花費與旅程預算</td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/reports.webp" width="240" alt="報表：分類支出與每月趨勢"><br>報表：分類支出、每月趨勢</td>
+    <td align="center" width="33%"><img src="docs/screenshots/characters.webp" width="240" alt="我的：外觀與三個角色"><br>三個角色任選、深淺色</td>
+    <td align="center" width="33%"><img src="docs/screenshots/home-light.webp" width="240" alt="淺色模式的首頁"><br>淺色模式</td>
+  </tr>
+</table>
+
+> 截圖來自示範模式（`npm run dev:demo`），預設深色；角色、深淺色在「我的 → 外觀」切換。
+
 ## 功能
 
 - **記帳**：手動輸入、說一句（「午餐拉麵 260 刷國泰」）、拍收據；AI（Gemini）只整理成草稿，確認後才記下。收據照片會留著，之後點那筆就看得到。
@@ -42,6 +59,7 @@ monee_ux.md             產品與 UX 規格、路線圖
 prototype/              互動原型（首頁、分帳）
 monee-home*.html        首頁設計稿（monee-home-pop.html 是現在的街頭貼紙版）
 monee-mascot.html       三個角色的設計稿
+docs/screenshots/       README 的畫面截圖
 ```
 
 ## 文件
