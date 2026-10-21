@@ -6,17 +6,18 @@ import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { formatForeign, getCurrency, toTwd, twdPerUnit } from '@/lib/currency';
-import { useAccounts, useAddTransaction, useDeleteTransaction, useFxRates, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
+import { useAccounts, useAddTransaction, useDeleteTransaction, useFxRates, useSaveRecurring, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
 import { activeTrip } from '@/lib/split';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
+import { after, describe, scheduleFrom, shortDue, type Frequency } from '@/lib/recurring';
 import type { Transaction, TransactionType } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useReceiptDraft } from '@/lib/use-receipt-draft';
 import { ReceiptField } from '../Receipt';
 import { Sheet, SheetHeader } from '../Sheet';
 import { SplitEntryPanel, SplitLinkedNotice, SplitSwitch } from '../split/SplitInEntry';
-import { EmptyBox } from '../ui';
+import { EmptyBox, SwitchRow } from '../ui';
 import { AiEntryBar } from './AiEntryBar';
 
 const TYPES: [TransactionType, string][] = [['EXPENSE', '支出'], ['INCOME', '收入'], ['TRANSFER', '轉帳']];
@@ -65,6 +66,11 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const [confirmDelete, setConfirmDelete] = useState(false);
   const photo = useReceiptDraft(editing?.receiptPath ?? null);
   const [uploading, setUploading] = useState(false);
+  // 設成固定收支：這一筆照常記下，之後每期幫你記或先問你
+  const saveRule = useSaveRecurring();
+  const [repeat, setRepeat] = useState(false);
+  const [repeatFreq, setRepeatFreq] = useState<Frequency>('monthly');
+  const [repeatAuto, setRepeatAuto] = useState(false);
   const { data: groups = [] } = useSplitGroups();
   const fx = useFxRates();
   // 旅程期間打開記一筆：直接記到這趟旅程（可以關掉分帳開關改記一般支出）
@@ -172,9 +178,23 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     try {
       const id = editing ? await update.mutateAsync({ id: editing.id, ...payload }) : await add.mutateAsync(payload);
       photo.settle(receiptPath, true);
+      // 固定收支從下一期開始（這一筆已經記了）；設不起來也不影響已經記好的這筆，提示再設一次就好
+      let repeatNote = '';
+      if (!editing && repeat) {
+        const schedule = scheduleFrom(repeatFreq, date);
+        try {
+          await saveRule.mutateAsync({
+            type, amount: value, categoryId: payload.categoryId, sourceAccountId: sourceId, targetAccountId: payload.targetAccountId, note: payload.note,
+            ...schedule, auto: repeatAuto, nextDate: after(schedule, date), paused: false,
+          });
+          repeatNote = `，之後${describe(schedule)}${repeatAuto ? '自動記' : '會先問你'}`;
+        } catch {
+          repeatNote = '；固定收支沒設好，到「我的 → 固定收支」再設一次';
+        }
+      }
       flash(id);
       onClose();
-      showToast(`${editing ? '已更新' : '已記下'}：${title} ${formatMoney(value)}`);
+      showToast(`${editing ? '已更新' : '已記下'}：${title} ${formatMoney(value)}${repeatNote}`);
     } catch (e) {
       photo.settle(receiptPath, false);
       setError(e instanceof Error ? e.message : '儲存失敗，請再試一次');
@@ -287,6 +307,25 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
       </div>
 
       <ReceiptField draft={photo} />
+
+      {!editing && (
+        <div className="flex flex-col gap-2.5">
+          <SwitchRow
+            title="設成固定收支"
+            hint={repeat
+              ? `${describe(scheduleFrom(repeatFreq, date))}，下次 ${shortDue(after(scheduleFrom(repeatFreq, date), date))}`
+              : '房租、訂閱這種每期一樣的，之後幫你記或到時候問你'}
+            checked={repeat}
+            onChange={setRepeat}
+          />
+          {repeat && (
+            <div className="flex flex-wrap gap-x-4 gap-y-2.5">
+              {chips([{ id: 'monthly', label: '每月' }, { id: 'weekly', label: '每週' }, { id: 'yearly', label: '每年' }], repeatFreq, (v) => setRepeatFreq(v as Frequency), '多久一次')}
+              {chips([{ id: 'ask', label: '到時候問我' }, { id: 'auto', label: '自動記下' }], repeatAuto ? 'auto' : 'ask', (v) => setRepeatAuto(v === 'auto'), '到了日子')}
+            </div>
+          )}
+        </div>
+      )}
 
       <div role="group" aria-label="數字鍵盤" className="grid grid-cols-3 gap-2">
         {KEYS.map((k) => (

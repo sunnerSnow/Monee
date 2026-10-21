@@ -49,6 +49,8 @@ export interface Transaction {
   excludeFromBudget?: boolean;
   /** 收據照片在 Storage 的路徑；沒有照片是 null */
   receiptPath?: string | null;
+  /** 固定收支自動產生的：那筆固定收支的 id */
+  recurringId?: string | null;
 }
 
 export interface Profile {

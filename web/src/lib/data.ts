@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { prepareRestore, type Backup } from './backup';
+import type { Frequency, RecurringRule } from './recurring';
 import { reconcileDiff } from './budget';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, toRows, type Category, type CategoryRow, type ManagedType } from './categories';
 import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
@@ -26,6 +27,7 @@ const keys = {
   user: ['user'],
   backupSnapshot: ['backupSnapshot'],
   categories: ['categories'],
+  recurring: ['recurring'],
 } satisfies Record<string, QueryKey>;
 
 interface AccountRow {
@@ -57,6 +59,7 @@ interface TransactionRow {
   original_amount?: number | string | null;
   exclude_from_budget?: boolean | null;
   receipt_image_url?: string | null;
+  recurring_id?: string | null;
 }
 
 const toAccount = (r: AccountRow): Account => ({
@@ -88,6 +91,7 @@ const toTransaction = (r: TransactionRow): Transaction => ({
   originalAmount: r.original_amount != null ? Number(r.original_amount) : null,
   excludeFromBudget: Boolean(r.exclude_from_budget),
   receiptPath: r.receipt_image_url ?? null,
+  recurringId: r.recurring_id ?? null,
 });
 
 /** Supabase 查詢回傳 { data, error }，有錯就丟出，讓 React Query 接手錯誤狀態 */
@@ -334,6 +338,84 @@ export function usePublicCategories(token: string) {
   });
 }
 
+// ---------- 固定收支 ----------
+// 到期時呼叫 recurring_post：把日期寫成交易、推下次日期，同一個交易裡做完；帶著「以為的下次日期」，別的裝置處理過就不記
+
+interface RecurringDbRow {
+  id: string; type: RecurringRule['type']; amount: number | string; category_id: string; source_account_id: string;
+  target_account_id: string | null; note: string | null; frequency: Frequency; day: number; month: number | null;
+  auto: boolean; next_date: string; paused: boolean;
+}
+const toRule = (r: RecurringDbRow): RecurringRule => ({
+  id: r.id, type: r.type, amount: Number(r.amount), categoryId: r.category_id, sourceAccountId: r.source_account_id,
+  targetAccountId: r.target_account_id, note: r.note, frequency: r.frequency, day: r.day, month: r.month,
+  auto: r.auto, nextDate: r.next_date, paused: r.paused,
+});
+
+export function useRecurringRules() {
+  return useQuery({
+    queryKey: keys.recurring,
+    queryFn: async (): Promise<RecurringRule[]> => {
+      if (isDemo) return demo.recurringRules();
+      const rows = await unwrap<RecurringDbRow[]>(createClient().from('recurring_rules').select('*').order('next_date').order('created_at'));
+      return rows.map(toRule);
+    },
+  });
+}
+
+export type RecurringInput = Omit<RecurringRule, 'id'> & { id?: string };
+
+/** 新增或修改一筆固定收支；回傳 id */
+export function useSaveRecurring() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (r: RecurringInput): Promise<string> => {
+      if (isDemo) return demo.saveRecurring(r);
+      const row = {
+        type: r.type, amount: r.amount, category_id: r.type === 'TRANSFER' ? 'transfer' : r.categoryId, source_account_id: r.sourceAccountId,
+        target_account_id: r.type === 'TRANSFER' ? r.targetAccountId : null, note: r.note, frequency: r.frequency, day: r.day,
+        month: r.frequency === 'yearly' ? r.month : null, auto: r.auto, next_date: r.nextDate, paused: r.paused,
+      };
+      const supabase = createClient();
+      if (r.id) {
+        const rows = await unwrap<{ id: string }[]>(supabase.from('recurring_rules').update(row).eq('id', r.id).select('id'));
+        if (!rows.length) throw new Error('找不到這筆固定收支，可能已經刪除');
+        return r.id;
+      }
+      return (await unwrap<{ id: string }>(supabase.from('recurring_rules').insert(row).select('id').single())).id;
+    },
+    onSuccess: () => invalidate(keys.recurring),
+  });
+}
+
+/** 刪掉固定收支；已經記的帳不動（交易的 recurring_id 變成 null） */
+export function useDeleteRecurring() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemo) return demo.deleteRecurring(id);
+      const rows = await unwrap<{ id: string }[]>(createClient().from('recurring_rules').delete().eq('id', id).select('id'));
+      if (!rows.length) throw new Error('找不到這筆固定收支，可能已經刪除');
+    },
+    onSuccess: () => invalidate(keys.recurring, keys.transactions),
+  });
+}
+
+/**
+ * 記下到期的固定收支：dates 是要記的日期（略過就是空的），next 是記完之後的下次日期，amount 是這次的金額（先問我時可以改）。
+ * 回傳 false 代表別的裝置已經處理過，這次什麼都沒記。
+ */
+export function usePostRecurring() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ rule, dates, next, amount }: { rule: RecurringRule; dates: string[]; next: string; amount?: number }): Promise<boolean> => {
+      if (isDemo) return demo.postRecurring(rule.id, dates, next, rule.nextDate, amount);
+      return rpc<boolean>('recurring_post', { p_rule: rule.id, p_dates: dates, p_next: next, p_expected: rule.nextDate, p_amount: amount ?? null });
+    },
+    onSuccess: () => invalidate(keys.recurring, keys.transactions, keys.accounts),
+  });
+}
+
 // ---------- 收據照片 ----------
 // 存在 Storage 的 receipts（私人），路徑是「{user id}/{隨機 id}.jpg」，每個人只能讀寫自己的資料夾
 
@@ -411,6 +493,7 @@ const toTransactionRow = (t: NewTransaction) => ({
   note: t.note,
   // 沒帶照片欄位就不動原本的照片
   ...(t.receiptPath !== undefined ? { receipt_image_url: t.receiptPath } : {}),
+  ...(t.recurringId !== undefined ? { recurring_id: t.recurringId } : {}),
 });
 
 export function useAddTransaction() {

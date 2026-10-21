@@ -7,11 +7,11 @@ export const BACKUP_VERSION = 1;
 
 /** 備份檔裡的資料表 */
 export const BACKUP_TABLES = [
-  'categories', 'accounts', 'budget_history', 'split_groups', 'split_members', 'split_rounds',
+  'categories', 'accounts', 'recurring_rules', 'budget_history', 'split_groups', 'split_members', 'split_rounds',
   'split_expenses', 'split_settlements', 'split_claims', 'split_proposals', 'transactions',
 ] as const;
 /** 舊版的備份檔沒有這些表（分類管理之前備份的） */
-const OPTIONAL_TABLES = new Set<string>(['categories']);
+const OPTIONAL_TABLES = new Set<string>(['categories', 'recurring_rules']);
 /** id 是每個人自己的（分類 id 像 food、c_xxx，預算紀錄用月份），換帳號還原時不用換 */
 const OWN_KEY_TABLES = new Set<string>(['categories', 'budget_history']);
 export type BackupTable = (typeof BACKUP_TABLES)[number];

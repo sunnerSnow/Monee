@@ -1,6 +1,7 @@
 // 示範模式：NEXT_PUBLIC_MONEE_DEMO=1 時改用記憶體裡的範例資料，不連 Supabase。
 // 用途：還沒建 Supabase 專案時先試用、截圖檢查畫面。重新整理頁面就會回到初始資料。
 import { reconcileDiff } from './budget';
+import type { RecurringRule } from './recurring';
 import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, type CategoryRow, type ManagedType } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
@@ -76,7 +77,18 @@ function seed() {
   ];
   // 分類：沒改過，用內建的
   const categories: CategoryRow[] = [];
-  return { accounts, txs, budgets, categories, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
+  // 固定收支：Spotify 昨天到期（打開就自動記下）、房租前兩天到期（先問我）、Netflix 三天後自動記、電信費五天後要問、薪水下個月 5 號自動記
+  const dayOf = (iso: string) => Number(iso.slice(8, 10));
+  const rc = (p: Pick<RecurringRule, 'id' | 'type' | 'amount' | 'categoryId' | 'sourceAccountId' | 'note' | 'auto' | 'nextDate'>): RecurringRule =>
+    ({ targetAccountId: null, frequency: 'monthly', day: dayOf(p.nextDate), month: null, paused: false, ...p });
+  const recurring: RecurringRule[] = [
+    rc({ id: 'rc-spotify', type: 'EXPENSE', amount: 149, categoryId: 'fun', sourceAccountId: 'cathay', note: 'Spotify', auto: true, nextDate: day(1) }),
+    rc({ id: 'rc-rent', type: 'EXPENSE', amount: 15000, categoryId: 'other', sourceAccountId: 'esun', note: '房租', auto: false, nextDate: day(2) }),
+    rc({ id: 'rc-netflix', type: 'EXPENSE', amount: 390, categoryId: 'fun', sourceAccountId: 'cathay', note: 'Netflix', auto: true, nextDate: day(-3) }),
+    rc({ id: 'rc-phone', type: 'EXPENSE', amount: 599, categoryId: 'other', sourceAccountId: 'flygo', note: '電信費', auto: false, nextDate: day(-5) }),
+    rc({ id: 'rc-salary', type: 'INCOME', amount: 48000, categoryId: 'salary', sourceAccountId: 'esun', note: '薪資', auto: true, nextDate: `${shiftMonth(current, 1)}-05` }),
+  ];
+  return { accounts, txs, budgets, categories, recurring, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
 }
 
 type Store = ReturnType<typeof seed>;
@@ -107,6 +119,36 @@ export const demo = {
   async profile(): Promise<Profile> {
     await pause();
     return { ...db().profile };
+  },
+  async recurringRules(): Promise<RecurringRule[]> {
+    await pause();
+    return db().recurring.map((r) => ({ ...r })).sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+  },
+  async saveRecurring(r: Omit<RecurringRule, 'id'> & { id?: string }) {
+    await pause();
+    const s = db();
+    const row: RecurringRule = { ...r, id: r.id ?? id('rc'), targetAccountId: r.type === 'TRANSFER' ? r.targetAccountId : null };
+    s.recurring = [...s.recurring.filter((x) => x.id !== row.id), row];
+    return row.id;
+  },
+  async deleteRecurring(ruleId: string) {
+    await pause();
+    const s = db();
+    s.recurring = s.recurring.filter((r) => r.id !== ruleId);
+    s.txs.forEach((t) => { if (t.recurringId === ruleId) t.recurringId = null; });
+  },
+  async postRecurring(ruleId: string, dates: string[], next: string, expected: string, amount?: number) {
+    await pause();
+    const s = db();
+    const r = s.recurring.find((x) => x.id === ruleId);
+    if (!r) throw new Error('找不到這筆固定收支');
+    if (r.nextDate !== expected) return false;
+    dates.forEach((date) => s.txs.push({
+      id: id('t'), date, time: null, type: r.type, amount: amount ?? r.amount, categoryId: r.categoryId, sourceAccountId: r.sourceAccountId,
+      targetAccountId: r.targetAccountId, note: r.note, createdAt: new Date().toISOString(), recurringId: r.id,
+    }));
+    r.nextDate = next;
+    return true;
   },
   async categoryRows(): Promise<CategoryRow[]> {
     await pause();

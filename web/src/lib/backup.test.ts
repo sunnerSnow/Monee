@@ -8,6 +8,7 @@ const GROUP = 'bbbbbbbb-0000-4000-8000-000000000001';
 const ME = 'cccccccc-0000-4000-8000-000000000001';
 const MING = 'cccccccc-0000-4000-8000-000000000002';
 const EXPENSE = 'dddddddd-0000-4000-8000-000000000001';
+const RULE = 'ffffffff-0000-4000-8000-000000000001';
 
 const backup = (): Backup => ({
   format: 'monee-backup',
@@ -16,6 +17,7 @@ const backup = (): Backup => ({
   owner: OWNER,
   profile: { pnl_color: 'red_up', display_name: '小雞', pay_bank: null, pay_line: null },
   categories: [{ id: 'c_pet', type: 'EXPENSE', name: '寵物', icon: 'paw-print', sort_order: 0, hidden: false }],
+  recurring_rules: [{ id: RULE, type: 'EXPENSE', amount: 15000, category_id: 'other', source_account_id: CASH, target_account_id: null, frequency: 'monthly', day: 5, next_date: '2026-11-05' }],
   accounts: [
     { id: CASH, name: '現金', type: 'CASH', opening_balance: 1000 },
     { id: FRIENDS, name: '朋友往來', type: 'FRIENDS', opening_balance: 0 },
@@ -62,6 +64,10 @@ describe('parseBackup', () => {
     expect(() => parseBackup(JSON.stringify({ ...backup(), profile: 'x' }))).toThrow('不完整');
   });
 
+  it('固定收支之前的備份檔沒有固定收支，當成沒有', () => {
+    expect(parseBackup(JSON.stringify({ ...backup(), recurring_rules: undefined })).recurring_rules).toEqual([]);
+  });
+
   it('預算紀錄沒有 id 也可以', () => {
     expect(parseBackup(JSON.stringify(backup())).budget_history).toHaveLength(1);
   });
@@ -105,6 +111,14 @@ describe('prepareRestore', () => {
     expect(expense).toMatchObject({ payer_id: me, account_id: cash, weights: { [me]: 1, [ming]: 1 }, amounts: { [me]: 450, [ming]: 450 } });
     expect(out.transactions[0]).toMatchObject({ source_account_id: cash, split_expense_id: expense.id });
     expect(out.owner).toBe('other-user');
+  });
+
+  it('別的帳號：固定收支的 id、帳戶，和交易記著的 recurring_id 一起換', () => {
+    const out = prepareRestore({ ...backup(), transactions: [{ ...backup().transactions[0], recurring_id: RULE }] }, 'other-user', newId);
+    const rule = out.recurring_rules[0];
+    expect(rule.id).not.toBe(RULE);
+    expect(rule.source_account_id).toBe(out.accounts[0].id);
+    expect(out.transactions[0].recurring_id).toBe(rule.id);
   });
 
   it('別的帳號：分類 id 不換（每個人的分類各自獨立），交易照樣指到那個分類', () => {

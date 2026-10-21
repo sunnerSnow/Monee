@@ -11,6 +11,7 @@ import { inboxCount } from '@/lib/split';
 import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
+import { RecurringHome } from '../Recurring';
 import { TxGroups } from '../TxList';
 import { InboxBanner } from '../split/parts';
 import type { Mood } from '../Mascot';
@@ -119,6 +120,8 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
       />
 
       <SplitInbox />
+
+      <RecurringHome today={today} />
 
       <section aria-labelledby="month-title" className="card flex flex-col gap-4 p-5">
         <div className="flex items-baseline justify-between gap-2">

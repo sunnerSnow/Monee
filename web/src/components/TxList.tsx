@@ -1,6 +1,6 @@
 'use client';
 
-import { Paperclip } from 'lucide-react';
+import { Paperclip, Repeat } from 'lucide-react';
 import { groupByDay, visibleTransactions } from '@/lib/budget';
 import { formatForeign } from '@/lib/currency';
 import { getCategory, useCategories } from '@/lib/categories';
@@ -38,6 +38,7 @@ export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, A
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-body">{title}</span>
             {t.receiptPath && <><Paperclip size={13} strokeWidth={1.5} aria-hidden className="flex-none text-muted" /><span className="sr-only">，有收據照片</span></>}
+            {t.recurringId && <><Repeat size={13} strokeWidth={1.5} aria-hidden className="flex-none text-muted" /><span className="sr-only">，固定收支</span></>}
           </span>
           <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>
         </span>
