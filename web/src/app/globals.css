@@ -102,6 +102,12 @@
   .pill[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
   .pills { display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; }
   .pills::-webkit-scrollbar { display: none; }
+  /* 桌機用滑鼠時顯示細的捲軸：看得出後面還有，也拖得動（手機維持隱藏，用手指滑）；滾輪左右捲見 lib/wheel-pills.ts */
+  @media (hover: hover) and (pointer: fine) {
+    .pills { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+    .pills::-webkit-scrollbar { display: block; height: 6px; }
+    .pills::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
+  }
 
   .field-input {
     width: 100%; height: 48px; padding: 0 var(--space-4); border-radius: var(--radius-pill);

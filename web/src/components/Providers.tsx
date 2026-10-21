@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { useWheelPills } from '@/lib/wheel-pills';
 
 let browserQueryClient: QueryClient | undefined;
 
@@ -15,5 +16,6 @@ function getQueryClient() {
 }
 
 export function Providers({ children }: { children: ReactNode }) {
+  useWheelPills();
   return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
 }
