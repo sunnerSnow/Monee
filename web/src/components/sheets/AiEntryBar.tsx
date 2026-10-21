@@ -1,6 +1,6 @@
 'use client';
 
-import { Camera, Keyboard, Mic, Sparkles, X } from 'lucide-react';
+import { Camera, Keyboard, Mic, Play, Sparkles, Square, X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { requestDraft, shrinkImage } from '@/lib/ai-client';
@@ -21,6 +21,28 @@ type Phase =
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
+/** 聽剛剛的錄音：AI 聽錯時，先確認手機錄到的聲音清不清楚、有沒有被切掉 */
+function Playback({ src }: { src: string }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const toggle = () => {
+    const a = audio.current;
+    if (!a) return;
+    if (!a.paused) return a.pause();
+    a.currentTime = 0;
+    a.play().catch(() => setPlaying(false));
+  };
+  return (
+    <>
+      <button type="button" onClick={toggle} className="btn-secondary press">
+        {playing ? <Square size={14} strokeWidth={1.5} aria-hidden /> : <Play size={14} strokeWidth={1.5} aria-hidden />}
+        {playing ? '停止' : '聽錄音'}
+      </button>
+      <audio ref={audio} src={src} preload="auto" hidden onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+    </>
+  );
+}
+
 /**
  * 記一筆上方的 AI 入口：說一句、拍收據（不能錄音的瀏覽器改成打一句）。
  * 辨識結果交給 onDraft 填進下面的表單，使用者檢查後按「記下」才會寫入。
@@ -37,12 +59,19 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [text, setText] = useState('');
   const [voiceOk] = useState(() => canRecord() || canTranscribe());
+  // 上一段錄音（錄音交給 AI 聽的時候才有），可以重聽
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController | null>(null);
   const draftCard = useRef<HTMLDivElement>(null);
 
   // 面板關掉時取消還在跑的辨識
   useEffect(() => () => request.current?.abort(), []);
+
+  // 換了一段錄音或面板關掉時，放掉上一段
+  useEffect(() => () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+  }, [audioUrl]);
 
   // 辨識完把焦點移到草稿說明（原本按的按鈕已經不在了），鍵盤使用者接著往下就是填好的欄位
   useEffect(() => {
@@ -73,11 +102,18 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
     onDone: (heard) => run('voice', { text: heard }),
     onError: (message) => setPhase({ kind: 'error', source: 'voice', message }),
   });
-  const recorder = useRecorder({ maxSeconds: MAX_SECONDS, onRecorded: (audio) => run('voice', { file: audio }) });
+  const recorder = useRecorder({
+    maxSeconds: MAX_SECONDS,
+    onRecorded: (audio) => {
+      setAudioUrl(URL.createObjectURL(audio));
+      run('voice', { file: audio });
+    },
+  });
   const transcribing = live.state !== 'idle';
 
   const startVoice = async () => {
     setPhase({ kind: 'idle' });
+    setAudioUrl(null);
     // 轉字要在按下的當下開始，Safari 才會動
     if (canTranscribe()) return live.start();
     live.cancel();
@@ -228,6 +264,7 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
               <button type="button" onClick={() => setPhase({ kind: 'typing' })} className="btn-secondary press">改用打字</button>
             )}
             <button type="button" onClick={() => setPhase({ kind: 'idle' })} className="btn-secondary press">手動輸入</button>
+            {phase.source === 'voice' && audioUrl && <Playback src={audioUrl} />}
           </div>
         </div>
         {hiddenInput}
@@ -249,6 +286,12 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
             <p className="caption text-warn-fg">
               {draft.suggestedAmount ? '有些地方不太確定，請檢查品項、金額、分類和帳戶。' : '沒有聽到金額，請用下面的鍵盤輸入。'}
             </p>
+          )}
+          {phase.source === 'voice' && audioUrl && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1">
+              <Playback src={audioUrl} />
+              <span className="caption">AI 聽錯的話，聽聽看錄得清不清楚</span>
+            </div>
           )}
         </div>
         {buttons}

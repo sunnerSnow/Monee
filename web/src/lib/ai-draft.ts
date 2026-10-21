@@ -94,9 +94,9 @@ ${accountLines}
 3. accountId：錢從哪個帳戶出去（收入則是存入哪個帳戶）。有提到付款方式才填：刷卡選名稱最接近的信用卡、付現選現金；收據印有信用卡末四碼時選最可能的信用卡帳戶。判斷不出來填 ${NONE}。
 4. date：YYYY-MM-DD。「昨天」「上週五」依今天推算；收據用上面印的交易日期，民國年加 1911、日本的令和年加 2018 換成西元年。沒提到就用今天，不能晚於今天。
 5. note：${MAX_NOTE} 字以內的繁體中文，格式「店名或場合・品項」，例如「全聯・衛生紙、洗衣精」「午餐・拉麵」。外文收據要把品項翻成中文，店名有常見的中文名稱就用中文，例如「羅森・飯糰、綠茶」。
-6. rawInput：語音的逐字稿；收據則用繁體中文寫出店名、日期、品項與總計，外文的要翻譯。
+6. rawInput：先寫這一欄，其他欄位都照它整理。語音要逐字寫出錄音裡實際聽到的話（繁體中文），聽不清楚的字寫「…」，不要猜、不要改寫，也不要套用上面舉的例子；收據則用繁體中文寫出店名、日期、品項與總計，外文的要翻譯。
 7. confidence：0 到 1，你對金額與分類有多確定。
-8. isTransaction：內容跟記帳無關、照片不是收據、或完全聽不清楚時填 false；聽得到金額就填 true，品項聽不清楚也照你聽到的寫進 note。${context ? splitRules(context) : ''}`;
+8. isTransaction：內容跟記帳無關、照片不是收據、或錄音裡沒有清楚的人聲時填 false，這時 rawInput 照實寫聽到的或留空，不要自己編一句；聽得到金額就填 true，品項聽不清楚也照你聽到的寫進 note。${context ? splitRules(context) : ''}`;
 }
 
 export const SOURCE_PROMPT: Record<DraftSource, string> = {
@@ -112,11 +112,17 @@ export const SPOKEN_TEXT_PROMPT = '使用者用說的記帳，手機已經轉成
 export function draftSchema(accounts: DraftAccount[], context?: DraftContext) {
   const accountIds = [...accounts.map((a) => a.id), NONE];
   const withPayer = Boolean(context?.members.length);
+  const fields = [
+    'rawInput', 'isTransaction', 'type', 'currency', 'amount', 'categoryId', 'accountId', 'targetAccountId', 'date', 'note', 'confidence',
+    ...(withPayer ? ['payer'] : []),
+  ];
   return {
     type: 'OBJECT',
+    // 先寫逐字稿再整理其他欄位：照聽到的整理，不會先決定好答案再編一句逐字稿
+    propertyOrdering: fields,
     properties: {
-      isTransaction: { type: 'BOOLEAN' },
       rawInput: { type: 'STRING' },
+      isTransaction: { type: 'BOOLEAN' },
       type: { type: 'STRING', enum: ['EXPENSE', 'INCOME', 'TRANSFER'] },
       currency: { type: 'STRING', enum: [...CODES] },
       amount: { type: 'NUMBER' },
@@ -128,10 +134,7 @@ export function draftSchema(accounts: DraftAccount[], context?: DraftContext) {
       confidence: { type: 'NUMBER' },
       ...(withPayer ? { payer: { type: 'STRING', enum: [ME, ...context!.members, NONE] } } : {}),
     },
-    required: [
-      'isTransaction', 'rawInput', 'type', 'currency', 'amount', 'categoryId', 'accountId', 'targetAccountId', 'date', 'note', 'confidence',
-      ...(withPayer ? ['payer'] : []),
-    ],
+    required: fields,
   };
 }
 

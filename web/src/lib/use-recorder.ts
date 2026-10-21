@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type RecorderState = 'idle' | 'starting' | 'recording';
 
-// 依序挑瀏覽器支援的格式：Chrome／Edge 是 webm，Safari 是 mp4，Firefox 是 ogg；三種 Gemini 都聽得懂
-const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'];
+// 依序挑瀏覽器支援的格式：先用 AAC（Gemini 官方支援的格式，iPhone 一直都是錄這種），
+// 不行再用 webm（Chrome／Edge）、mp4、ogg（Firefox）
+const MIME_TYPES = ['audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'];
 // 按「說完了」後多錄一下，最後一個字才不會被切掉
 const TAIL_MS = 300;
 
@@ -79,7 +80,8 @@ export function useRecorder({ maxSeconds, onRecorded }: { maxSeconds: number; on
     }
 
     const mimeType = MIME_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32_000 } : undefined);
+    // 音質用瀏覽器預設的，不壓低：壓太低 AI 比較容易聽錯（30 秒也才幾百 KB）
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
     const s: Session = { recorder, stream, timer: null, tail: null, discard: false };
     session.current = s;
