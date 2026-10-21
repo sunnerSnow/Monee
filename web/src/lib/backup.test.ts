@@ -15,6 +15,7 @@ const backup = (): Backup => ({
   exportedAt: '2026-10-20T21:30:00+08:00',
   owner: OWNER,
   profile: { pnl_color: 'red_up', display_name: '小雞', pay_bank: null, pay_line: null },
+  categories: [{ id: 'c_pet', type: 'EXPENSE', name: '寵物', icon: 'paw-print', sort_order: 0, hidden: false }],
   accounts: [
     { id: CASH, name: '現金', type: 'CASH', opening_balance: 1000 },
     { id: FRIENDS, name: '朋友往來', type: 'FRIENDS', opening_balance: 0 },
@@ -64,6 +65,10 @@ describe('parseBackup', () => {
   it('預算紀錄沒有 id 也可以', () => {
     expect(parseBackup(JSON.stringify(backup())).budget_history).toHaveLength(1);
   });
+
+  it('分類管理之前的備份檔沒有分類，當成沒改過分類', () => {
+    expect(parseBackup(JSON.stringify({ ...backup(), categories: undefined })).categories).toEqual([]);
+  });
 });
 
 describe('summarizeBackup', () => {
@@ -100,6 +105,12 @@ describe('prepareRestore', () => {
     expect(expense).toMatchObject({ payer_id: me, account_id: cash, weights: { [me]: 1, [ming]: 1 }, amounts: { [me]: 450, [ming]: 450 } });
     expect(out.transactions[0]).toMatchObject({ source_account_id: cash, split_expense_id: expense.id });
     expect(out.owner).toBe('other-user');
+  });
+
+  it('別的帳號：分類 id 不換（每個人的分類各自獨立），交易照樣指到那個分類', () => {
+    const out = prepareRestore({ ...backup(), transactions: [{ ...backup().transactions[0], category_id: 'c_pet' }] }, 'other-user', newId);
+    expect(out.categories).toEqual(backup().categories);
+    expect(out.transactions[0].category_id).toBe('c_pet');
   });
 
   it('別的帳號：分享連結、收據照片不帶過來，其他內容不變', () => {

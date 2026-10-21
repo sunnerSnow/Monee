@@ -7,9 +7,13 @@ export const BACKUP_VERSION = 1;
 
 /** 備份檔裡的資料表 */
 export const BACKUP_TABLES = [
-  'accounts', 'budget_history', 'split_groups', 'split_members', 'split_rounds',
+  'categories', 'accounts', 'budget_history', 'split_groups', 'split_members', 'split_rounds',
   'split_expenses', 'split_settlements', 'split_claims', 'split_proposals', 'transactions',
 ] as const;
+/** 舊版的備份檔沒有這些表（分類管理之前備份的） */
+const OPTIONAL_TABLES = new Set<string>(['categories']);
+/** id 是每個人自己的（分類 id 像 food、c_xxx，預算紀錄用月份），換帳號還原時不用換 */
+const OWN_KEY_TABLES = new Set<string>(['categories', 'budget_history']);
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 export type BackupRow = Record<string, unknown>;
 
@@ -43,6 +47,7 @@ export function parseBackup(text: string): Backup {
   if (typeof data.exportedAt !== 'string' || typeof data.owner !== 'string') throw new Error(BROKEN);
   if (data.profile != null && !isObject(data.profile)) throw new Error(BROKEN);
   for (const table of BACKUP_TABLES) {
+    if (data[table] === undefined && OPTIONAL_TABLES.has(table)) data[table] = [];
     const rows = data[table];
     if (!Array.isArray(rows) || !rows.every(isObject)) throw new Error(BROKEN);
     // 預算紀錄用月份當 key，其他表都要有 id，換帳號時才換得掉
@@ -86,7 +91,7 @@ export const isOtherAccount = (b: Backup, userId: string) => b.owner !== userId;
 export function prepareRestore(b: Backup, userId: string, newId: () => string = () => crypto.randomUUID()): Backup {
   if (!isOtherAccount(b, userId)) return b;
   const ids = new Map<string, string>();
-  for (const table of BACKUP_TABLES) {
+  for (const table of BACKUP_TABLES.filter((t) => !OWN_KEY_TABLES.has(t))) {
     for (const row of b[table]) {
       if (typeof row.id === 'string') ids.set(row.id, newId());
     }

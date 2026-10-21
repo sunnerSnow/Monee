@@ -3,10 +3,10 @@
 import { Check, Copy, Info, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import { getCategory } from '@/lib/categories';
+import { getCategory, setCategoryRows, useCategories } from '@/lib/categories';
 import { copyText } from '@/lib/clipboard';
 import { formatForeign } from '@/lib/currency';
-import { usePublicClaim, usePublicRemove, usePublicSplit } from '@/lib/data';
+import { usePublicCategories, usePublicClaim, usePublicRemove, usePublicSplit } from '@/lib/data';
 import { formatMoney } from '@/lib/money';
 import {
   balances, initialOf, involves, modeText, openExpenses, originalShareOf, publicAsGroup, suggestTransfers, waitingProposals, type Transfer,
@@ -23,6 +23,11 @@ const whoKey = (token: string) => `monee-share-${token}`;
  */
 export function SharedSplit({ token }: { token: string }) {
   const q = usePublicSplit(token);
+  // 花費的分類用群組擁有者自己的（改過的名字、自己加的分類）
+  const { data: categoryRows } = usePublicCategories(token);
+  useEffect(() => {
+    if (categoryRows) setCategoryRows(categoryRows);
+  }, [categoryRows]);
   // 伺服器上沒有 localStorage；資料載入前兩邊都只顯示骨架，不會對不上
   const [who, setWho] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -115,6 +120,7 @@ function PickWho({ view, onPick }: { view: PublicSplit; onPick: (id: string) => 
 }
 
 function FriendView({ view, token, me, onSwitch }: { view: PublicSplit; token: string; me: SplitMember; onSwitch: () => void }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const g = publicAsGroup(view);
   const owner = view.members.find((m) => m.isMe)!;
   const transfers = suggestTransfers(balances(g));

@@ -2,7 +2,7 @@
 
 import { Search } from 'lucide-react';
 import { useState } from 'react';
-import { getCategory } from '@/lib/categories';
+import { getCategory, useCategories } from '@/lib/categories';
 import { HISTORY_MONTHS, useAccounts, useTransactions } from '@/lib/data';
 import { monthKey, monthKeyOf, shiftMonth } from '@/lib/dates';
 import { money } from '@/lib/money';
@@ -15,6 +15,7 @@ type Filter = 'ALL' | TransactionType;
 const FILTERS: [Filter, string][] = [['ALL', '全部'], ['EXPENSE', '支出'], ['INCOME', '收入'], ['TRANSFER', '轉帳']];
 
 export function TransactionsScreen() {
+  useCategories(); // 分類改名、隱藏時重畫
   const now = useNow();
   const accountsQ = useAccounts();
   const txQ = useTransactions();

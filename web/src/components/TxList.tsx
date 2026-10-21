@@ -3,13 +3,14 @@
 import { Paperclip } from 'lucide-react';
 import { groupByDay, visibleTransactions } from '@/lib/budget';
 import { formatForeign } from '@/lib/currency';
-import { getCategory } from '@/lib/categories';
+import { getCategory, useCategories } from '@/lib/categories';
 import { dayLabel } from '@/lib/dates';
 import { money, transactionAmount } from '@/lib/money';
 import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 
 export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, Account> }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const hidden = useUi((s) => s.hidden);
   const flashId = useUi((s) => s.flashId);
   const openSheet = useUi((s) => s.openSheet);

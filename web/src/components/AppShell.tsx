@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { setCategoryRows } from '@/lib/categories';
+import { useCategoryRows } from '@/lib/data';
 import { isDemo } from '@/lib/demo';
 import { applyTheme, useUi } from '@/lib/ui-store';
 import { BottomNav } from './BottomNav';
@@ -13,10 +15,16 @@ import { SplitSheets } from './split/SplitSheets';
 export function AppShell({ children }: { children: ReactNode }) {
   const sheetOpen = useUi((s) => s.sheet !== null);
   const theme = useUi((s) => s.theme);
+  const { data: categoryRows } = useCategoryRows();
 
   useEffect(() => {
     useUi.getState().hydrate();
   }, []);
+
+  // 使用者改過的分類、自己加的分類，放進 categories 的 store，畫面上的分類名稱、圖示都照它
+  useEffect(() => {
+    if (categoryRows) setCategoryRows(categoryRows);
+  }, [categoryRows]);
 
   // 選「跟隨系統」時，系統切換深淺色要即時反映
   useEffect(() => {

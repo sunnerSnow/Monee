@@ -2,7 +2,7 @@
 // 用途：還沒建 Supabase 專案時先試用、截圖檢查畫面。重新整理頁面就會回到初始資料。
 import { reconcileDiff } from './budget';
 import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
-import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
+import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, type CategoryRow, type ManagedType } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
 import type { ExportData } from './sheets-export';
 import { balances, involves, meOf, memberInvolved, openExpenses, originalShareOf, splitAmounts } from './split';
@@ -74,7 +74,9 @@ function seed() {
     { month: shiftMonth(current, -5), amount: 22000 },
     { month: shiftMonth(current, -2), amount: 24000 },
   ];
-  return { accounts, txs, budgets, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
+  // 分類：沒改過，用內建的
+  const categories: CategoryRow[] = [];
+  return { accounts, txs, budgets, categories, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
 }
 
 type Store = ReturnType<typeof seed>;
@@ -105,6 +107,33 @@ export const demo = {
   async profile(): Promise<Profile> {
     await pause();
     return { ...db().profile };
+  },
+  async categoryRows(): Promise<CategoryRow[]> {
+    await pause();
+    return db().categories.map((r) => ({ ...r }));
+  },
+  async saveCategoryRows(type: ManagedType, rows: CategoryRow[]) {
+    await pause();
+    const s = db();
+    s.categories = [...s.categories.filter((r) => r.type !== type), ...rows];
+  },
+  async categoryUsage(categoryId: string) {
+    await pause();
+    const s = db();
+    return {
+      transactions: s.txs.filter((t) => t.categoryId === categoryId).length,
+      splitExpenses: s.split.flatMap((g) => g.expenses).filter((e) => e.categoryId === categoryId).length,
+    };
+  },
+  async deleteCategory(categoryId: string, moveTo: string) {
+    await pause();
+    const s = db();
+    s.txs.forEach((t) => { if (t.categoryId === categoryId) t.categoryId = moveTo; });
+    s.split.forEach((g) => {
+      g.expenses.forEach((e) => { if (e.categoryId === categoryId) e.categoryId = moveTo; });
+      g.proposals.forEach((p) => { if (p.categoryId === categoryId) p.categoryId = moveTo; });
+    });
+    s.categories = s.categories.filter((r) => r.id !== categoryId);
   },
   async addTransaction(t: NewTransaction) {
     await pause();

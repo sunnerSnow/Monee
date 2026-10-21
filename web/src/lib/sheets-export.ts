@@ -1,7 +1,7 @@
 // 匯出到 Google Sheets 的內容：總覽、月報、明細、帳戶四張工作表。
 // 這裡只把資料排成表格（純函式，有測試）；寫進 Google 的部分在 google-sheets.ts。
 import { accountSummary, budgetFor, monthTotals, sortNewestFirst } from './budget';
-import { CATEGORIES, getCategory } from './categories';
+import { allCategories, getCategory } from './categories';
 import { isForeign } from './currency';
 import { monthKey, monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
 import type { Account, AccountType, BudgetEntry, Transaction, TransactionType } from './types';
@@ -38,7 +38,11 @@ const TYPE_LABEL: Record<TransactionType, string> = { EXPENSE: '支出', INCOME:
 const ACCOUNT_LABEL: Record<AccountType, string> = {
   CASH: '現金', BANK: '銀行', CREDIT_CARD: '信用卡', INVESTMENT_MIRROR: '投資帳戶', FRIENDS: '朋友往來',
 };
-const EXPENSE_CATEGORIES = CATEGORIES.filter((c) => c.type === 'EXPENSE');
+/** 支出算在哪個分類：不認得或不是支出的分類算進「其他」，各分類加起來才會等於支出 */
+function expenseCategoryOf(t: ExportTransaction) {
+  const cat = getCategory(t.categoryId);
+  return cat.type === 'EXPENSE' ? cat.id : 'other';
+}
 
 /** YYYY-MM-DD 換成試算表的日期序號（1899-12-30 起算的天數），匯出後是真的日期，可以排序、篩選 */
 export function sheetDate(iso: string) {
@@ -89,21 +93,23 @@ export function buildWorkbook({ transactions, accounts, budgets }: ExportData, n
     byMonth.set(monthKey(t.date), list);
   });
 
+  // 月報的分類欄：沒隱藏的支出分類照使用者排的順序；隱藏了但有花費的也列出來，各分類加起來才等於支出
+  const used = new Set(txs.filter((t) => t.type === 'EXPENSE').map(expenseCategoryOf));
+  const expenseCategories = allCategories().filter((c) => c.type === 'EXPENSE' && (!c.hidden || used.has(c.id)));
+
   const report: Cell[][] = months.map((key) => {
     const list = byMonth.get(key) ?? [];
     const totals = monthTotals(list, key);
     const budget = budgetFor(budgets, key);
     const cats = new Map<string, number>();
     list.filter((t) => t.type === 'EXPENSE').forEach((t) => {
-      // 不認得或不是支出的分類算進「其他」，各分類加起來才會等於支出
-      const cat = getCategory(t.categoryId);
-      const id = cat.type === 'EXPENSE' ? cat.id : 'other';
+      const id = expenseCategoryOf(t);
       cats.set(id, (cats.get(id) ?? 0) + t.amount);
     });
     return [
       key, totals.income, totals.expense, totals.income - totals.expense, budget,
       budget ? totals.budgetExpense / budget : null,
-      ...EXPENSE_CATEGORIES.map((c) => cats.get(c.id) ?? 0),
+      ...expenseCategories.map((c) => cats.get(c.id) ?? 0),
     ];
   });
 
@@ -144,9 +150,9 @@ export function buildWorkbook({ transactions, accounts, budgets }: ExportData, n
     { title: '總覽', rows: overview, freeze: false, formats: { 1: 'money' }, widths: [120, 140] },
     {
       title: '月報',
-      rows: [['月份', '收入', '支出', '結餘', '預算', '預算已用', ...EXPENSE_CATEGORIES.map((c) => c.name)], ...report],
+      rows: [['月份', '收入', '支出', '結餘', '預算', '預算已用', ...expenseCategories.map((c) => c.name)], ...report],
       freeze: true,
-      formats: { 1: 'money', 2: 'money', 3: 'money', 4: 'money', 5: 'percent', ...Object.fromEntries(EXPENSE_CATEGORIES.map((_, i) => [6 + i, 'money'])) },
+      formats: { 1: 'money', 2: 'money', 3: 'money', 4: 'money', 5: 'percent', ...Object.fromEntries(expenseCategories.map((_, i) => [6 + i, 'money'])) },
     },
     {
       title: '明細',

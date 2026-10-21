@@ -3,7 +3,7 @@
 import { Archive, ArchiveRestore, Info, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { getCategory } from '@/lib/categories';
+import { getCategory, useCategories } from '@/lib/categories';
 import { CURRENCIES, formatForeign } from '@/lib/currency';
 import {
   useAccounts, useArchiveSplitGroup, useCreateSplitGroup, useDeleteSplitExpense, useDeleteSplitGroup, useReopenRound, useSettle, useSplitGroups,
@@ -86,6 +86,7 @@ function ExpenseSheet({ g, expenseId }: { g: SplitGroup; expenseId?: string }) {
 }
 
 function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const close = useUi((s) => s.closeSheet);
   const openSheet = useUi((s) => s.openSheet);
   const showToast = useUi((s) => s.showToast);
@@ -234,6 +235,7 @@ function SettleSheet({ g, fromId, toId, amount: suggested }: { g: SplitGroup; fr
 }
 
 function RoundSheet({ g, roundId }: { g: SplitGroup; roundId: string }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const close = useUi((s) => s.closeSheet);
   const showToast = useUi((s) => s.showToast);
   const reopen = useReopenRound();

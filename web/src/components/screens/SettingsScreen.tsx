@@ -1,11 +1,12 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, KeyRound, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, KeyRound, LogOut, Tags } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { budgetFor, planBudget, type BudgetScope } from '@/lib/budget';
+import { setCategoryRows } from '@/lib/categories';
 import { useBudgets, useProfile, useSetBudget, useUpdateProfile, useUser } from '@/lib/data';
 import { monthKeyOf, monthLabel, monthTitle, shiftMonth } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
@@ -91,6 +92,7 @@ export function SettingsScreen() {
     setSigningOut(true);
     await createClient().auth.signOut();
     queryClient.clear();
+    setCategoryRows([]);
     forgetGoogleToken();
     router.replace('/login');
     router.refresh();
@@ -184,6 +186,18 @@ export function SettingsScreen() {
             </div>
           )}
         </div>
+      </section>
+
+      <section aria-labelledby="s-categories" className="flex flex-col gap-2">
+        <h2 id="s-categories" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">記帳</h2>
+        <Link href="/settings/categories" className="card press flex min-h-14 items-center gap-3.5 px-5 py-2">
+          <span aria-hidden className="ico sm"><Tags size={16} strokeWidth={1.5} /></span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-body">分類管理</span>
+            <span className="caption">新增、改名、隱藏、調整順序</span>
+          </span>
+          <ChevronRight size={18} strokeWidth={1.5} aria-hidden className="text-muted" />
+        </Link>
       </section>
 
       <section aria-labelledby="s-theme" className="flex flex-col gap-2">

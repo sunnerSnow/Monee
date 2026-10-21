@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useState } from 'react';
 import { budgetFor, expenseByCategory, monthTotals, monthlyExpenses } from '@/lib/budget';
-import { getCategory } from '@/lib/categories';
+import { getCategory, useCategories } from '@/lib/categories';
 import { HISTORY_MONTHS, useBudgets, useTransactions } from '@/lib/data';
 import { monthLabel, monthKeyOf, shiftMonth } from '@/lib/dates';
 import { MASK, formatMoney, money } from '@/lib/money';
@@ -12,6 +12,7 @@ import { MonthlyChart } from '../MonthlyChart';
 import { EmptyBox, ErrorBox, LoadingBlocks, MonthSwitch, PageHeader, useHidden } from '../ui';
 
 export function ReportsScreen() {
+  useCategories(); // 分類改名、隱藏時重畫
   const now = useNow();
   const txQ = useTransactions();
   const budgetsQ = useBudgets();

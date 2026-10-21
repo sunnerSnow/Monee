@@ -2,7 +2,7 @@
 
 import { Copy, Info, Share2 } from 'lucide-react';
 import { useState } from 'react';
-import { categoriesFor, getCategory } from '@/lib/categories';
+import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { copyText } from '@/lib/clipboard';
 import { formatForeign } from '@/lib/currency';
 import {
@@ -181,6 +181,7 @@ export function InboxSheet({ groups, groupId }: { groups: SplitGroup[]; groupId?
 
 /** 朋友新增、跟你有關的花費：可以改分類；你先付的要選付款帳戶。確認後照一般花費寫進群組與你的帳 */
 function ProposalItem({ g, p, isLast }: { g: SplitGroup; p: SplitProposal; isLast: boolean }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const close = useUi((s) => s.closeSheet);
   const showToast = useUi((s) => s.showToast);
   const { data: accounts = [] } = useAccounts();
@@ -189,7 +190,7 @@ function ProposalItem({ g, p, isLast }: { g: SplitGroup; p: SplitProposal; isLas
   const me = meOf(g)!;
   const youPaid = p.payerId === me.id;
   const payable = payableAccounts(accounts);
-  const [categoryId, setCategoryId] = useState(getCategory(p.categoryId).type === 'EXPENSE' ? getCategory(p.categoryId).id : 'other');
+  const [categoryId, setCategoryId] = useState(getCategory(p.categoryId).type === 'EXPENSE' ? getCategory(p.categoryId).id : defaultCategory('EXPENSE'));
   const [accountId, setAccountId] = useState(payable[0]?.id ?? '');
   const [error, setError] = useState('');
   const mine = myShare(g, p);
@@ -224,7 +225,7 @@ function ProposalItem({ g, p, isLast }: { g: SplitGroup; p: SplitProposal; isLas
         {youPaid ? '說是你先付的' : `${memberName(g, p.payerId)}先付`}{mine ? <>，你的部分 <b className="num font-normal">{formatMoney(mine)}</b></> : ''}。
       </p>
       <Field label="分類">
-        <Pills items={categoriesFor('EXPENSE').map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
+        <Pills items={categoriesFor('EXPENSE', categoryId).map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
       </Field>
       {youPaid && (
         <Field label="從哪個帳戶付">

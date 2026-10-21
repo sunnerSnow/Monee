@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { prepareRestore, type Backup } from './backup';
 import { reconcileDiff } from './budget';
-import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
+import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, toRows, type Category, type CategoryRow, type ManagedType } from './categories';
 import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
 import { SAMPLE_RATES, type FxRates } from './currency';
 import { demo, isDemo } from './demo';
@@ -25,6 +25,7 @@ const keys = {
   split: ['split'],
   user: ['user'],
   backupSnapshot: ['backupSnapshot'],
+  categories: ['categories'],
 } satisfies Record<string, QueryKey>;
 
 interface AccountRow {
@@ -251,6 +252,85 @@ export function useRestoreBackup() {
     },
     // 帳戶、交易、預算、分帳、個人設定全都換了，全部重新讀
     onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+// ---------- 分類 ----------
+// 內建分類寫在 lib/categories.ts；表裡存使用者改過的內建分類和自己加的分類，合起來由 AppShell 放進 categories 的 store
+
+interface CategoryDbRow { id: string; type: ManagedType; name: string; icon: string; sort_order: number; hidden: boolean }
+const toCategoryRow = (r: CategoryDbRow): CategoryRow => ({ id: r.id, type: r.type, name: r.name, icon: r.icon, sortOrder: r.sort_order, hidden: r.hidden });
+
+export function useCategoryRows(enabled = true) {
+  return useQuery({
+    queryKey: keys.categories,
+    enabled,
+    queryFn: async (): Promise<CategoryRow[]> => {
+      if (isDemo) return demo.categoryRows();
+      const rows = await unwrap<CategoryDbRow[]>(createClient().from('categories').select('id, type, name, icon, sort_order, hidden').order('sort_order'));
+      return rows.map(toCategoryRow);
+    },
+  });
+}
+
+/**
+ * 存一整類（支出或收入）的分類，連同順序：改名、換圖示、隱藏、排序、新增都走這裡。
+ * 先把畫面換成新的（排序按一下就動），失敗再重新讀回資料庫的。
+ */
+export function useSaveCategories() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ type, list }: { type: ManagedType; list: Category[] }) => {
+      const rows = toRows(list, type);
+      if (isDemo) return demo.saveCategoryRows(type, rows);
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) throw new Error('登入已過期，請重新登入');
+      await unwrap(supabase.from('categories').upsert(rows.map((r) => ({
+        user_id: data.user.id, id: r.id, type: r.type, name: r.name, icon: r.icon, sort_order: r.sortOrder, hidden: r.hidden,
+      }))).select('id'));
+    },
+    onMutate: ({ type, list }) => {
+      const before = queryClient.getQueryData<CategoryRow[]>(keys.categories) ?? [];
+      queryClient.setQueryData<CategoryRow[]>(keys.categories, [...before.filter((r) => r.type !== type), ...toRows(list, type)]);
+    },
+    onError: () => queryClient.invalidateQueries({ queryKey: keys.categories }),
+  });
+}
+
+/** 有幾筆交易、分帳花費用到這個分類（刪除前要問帳移到哪裡） */
+export async function fetchCategoryUsage(id: string): Promise<{ transactions: number; splitExpenses: number }> {
+  if (isDemo) return demo.categoryUsage(id);
+  const supabase = createClient();
+  const count = async (table: 'transactions' | 'split_expenses') => {
+    const { count: n, error } = await supabase.from(table).select('id', { count: 'exact', head: true }).eq('category_id', id);
+    if (error) throw new Error(error.message);
+    return n ?? 0;
+  };
+  const [transactions, splitExpenses] = await Promise.all([count('transactions'), count('split_expenses')]);
+  return { transactions, splitExpenses };
+}
+
+/** 刪掉自己加的分類：交易、分帳花費、朋友的待確認先移到 moveTo，再刪掉 */
+export function useDeleteCategory() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ id, moveTo }: { id: string; moveTo: string }) => {
+      if (isDemo) return demo.deleteCategory(id, moveTo);
+      await rpc('category_delete', { p_id: id, p_move_to: moveTo });
+    },
+    onSuccess: () => invalidate(keys.categories, keys.transactions, keys.split),
+  });
+}
+
+/** 分享頁：群組擁有者的支出分類 */
+export function usePublicCategories(token: string) {
+  return useQuery({
+    queryKey: ['public-categories', token],
+    queryFn: async (): Promise<CategoryRow[]> => {
+      if (isDemo) return (await demo.categoryRows()).filter((r) => r.type === 'EXPENSE');
+      return rpc<CategoryRow[]>('split_public_categories', { p_token: token });
+    },
   });
 }
 

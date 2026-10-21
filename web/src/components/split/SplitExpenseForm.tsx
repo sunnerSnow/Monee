@@ -3,7 +3,7 @@
 import { Check, Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ME, type AiDraftTransaction } from '@/lib/ai-draft';
-import { categoriesFor, getCategory } from '@/lib/categories';
+import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { cleanAmountInput, formatForeign, getCurrency, toMinor, toTwd, twdPerUnit } from '@/lib/currency';
 import { useAccounts, useFxRates, useSaveSplitExpense, useSetSplitReceipt } from '@/lib/data';
 import { toISODate, toTime } from '@/lib/dates';
@@ -51,6 +51,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   /** again：使用者按了「記下並再記一筆」 */
   onSaved: (message: string, again: boolean) => void;
 }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const { data: accounts = [] } = useAccounts();
   const fx = useFxRates();
   const save = useSaveSplitExpense();
@@ -66,7 +67,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   const [rateInput, setRateInput] = useState(editing?.fxRate ? String(editing.fxRate) : '');
   const [amount, setAmount] = useState(editing ? String(editing.currency !== 'TWD' && editing.originalAmount ? editing.originalAmount : editing.amount) : initial?.amount ?? '');
   const [title, setTitle] = useState(editing?.title ?? initial?.title ?? '');
-  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? (initial?.categoryId && getCategory(initial.categoryId).type === 'EXPENSE' ? initial.categoryId : 'food'));
+  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? (initial?.categoryId && getCategory(initial.categoryId).type === 'EXPENSE' ? initial.categoryId : defaultCategory('EXPENSE')));
   const [payerId, setPayerId] = useState(editing?.payerId ?? me.id);
   const [accountId, setAccountId] = useState(editing?.accountId ?? '');
   const [mode, setMode] = useState<SplitMode>(editing?.mode ?? 'equal');
@@ -310,7 +311,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
           <label className="sr-only" htmlFor="split-date">日期</label>
           <input id="split-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input w-[150px] px-3" />
         </div>
-        <Pills items={categoriesFor('EXPENSE').map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
+        <Pills items={categoriesFor('EXPENSE', categoryId).map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
       </Field>
 
       {group.members.length > 1 && (

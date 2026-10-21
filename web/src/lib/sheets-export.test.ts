@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setCategoryRows } from './categories';
 import { buildWorkbook, sheetDate, type ExportAccount, type ExportTransaction, type Tab } from './sheets-export';
 
 let n = 0;
@@ -36,6 +37,8 @@ describe('sheetDate', () => {
 });
 
 describe('buildWorkbook', () => {
+  afterEach(() => setCategoryRows([]));
+
   it('四張工作表依序是總覽、月報、明細、帳戶', () => {
     expect(buildWorkbook({ transactions: [], accounts: [], budgets: [] }, now).map((t) => t.title)).toEqual(['總覽', '月報', '明細', '帳戶']);
   });
@@ -106,6 +109,22 @@ describe('buildWorkbook', () => {
     expect(row.其他).toBe(500);
     const categoryTotal = report.rows[0].slice(6).reduce((s: number, h) => s + Number(row[h as string]), 0);
     expect(categoryTotal).toBe(row.支出);
+  });
+
+  it('月報的分類欄照使用者的分類：自己加的、改過的名字、照排好的順序；隱藏了但有花費的也列出來', () => {
+    setCategoryRows([
+      { id: 'c_pet', type: 'EXPENSE', name: '寵物', icon: 'paw-print', sortOrder: 0, hidden: false },
+      { id: 'food', type: 'EXPENSE', name: '吃飯', icon: 'utensils', sortOrder: 1, hidden: false },
+      { id: 'fun', type: 'EXPENSE', name: '娛樂', icon: 'ticket', sortOrder: 2, hidden: true },
+      { id: 'health', type: 'EXPENSE', name: '醫療', icon: 'heart-pulse', sortOrder: 3, hidden: true },
+    ]);
+    const report = tab(buildWorkbook({
+      transactions: [tx({ categoryId: 'c_pet', amount: 450 }), tx({ categoryId: 'fun', amount: 650 }), tx({ categoryId: 'food', amount: 100 })],
+      accounts: [], budgets: [],
+    }, now), '月報');
+    // 隱藏又沒花費的「醫療」不列
+    expect(report.rows[0].slice(6)).toEqual(['寵物', '吃飯', '娛樂', '交通', '日用', '購物', '其他']);
+    expect(record(report, 1)).toMatchObject({ 寵物: 450, 吃飯: 100, 娛樂: 650 });
   });
 
   it('沒有交易時月報只有本月', () => {

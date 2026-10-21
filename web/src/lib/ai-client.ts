@@ -1,6 +1,7 @@
 'use client';
 
 import type { AiDraftTransaction, DraftAccount, DraftContext, DraftSource } from './ai-draft';
+import { allCategories } from './categories';
 import { toISODate } from './dates';
 
 /** 把語音、收據照片或文字送到 /api/ai/draft，拿回整理好的交易草稿 */
@@ -18,6 +19,8 @@ export async function requestDraft(input: {
   // 「今天」以使用者手機的日期為準，「昨天晚餐」才不會因為伺服器時區算錯
   form.set('today', toISODate(new Date()));
   form.set('accounts', JSON.stringify(input.accounts.map(({ id, name, type }) => ({ id, name, type }))));
+  // 使用者自己的分類（沒隱藏的），AI 才會用「寵物」「學費」這些自己加的分類
+  form.set('categories', JSON.stringify(allCategories().filter((c) => !c.hidden && c.type !== 'TRANSFER').map(({ id, name, type }) => ({ id, name, type }))));
   if (input.context) form.set('context', JSON.stringify(input.context));
   if (input.file) form.set('file', input.file, input.source === 'voice' ? 'voice' : 'receipt.jpg');
   if (input.text) form.set('text', input.text);

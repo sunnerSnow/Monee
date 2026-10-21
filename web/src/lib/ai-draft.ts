@@ -1,6 +1,6 @@
 // AI 記帳草稿：給 Gemini 的指示、回傳格式，以及把回傳結果整理成表單可以直接用的草稿。
 // 伺服器（/api/ai/draft）與測試共用；這裡只放純函式，不碰網路與金鑰。
-import { CATEGORIES, categoriesFor } from './categories';
+import { mergeCategories, MAX_CATEGORY_NAME } from './categories';
 import { CURRENCIES, getCurrency } from './currency';
 import type { Account, AccountType, TransactionType } from './types';
 
@@ -8,6 +8,16 @@ export type DraftSource = 'voice' | 'receipt' | 'text';
 
 /** 送給 AI 當參考的帳戶（只需要這些欄位） */
 export type DraftAccount = Pick<Account, 'id' | 'name' | 'type'>;
+
+/** 送給 AI 的分類：使用者沒隱藏的支出、收入分類，加上轉帳 */
+export interface DraftCategory {
+  id: string;
+  name: string;
+  type: TransactionType;
+}
+
+/** 前端沒送分類時（例如舊版畫面）用內建的 */
+export const DEFAULT_DRAFT_CATEGORIES: DraftCategory[] = mergeCategories([]).map(({ id, name, type }) => ({ id, name, type }));
 
 /** 分帳／旅程裡記帳時多給 AI 的資訊 */
 export interface DraftContext {
@@ -58,7 +68,8 @@ export const isISODate = (s: unknown): s is string =>
 
 const weekday = (iso: string) => WEEKDAYS[new Date(`${iso}T00:00:00Z`).getUTCDay()];
 
-const categoryList = (type: TransactionType) => categoriesFor(type).map((c) => `${c.id} ${c.name}`).join('、');
+const categoryList = (categories: DraftCategory[], type: TransactionType) =>
+  categories.filter((c) => c.type === type).map((c) => `${c.id} ${c.name}`).join('、');
 
 /** 分帳／旅程多加的規則 */
 function splitRules({ members, currency }: DraftContext) {
@@ -71,7 +82,7 @@ function splitRules({ members, currency }: DraftContext) {
   return lines.join('\n');
 }
 
-export function draftInstruction(accounts: DraftAccount[], today: string, context?: DraftContext) {
+export function draftInstruction(accounts: DraftAccount[], today: string, context?: DraftContext, categories = DEFAULT_DRAFT_CATEGORIES) {
   const accountLines = accounts.length
     ? accounts.map((a) => `- ${a.id}：${a.name}（${TYPE_LABEL[a.type]}）`).join('\n')
     : '- （還沒有帳戶，accountId 一律填 none）';
@@ -84,9 +95,9 @@ export function draftInstruction(accounts: DraftAccount[], today: string, contex
 ${accountLines}
 
 分類（categoryId 只能用這些 id）：
-- 支出：${categoryList('EXPENSE')}
-- 收入：${categoryList('INCOME')}
-- 轉帳：${categoryList('TRANSFER')}
+- 支出：${categoryList(categories, 'EXPENSE')}
+- 收入：${categoryList(categories, 'INCOME')}
+- 轉帳：${categoryList(categories, 'TRANSFER')}
 
 規則：
 1. type：花錢是 EXPENSE，收到錢是 INCOME；在自己的帳戶之間移動錢（提款、繳卡費、轉到證券戶）是 TRANSFER，categoryId 填 transfer，並填 targetAccountId（轉入的帳戶）。不是轉帳時 targetAccountId 填 ${NONE}。
@@ -109,7 +120,7 @@ export const SOURCE_PROMPT: Record<DraftSource, string> = {
 export const SPOKEN_TEXT_PROMPT = '使用者用說的記帳，手機已經轉成下面的文字（可能有同音字轉錯，請照記帳的常理判斷），請整理成交易草稿：';
 
 /** Gemini responseSchema（OpenAPI 子集）；分類、帳戶、幣別、付款人用 enum 限定，避免 AI 自己編 */
-export function draftSchema(accounts: DraftAccount[], context?: DraftContext) {
+export function draftSchema(accounts: DraftAccount[], context?: DraftContext, categories = DEFAULT_DRAFT_CATEGORIES) {
   const accountIds = [...accounts.map((a) => a.id), NONE];
   const withPayer = Boolean(context?.members.length);
   const fields = [
@@ -126,7 +137,7 @@ export function draftSchema(accounts: DraftAccount[], context?: DraftContext) {
       type: { type: 'STRING', enum: ['EXPENSE', 'INCOME', 'TRANSFER'] },
       currency: { type: 'STRING', enum: [...CODES] },
       amount: { type: 'NUMBER' },
-      categoryId: { type: 'STRING', enum: CATEGORIES.map((c) => c.id) },
+      categoryId: { type: 'STRING', enum: categories.map((c) => c.id) },
       accountId: { type: 'STRING', enum: accountIds },
       targetAccountId: { type: 'STRING', enum: accountIds },
       date: { type: 'STRING' },
@@ -155,8 +166,9 @@ const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice
  * 金額照幣別取到該有的小數位、日期不晚於今天、帳戶與分類一定是現有的 id。
  * 分帳時一律是支出，付款人一定是群組裡的人。
  */
-export function sanitizeDraft(raw: unknown, { accounts, today, source, context }: {
+export function sanitizeDraft(raw: unknown, { accounts, today, source, context, categories = DEFAULT_DRAFT_CATEGORIES }: {
   accounts: DraftAccount[];
+  categories?: DraftCategory[];
   today: string;
   source: DraftSource;
   context?: DraftContext;
@@ -171,8 +183,8 @@ export function sanitizeDraft(raw: unknown, { accounts, today, source, context }
   if (doubtful && (source === 'receipt' || !amount)) throw new NotATransactionError(source);
 
   const type: TransactionType = !context && (r.type === 'INCOME' || r.type === 'TRANSFER') ? r.type : 'EXPENSE';
-  const allowed = categoriesFor(type);
-  const categoryId = allowed.some((c) => c.id === r.categoryId) ? (r.categoryId as string) : allowed[0].id;
+  const allowed = categories.filter((c) => c.type === type);
+  const categoryId = allowed.some((c) => c.id === r.categoryId) ? (r.categoryId as string) : allowed[0]?.id ?? DEFAULT_DRAFT_CATEGORIES.find((c) => c.type === type)!.id;
 
   // 投資帳戶由 Monee Invest 同步，只能當轉入對象（跟手動記帳的規則一樣）
   const payable = accounts.filter((a) => a.type !== 'INVESTMENT_MIRROR' && a.type !== 'FRIENDS');
@@ -212,6 +224,30 @@ export function parseDraftContext(input: unknown): DraftContext | undefined {
     .filter((m) => m && m !== ME && m !== NONE)
     .slice(0, 20);
   return { members, currency: typeof r.currency === 'string' && CODES.has(r.currency) ? r.currency : 'TWD' };
+}
+
+/**
+ * 檢查前端送來的分類清單：id 格式、名字長度（名字會寫進給 AI 的指示，去掉換行）、不重複；
+ * 支出或收入一個都沒有（或沒送）就用內建的那一類，轉帳一定有。
+ */
+export function parseDraftCategories(input: unknown): DraftCategory[] {
+  const list = Array.isArray(input) ? input : [];
+  const seen = new Set<string>();
+  const picked: DraftCategory[] = [];
+  for (const c of list.slice(0, 80)) {
+    if (!c || typeof c !== 'object') continue;
+    const { id, name, type } = c as Record<string, unknown>;
+    if (typeof id !== 'string' || !/^[a-z0-9_]{1,40}$/.test(id) || id === 'transfer' || seen.has(id)) continue;
+    if (type !== 'EXPENSE' && type !== 'INCOME') continue;
+    const clean = typeof name === 'string' ? name.replace(/\s+/g, ' ').trim().slice(0, MAX_CATEGORY_NAME) : '';
+    if (!clean) continue;
+    seen.add(id);
+    picked.push({ id, name: clean, type });
+  }
+  return (['EXPENSE', 'INCOME', 'TRANSFER'] as const).flatMap((type) => {
+    const mine = type === 'TRANSFER' ? [] : picked.filter((c) => c.type === type);
+    return mine.length ? mine : DEFAULT_DRAFT_CATEGORIES.filter((c) => c.type === type);
+  });
 }
 
 /** 檢查前端送來的帳戶清單，只留需要的欄位 */

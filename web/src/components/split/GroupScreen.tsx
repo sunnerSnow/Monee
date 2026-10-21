@@ -4,7 +4,7 @@ import { Archive, ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plane, Plus, S
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
-import { getCategory } from '@/lib/categories';
+import { getCategory, useCategories } from '@/lib/categories';
 import { useAccounts, useArchiveSplitGroup, useDeleteSettlement, useSplitGroups } from '@/lib/data';
 import { formatForeign, getCurrency } from '@/lib/currency';
 import { dayLabel, toISODate } from '@/lib/dates';
@@ -195,6 +195,7 @@ const myOriginal = (g: SplitGroup, e: SplitExpense) => {
 };
 
 function Expenses({ g }: { g: SplitGroup }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const now = useNow();
   const hidden = useHidden();
   const openSheet = useUi((s) => s.openSheet);

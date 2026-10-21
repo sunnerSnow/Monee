@@ -2,7 +2,7 @@
 
 import { Check, ChevronLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { categoriesFor } from '@/lib/categories';
+import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { cleanAmountInput, formatForeign, getCurrency, toMinor, toTwd, twdPerUnit } from '@/lib/currency';
 import { useFxRates, usePublicAddExpense } from '@/lib/data';
 import { toISODate } from '@/lib/dates';
@@ -26,6 +26,7 @@ export function FriendExpenseForm({ g, token, me, ownerName, onDone, onCancel }:
   onDone: (message: string) => void;
   onCancel: () => void;
 }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const fx = useFxRates();
   const add = usePublicAddExpense(token);
   const owner = g.members.find((m) => m.isMe)!;
@@ -37,7 +38,7 @@ export function FriendExpenseForm({ g, token, me, ownerName, onDone, onCancel }:
   const [rateInput, setRateInput] = useState('');
   const [amount, setAmount] = useState('');
   const [title, setTitle] = useState('');
-  const [categoryId, setCategoryId] = useState('food');
+  const [categoryId, setCategoryId] = useState(() => defaultCategory('EXPENSE'));
   const [date, setDate] = useState(toISODate(new Date()));
   const [payerId, setPayerId] = useState(me.id);
   const [who, setWho] = useState<Set<string>>(() => new Set(ids));
@@ -77,7 +78,7 @@ export function FriendExpenseForm({ g, token, me, ownerName, onDone, onCancel }:
 
   const submit = async () => {
     if (problem) return setError(problem);
-    const finalTitle = title.trim() || categoriesFor('EXPENSE').find((c) => c.id === categoryId)?.name || '花費';
+    const finalTitle = title.trim() || getCategory(categoryId).name;
     try {
       const res = await add.mutateAsync({
         memberId: me.id, date, title: finalTitle, categoryId, amount: total, payerId, weights, amounts,

@@ -4,7 +4,7 @@ import { Delete, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { frequentEntries } from '@/lib/budget';
-import { categoriesFor, getCategory } from '@/lib/categories';
+import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { formatForeign, getCurrency, toTwd, twdPerUnit } from '@/lib/currency';
 import { useAccounts, useAddTransaction, useDeleteTransaction, useFxRates, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
 import { activeTrip } from '@/lib/split';
@@ -44,6 +44,7 @@ export function EntrySheet() {
 }
 
 function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () => void }) {
+  useCategories(); // 分類改名、隱藏時重畫
   const { data: accounts = [], isPending } = useAccounts();
   const { data: txs = [] } = useTransactions();
   const add = useAddTransaction();
@@ -55,7 +56,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
 
   const [type, setType] = useState<TransactionType>(editing?.type ?? 'EXPENSE');
   const [amount, setAmount] = useState(editing ? String(Math.round(editing.amount)) : '');
-  const [categoryId, setCategoryId] = useState(editing?.categoryId ?? 'food');
+  const [categoryId, setCategoryId] = useState(() => editing?.categoryId ?? defaultCategory('EXPENSE'));
   const [source, setSource] = useState(editing?.sourceAccountId ?? '');
   const [target, setTarget] = useState(editing?.targetAccountId ?? '');
   const [note, setNote] = useState(editing?.note ?? '');
@@ -97,7 +98,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
 
   const switchType = (next: TransactionType) => {
     setType(next);
-    setCategoryId(categoriesFor(next)[0].id);
+    setCategoryId(next === 'TRANSFER' ? 'transfer' : defaultCategory(next));
     setError('');
   };
 
@@ -260,7 +261,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
       {type !== 'TRANSFER' && (
         <div className="flex flex-col gap-2">
           <span className="caption">分類</span>
-          {chips(categoriesFor(type).map((c) => ({ id: c.id, label: c.name })), categoryId, setCategoryId, '分類')}
+          {chips(categoriesFor(type, categoryId).map((c) => ({ id: c.id, label: c.name })), categoryId, setCategoryId, '分類')}
         </div>
       )}
 
