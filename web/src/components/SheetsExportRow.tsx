@@ -3,18 +3,13 @@
 import { ExternalLink, Sheet as SheetIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { fetchExportData, useProfile, useUpdateProfile } from '@/lib/data';
-import { toTime } from '@/lib/dates';
+import { shortDateTime } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
 import { isGoogleConfigured, preloadGoogle, requestGoogleToken, sheetsUrl, writeSpreadsheet } from '@/lib/google-sheets';
 import { buildWorkbook } from '@/lib/sheets-export';
 import { useUi } from '@/lib/ui-store';
 
 const ready = isGoogleConfigured && !isDemo;
-
-const shortTime = (iso: string) => {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${toTime(d)}`;
-};
 
 /** 我的 → 資料：匯出到 Google Sheets。第一次建一份「Monee 記帳」，之後每次都更新同一份 */
 export function SheetsExportRow() {
@@ -58,7 +53,7 @@ export function SheetsExportRow() {
     : stage === 'write' ? '匯出中，資料多的話要等一下…'
       : isDemo ? '示範模式不能用'
         : !isGoogleConfigured ? '還沒設定'
-          : profile?.sheetsExportedAt ? `上次 ${shortTime(profile.sheetsExportedAt)}・每次更新同一份`
+          : profile?.sheetsExportedAt ? `上次 ${shortDateTime(profile.sheetsExportedAt)}・每次更新同一份`
             : '在你的 Google 雲端硬碟建一份試算表，之後每次更新同一份。Monee 只能存取它自己建立的檔案。';
 
   return (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { prepareRestore, type Backup } from './backup';
 import { reconcileDiff } from './budget';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY } from './categories';
 import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
@@ -23,6 +24,7 @@ const keys = {
   budgets: ['budgets'],
   split: ['split'],
   user: ['user'],
+  backupSnapshot: ['backupSnapshot'],
 } satisfies Record<string, QueryKey>;
 
 interface AccountRow {
@@ -209,6 +211,45 @@ export async function fetchExportData(): Promise<ExportData> {
     accounts: accounts.map((r) => ({ ...toAccount(r), archived: r.archived })),
     budgets: budgets.map((r) => ({ month: r.effective_month, amount: r.amount != null ? Number(r.amount) : null })),
   };
+}
+
+// ---------- 備份 ----------
+
+/** 全部資料的備份檔內容（資料庫函式 backup_export 產生） */
+export async function fetchBackup(): Promise<Backup> {
+  return unwrap<Backup>(createClient().rpc('backup_export'));
+}
+
+/** 上次還原時留下的「還原前的資料」，只拿時間 */
+export function useBackupSnapshot() {
+  return useQuery({
+    queryKey: keys.backupSnapshot,
+    queryFn: async () => {
+      if (isDemo) return null;
+      const row = await unwrap<{ created_at: string } | null>(createClient().from('backup_snapshots').select('created_at').maybeSingle());
+      return row ? { createdAt: row.created_at } : null;
+    },
+  });
+}
+
+export async function fetchBackupSnapshot(): Promise<Backup | null> {
+  const row = await unwrap<{ data: Backup } | null>(createClient().from('backup_snapshots').select('data').maybeSingle());
+  return row?.data ?? null;
+}
+
+/** 整個換成備份的內容；資料庫會先留一份現在的資料（backup_snapshots） */
+export function useRestoreBackup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (backup: Backup) => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) throw new Error('登入已過期，請重新登入');
+      await unwrap(supabase.rpc('backup_restore', { p_data: prepareRestore(backup, data.user.id) }));
+    },
+    // 帳戶、交易、預算、分帳、個人設定全都換了，全部重新讀
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
 }
 
 // ---------- 寫入 ----------

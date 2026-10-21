@@ -4,6 +4,11 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /** 使用者當地日期 YYYY-MM-DD */
 export const toISODate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 export const toTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** 10/21 14:03 */
+export const shortDateTime = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${toTime(d)}`;
+};
 
 /** YYYY-MM */
 export const monthKey = (iso: string) => iso.slice(0, 7);

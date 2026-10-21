@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, CloudUpload, KeyRound, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, KeyRound, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { BudgetEntry, PnlColor } from '@/lib/types';
 import { useUi, type ThemePref } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
+import { BackupRow } from '../BackupRow';
 import { SheetsExportRow } from '../SheetsExportRow';
 import { Avatar } from '../ui';
 
@@ -200,10 +201,7 @@ export function SettingsScreen() {
         <h2 id="s-data" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">資料</h2>
         <ul className="card">
           <SheetsExportRow />
-          <li className="flex min-h-14 items-center gap-3.5 border-t border-line px-5 py-2 text-body text-muted">
-            <span aria-hidden className="ico sm"><CloudUpload size={16} strokeWidth={1.5} /></span>
-            資料備份<span className="caption ml-auto">即將推出</span>
-          </li>
+          <BackupRow />
         </ul>
       </section>
 
