@@ -5,11 +5,13 @@ import { useState } from 'react';
 import { ME, type AiDraftTransaction } from '@/lib/ai-draft';
 import { categoriesFor, getCategory } from '@/lib/categories';
 import { cleanAmountInput, formatForeign, getCurrency, toMinor, toTwd, twdPerUnit } from '@/lib/currency';
-import { useAccounts, useFxRates, useSaveSplitExpense } from '@/lib/data';
+import { useAccounts, useFxRates, useSaveSplitExpense, useSetSplitReceipt } from '@/lib/data';
 import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { allocate, meOf, splitProblem } from '@/lib/split';
 import type { SplitExpense, SplitGroup, SplitMode } from '@/lib/types';
+import { useReceiptDraft } from '@/lib/use-receipt-draft';
+import { ReceiptField } from '../Receipt';
 import { AiEntryBar } from '../sheets/AiEntryBar';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts } from './parts';
 
@@ -29,6 +31,8 @@ export interface SplitInitial {
   title?: string;
   categoryId?: string;
   date?: string;
+  /** 在記一筆先拍了收據才切到分帳：照片一起帶過來 */
+  receipt?: Blob | null;
 }
 
 /** 輸入框裡的數字：整數不帶小數，有小數的幣別保留兩位 */
@@ -50,6 +54,9 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   const { data: accounts = [] } = useAccounts();
   const fx = useFxRates();
   const save = useSaveSplitExpense();
+  const setReceipt = useSetSplitReceipt();
+  const photo = useReceiptDraft(editing?.receiptPath ?? null, initial?.receipt ?? null);
+  const [uploading, setUploading] = useState(false);
   const me = meOf(group)!;
   const payable = payableAccounts(accounts);
   const ids = group.members.map((m) => m.id);
@@ -192,26 +199,53 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
     const finalTitle = title.trim() || getCategory(categoryId).name;
     // 指定金額存使用者輸入的原幣金額，編輯時才能原樣帶回
     const storedWeights = mode === 'exact' ? Object.fromEntries(Object.entries(weights).map(([k, v]) => [k, v / 10 ** dec])) : weights;
+    // 照片有變才處理；新照片先上傳，上傳失敗就先不記，讓使用者決定要不要拿掉照片
+    let receiptPath: string | null | undefined;
+    if (photo.changed) {
+      setUploading(true);
+      try {
+        receiptPath = await photo.upload();
+      } catch (e) {
+        return setError(e instanceof Error ? e.message : '照片上傳失敗，請再試一次');
+      } finally {
+        setUploading(false);
+      }
+    }
+    let id: string;
     try {
-      await save.mutateAsync({
+      id = await save.mutateAsync({
         id: editing?.id, groupId: group.id, date,
         time: editing ? editing.time : date === toISODate(now) ? toTime(now) : null,
         title: finalTitle, categoryId, amount: total, payerId, accountId: payerId === me.id ? acct : null, mode, weights: storedWeights, amounts,
         currency, originalAmount: foreign ? totalOriginal : null, fxRate: foreign ? rate : null,
         originalShares: foreign ? Object.fromEntries(Object.entries(originals).map(([k, v]) => [k, v / 10 ** dec])) : null,
       });
-      const mine = amounts[me.id] ?? 0;
-      onSaved(editing ? `已更新：${finalTitle}，結算重新計算了` : `已記下：${finalTitle}${mine ? `，你的部分 ${formatMoney(mine)}` : ''}`, again);
-      if (again) {
-        setAmount('');
-        setTitle('');
-        setExact({});
-        setError('');
-      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '儲存失敗，請再試一次');
+      if (receiptPath !== undefined) photo.settle(receiptPath, false);
+      return setError(e instanceof Error ? e.message : '儲存失敗，請再試一次');
+    }
+    // 照片路徑接著補上；補不上的話花費也已經記好了，只提醒再附一次（不能讓使用者重按一次記下，會記成兩筆）
+    let photoNote = '';
+    if (receiptPath !== undefined) {
+      try {
+        await setReceipt.mutateAsync({ id, receiptPath });
+        photo.settle(receiptPath, true);
+      } catch {
+        photo.settle(receiptPath, false);
+        photoNote = '；照片沒存到，打開這筆花費再附一次';
+      }
+    }
+    const mine = amounts[me.id] ?? 0;
+    onSaved(`${editing ? `已更新：${finalTitle}，結算重新計算了` : `已記下：${finalTitle}${mine ? `，你的部分 ${formatMoney(mine)}` : ''}`}${photoNote}`, again);
+    if (again) {
+      setAmount('');
+      setTitle('');
+      setExact({});
+      setError('');
+      photo.clear();
     }
   };
+  const busy = uploading || save.isPending || setReceipt.isPending;
 
   const remain = mode === 'exact'
     ? (problem && problem !== '請輸入金額' ? problem : totalOriginal ? '剛好分完・改一個人的金額，其他沒改過的人會自動分剩下的' : '')
@@ -223,6 +257,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
         <AiEntryBar
           accounts={payable}
           onDraft={applyDraft}
+          onPhoto={photo.attach}
           context={{ members: friends.map((m) => m.name), currency: group.currency ?? 'TWD' }}
           example={example}
         />
@@ -365,17 +400,19 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
 
       <EffectBox lines={mode === 'exact' && problem ? ['分配好金額後，這裡會顯示怎麼記進你的帳'] : lines} />
 
+      <ReceiptField draft={photo} />
+
       {error && <p role="alert" className="-my-2 text-caption text-alert">{error}</p>}
 
       {editing ? (
-        <button type="button" onClick={() => submit(false)} disabled={!!problem || save.isPending} className="btn-primary press w-full">
-          {save.isPending ? '儲存中…' : '儲存變更'}
+        <button type="button" onClick={() => submit(false)} disabled={!!problem || busy} className="btn-primary press w-full">
+          {uploading ? '上傳照片中…' : busy ? '儲存中…' : '儲存變更'}
         </button>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => submit(true)} disabled={!!problem || save.isPending} className="btn-secondary press min-h-[52px]">記下並再記一筆</button>
-          <button type="button" onClick={() => submit(false)} disabled={!!problem || save.isPending} className="btn-primary press px-3">
-            {save.isPending ? '儲存中…' : `記下${totalOriginal ? ` ${foreign ? formatForeign(totalOriginal, currency) : formatMoney(total)}` : ''}`}
+          <button type="button" onClick={() => submit(true)} disabled={!!problem || busy} className="btn-secondary press min-h-[52px]">記下並再記一筆</button>
+          <button type="button" onClick={() => submit(false)} disabled={!!problem || busy} className="btn-primary press px-3">
+            {uploading ? '上傳照片中…' : busy ? '儲存中…' : `記下${totalOriginal ? ` ${foreign ? formatForeign(totalOriginal, currency) : formatMoney(total)}` : ''}`}
           </button>
         </div>
       )}

@@ -80,7 +80,7 @@ export const isOtherAccount = (b: Backup, userId: string) => b.owner !== userId;
 
 /**
  * 還原前的準備。同一個帳號照原樣還原，朋友手上的分享連結繼續有效。
- * 別的帳號的備份要換掉所有 id（原本的帳號可能還在用這些 id），分享連結也不帶過來（連結還是原本帳號的）。
+ * 別的帳號的備份要換掉所有 id（原本的帳號可能還在用這些 id），分享連結和收據照片也不帶過來（都還是原本帳號的）。
  * id 都是隨機的 UUID，所以只要值或 key 剛好等於某個 id 就換掉，花費分攤（amounts 等）裡用成員 id 當 key 的也一起換。
  */
 export function prepareRestore(b: Backup, userId: string, newId: () => string = () => crypto.randomUUID()): Backup {
@@ -100,6 +100,8 @@ export function prepareRestore(b: Backup, userId: string, newId: () => string = 
   const out = { ...b, owner: userId };
   for (const table of BACKUP_TABLES) out[table] = b[table].map((row) => swap(row) as BackupRow);
   out.split_groups = out.split_groups.map((g) => ({ ...g, share_token: null }));
+  out.split_expenses = out.split_expenses.map((e) => ({ ...e, receipt_path: null }));
+  out.transactions = out.transactions.map((t) => ({ ...t, receipt_image_url: null }));
   return out;
 }
 

@@ -14,6 +14,7 @@ import { formatMoney } from '@/lib/money';
 import { initialOf, meOf, memberInvolved, memberName, modeText, myNet, myShare } from '@/lib/split';
 import type { SplitGroup, SplitKind } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
+import { ReceiptView } from '../Receipt';
 import { Sheet, SheetHeader } from '../Sheet';
 import { EmptyBox } from '../ui';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts, receivingAccounts, shortDate } from './parts';
@@ -102,7 +103,7 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
 
   const destroy = async () => {
     try {
-      await remove.mutateAsync(e.id);
+      await remove.mutateAsync(e);
       close();
       showToast(`已刪除：${e.title}，結算重新計算了`);
     } catch (err) {
@@ -138,6 +139,7 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
         </ul>
       </Field>
       <EffectBox lines={effectLines(g, e, accounts)} />
+      {e.receiptPath && <Field label="收據照片"><ReceiptView path={e.receiptPath} /></Field>}
       {mine > 0 && (
         <Field label="在你的明細會顯示成">
           <div className="card py-1">
@@ -367,7 +369,7 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
   const destroy = async () => {
     if (!g) return;
     try {
-      await remove.mutateAsync({ groupId: g.id, force: g.expenses.length > 0 });
+      await remove.mutateAsync({ groupId: g.id, force: g.expenses.length > 0, receipts: g.expenses.map((x) => x.receiptPath) });
       close();
       router.push('/split');
       showToast(`已刪除「${g.name}」`);

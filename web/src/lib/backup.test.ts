@@ -28,13 +28,13 @@ const backup = (): Backup => ({
   split_rounds: [],
   split_expenses: [{
     id: EXPENSE, group_id: GROUP, payer_id: ME, account_id: CASH, added_by: null, title: '拉麵',
-    weights: { [ME]: 1, [MING]: 1 }, amounts: { [ME]: 450, [MING]: 450 }, original_shares: null,
+    weights: { [ME]: 1, [MING]: 1 }, amounts: { [ME]: 450, [MING]: 450 }, original_shares: null, receipt_path: `${OWNER}/r1.jpg`,
   }],
   split_settlements: [],
   split_claims: [],
   split_proposals: [],
   transactions: [
-    { id: 'eeeeeeee-0000-4000-8000-000000000002', date: '2026-10-05', note: '拉麵', source_account_id: CASH, split_expense_id: EXPENSE },
+    { id: 'eeeeeeee-0000-4000-8000-000000000002', date: '2026-10-05', note: '拉麵', source_account_id: CASH, split_expense_id: EXPENSE, receipt_image_url: `${OWNER}/r2.jpg` },
     { id: 'eeeeeeee-0000-4000-8000-000000000001', date: '2026-04-01', note: CASH.slice(0, 8), source_account_id: CASH, split_expense_id: null },
   ],
 });
@@ -102,9 +102,11 @@ describe('prepareRestore', () => {
     expect(out.owner).toBe('other-user');
   });
 
-  it('別的帳號：分享連結不帶過來，其他內容不變', () => {
+  it('別的帳號：分享連結、收據照片不帶過來，其他內容不變', () => {
     const out = prepareRestore(backup(), 'other-user', newId);
     expect(out.split_groups[0]).toMatchObject({ name: '東京', share_token: null });
+    expect(out.split_expenses[0].receipt_path).toBeNull();
+    expect(out.transactions[0].receipt_image_url).toBeNull();
     // 只有整個值等於 id 才換，備註裡剛好有一段像 id 的字不會被動到
     expect(out.transactions[1].note).toBe(CASH.slice(0, 8));
     expect(out.profile).toEqual(backup().profile);

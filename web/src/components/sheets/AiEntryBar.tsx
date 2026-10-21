@@ -49,9 +49,11 @@ function Playback({ src }: { src: string }) {
  * onDraft 可以回傳一句補充說明（例如外幣換算），顯示在草稿說明裡。
  * 分帳、旅程帶 context（成員與幣別），AI 才認得「小明付的」和當地貨幣。
  */
-export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉麵 260 刷國泰」「昨天全聯 389 付現」' }: {
+export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「午餐拉麵 260 刷國泰」「昨天全聯 389 付現」' }: {
   accounts: Account[];
   onDraft: (draft: AiDraftTransaction) => string | void;
+  /** 拍了收據：縮好的照片交給表單附上（AI 認不出來也留著，手動輸入時一樣用得到） */
+  onPhoto?: (photo: Blob) => void;
   context?: DraftContext;
   /** 錄音時的說法範例 */
   example?: string;
@@ -130,7 +132,9 @@ export function AiEntryBar({ accounts, onDraft, context, example = '「午餐拉
     if (fileInput.current) fileInput.current.value = '';
     if (!file) return;
     setPhase({ kind: 'working', source: 'receipt' });
-    run('receipt', { file: await shrinkImage(file) });
+    const photo = await shrinkImage(file);
+    onPhoto?.(photo);
+    run('receipt', { file: photo });
   };
 
   const submitText = (e: FormEvent) => {

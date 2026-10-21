@@ -55,6 +55,7 @@ interface TransactionRow {
   currency?: string | null;
   original_amount?: number | string | null;
   exclude_from_budget?: boolean | null;
+  receipt_image_url?: string | null;
 }
 
 const toAccount = (r: AccountRow): Account => ({
@@ -85,6 +86,7 @@ const toTransaction = (r: TransactionRow): Transaction => ({
   currency: r.currency ?? null,
   originalAmount: r.original_amount != null ? Number(r.original_amount) : null,
   excludeFromBudget: Boolean(r.exclude_from_budget),
+  receiptPath: r.receipt_image_url ?? null,
 });
 
 /** Supabase 查詢回傳 { data, error }，有錯就丟出，讓 React Query 接手錯誤狀態 */
@@ -252,6 +254,65 @@ export function useRestoreBackup() {
   });
 }
 
+// ---------- 收據照片 ----------
+// 存在 Storage 的 receipts（私人），路徑是「{user id}/{隨機 id}.jpg」，每個人只能讀寫自己的資料夾
+
+const RECEIPTS = 'receipts';
+const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' };
+
+/** 上傳一張收據照片，回傳路徑；示範模式只放在記憶體 */
+export async function uploadReceipt(photo: Blob): Promise<string> {
+  if (isDemo) return URL.createObjectURL(photo);
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) throw new Error('登入已過期，請重新登入');
+  const type = photo.type || 'image/jpeg';
+  const path = `${data.user.id}/${crypto.randomUUID()}.${EXTENSIONS[type] ?? 'jpg'}`;
+  const { error } = await supabase.storage.from(RECEIPTS).upload(path, photo, { contentType: type, upsert: false });
+  if (error) throw new Error('照片上傳失敗，請檢查網路再試一次；或先拿掉照片再記');
+  return path;
+}
+
+/** 刪掉不再用到的照片；刪不掉也不影響帳，只是多佔一點空間，所以不報錯 */
+export async function removeReceipts(paths: (string | null | undefined)[]) {
+  const list = paths.filter((p): p is string => Boolean(p));
+  if (isDemo || !list.length) return;
+  try {
+    await createClient().storage.from(RECEIPTS).remove(list);
+  } catch {
+    // 忽略
+  }
+}
+
+/** 照片是私人檔案，用一小時內有效的簽名網址顯示 */
+export function useReceiptUrl(path: string | null | undefined) {
+  return useQuery({
+    queryKey: ['receipt', path],
+    enabled: Boolean(path),
+    staleTime: 50 * 60 * 1000,
+    retry: false,
+    queryFn: async () => {
+      if (isDemo) return path!;
+      const { data, error } = await createClient().storage.from(RECEIPTS).createSignedUrl(path!, 60 * 60);
+      if (error) throw new Error('照片已經不在了');
+      return data.signedUrl;
+    },
+  });
+}
+
+/** 分帳花費的照片另外存：花費由 split_save_expense 寫入，照片路徑接著補上 */
+export function useSetSplitReceipt() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ id, receiptPath }: { id: string; receiptPath: string | null }) => {
+      if (isDemo) return demo.setSplitReceipt(id, receiptPath);
+      const rows = await unwrap<{ id: string }[]>(createClient().from('split_expenses').update({ receipt_path: receiptPath }).eq('id', id).select('id'));
+      if (!rows.length) throw new Error('找不到這筆花費');
+    },
+    onSuccess: () => invalidate(keys.split),
+  });
+}
+
 // ---------- 寫入 ----------
 
 function useInvalidate() {
@@ -268,6 +329,8 @@ const toTransactionRow = (t: NewTransaction) => ({
   source_account_id: t.sourceAccountId,
   target_account_id: t.type === 'TRANSFER' ? t.targetAccountId : null,
   note: t.note,
+  // 沒帶照片欄位就不動原本的照片
+  ...(t.receiptPath !== undefined ? { receipt_image_url: t.receiptPath } : {}),
 });
 
 export function useAddTransaction() {
@@ -303,8 +366,11 @@ export function useDeleteTransaction() {
     mutationFn: async (id: string) => {
       if (isDemo) return demo.deleteTransaction(id);
       // 用 select 確認真的刪到一筆；RLS 擋下時 Supabase 不會報錯，只會回傳空陣列
-      const rows = await unwrap<{ id: string }[]>(createClient().from('transactions').delete().eq('id', id).select('id'));
+      const rows = await unwrap<{ id: string; receipt_image_url: string | null }[]>(
+        createClient().from('transactions').delete().eq('id', id).select('id, receipt_image_url'),
+      );
       if (!rows.length) throw new Error('找不到這筆交易，可能已經刪除');
+      await removeReceipts(rows.map((r) => r.receipt_image_url));
     },
     onSuccess: () => invalidate(keys.transactions, keys.accounts),
   });
@@ -426,6 +492,7 @@ interface SplitGroupRow {
     amount: number | string; payer_id: string; account_id: string | null; mode: SplitExpense['mode'];
     weights: Record<string, number | string>; amounts: Record<string, number | string>; created_at: string;
     currency: string | null; original_amount: number | string | null; fx_rate: number | string | null; added_by?: string | null;
+    receipt_path?: string | null;
   }[];
   settlements: {
     id: string; round_id: string | null; from_id: string; to_id: string; amount: number | string;
@@ -469,7 +536,7 @@ const toSplitGroup = (r: SplitGroupRow): SplitGroup => ({
       amount: Number(e.amount), payerId: e.payer_id, accountId: e.account_id, mode: e.mode,
       weights: numbers(e.weights), amounts: numbers(e.amounts), createdAt: e.created_at,
       currency: e.currency ?? 'TWD', originalAmount: e.original_amount != null ? Number(e.original_amount) : null,
-      fxRate: e.fx_rate != null ? Number(e.fx_rate) : null, addedBy: e.added_by ?? null,
+      fxRate: e.fx_rate != null ? Number(e.fx_rate) : null, addedBy: e.added_by ?? null, receiptPath: e.receipt_path ?? null,
     }))
     .sort((a, b) => `${b.date} ${b.time ?? ''} ${b.createdAt}`.localeCompare(`${a.date} ${a.time ?? ''} ${a.createdAt}`)),
   settlements: r.settlements
@@ -537,13 +604,14 @@ export function useUpdateSplitGroup() {
   });
 }
 
-/** 刪除群組；有花費時要 force，連同花費、還款和你帳上的對應交易一起刪 */
+/** 刪除群組；有花費時要 force，連同花費、還款和你帳上的對應交易一起刪，花費的收據照片也刪掉 */
 export function useDeleteSplitGroup() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async ({ groupId, force }: { groupId: string; force: boolean }) => {
+    mutationFn: async ({ groupId, force, receipts }: { groupId: string; force: boolean; receipts: (string | null | undefined)[] }) => {
       if (isDemo) return demo.deleteSplitGroup(groupId, force);
       await rpc('split_delete_group', { p_group: groupId, p_force: force });
+      await removeReceipts(receipts);
     },
     onSuccess: () => invalidate(...SPLIT_TOUCHES),
   });
@@ -582,9 +650,10 @@ export function useSaveSplitExpense() {
 export function useDeleteSplitExpense() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, receiptPath }: Pick<SplitExpense, 'id' | 'receiptPath'>) => {
       if (isDemo) return demo.deleteSplitExpense(id);
       await rpc('split_delete_expense', { p_id: id });
+      await removeReceipts([receiptPath]);
     },
     onSuccess: () => invalidate(...SPLIT_TOUCHES),
   });

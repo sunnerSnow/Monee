@@ -244,6 +244,12 @@ export const demo = {
     writeExpenseTxs(s, g, row);
     return row.id;
   },
+  async setSplitReceipt(expenseId: string, receiptPath: string | null) {
+    await pause();
+    const e = db().split.flatMap((g) => g.expenses).find((x) => x.id === expenseId);
+    if (!e) throw new Error('找不到這筆花費');
+    e.receiptPath = receiptPath;
+  },
   async deleteSplitExpense(expenseId: string) {
     await pause();
     const s = db();

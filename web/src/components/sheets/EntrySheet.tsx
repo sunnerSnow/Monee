@@ -12,6 +12,8 @@ import { toISODate, toTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import type { Transaction, TransactionType } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
+import { useReceiptDraft } from '@/lib/use-receipt-draft';
+import { ReceiptField } from '../Receipt';
 import { Sheet, SheetHeader } from '../Sheet';
 import { SplitEntryPanel, SplitLinkedNotice, SplitSwitch } from '../split/SplitInEntry';
 import { EmptyBox } from '../ui';
@@ -60,6 +62,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const [date, setDate] = useState(() => editing?.date ?? toISODate(new Date()));
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const photo = useReceiptDraft(editing?.receiptPath ?? null);
+  const [uploading, setUploading] = useState(false);
   const { data: groups = [] } = useSplitGroups();
   const fx = useFxRates();
   // 旅程期間打開記一筆：直接記到這趟旅程（可以關掉分帳開關改記一般支出）
@@ -87,7 +91,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const targets = usable.filter((a) => a.id !== sourceId);
   const value = Number(amount) || 0;
   const quick = editing ? [] : frequentEntries(txs);
-  const busy = add.isPending || update.isPending || remove.isPending;
+  const saving = uploading || add.isPending || update.isPending;
+  const busy = saving || remove.isPending;
   const title = note.trim() || getCategory(type === 'TRANSFER' ? 'transfer' : categoryId).name;
 
   const switchType = (next: TransactionType) => {
@@ -143,6 +148,15 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     if (!sourceId) return setError('請先新增帳戶');
     if (type === 'TRANSFER' && !target) return setError('請選擇轉入帳戶');
     const now = new Date();
+    let receiptPath: string | null;
+    setUploading(true);
+    try {
+      receiptPath = await photo.upload();
+    } catch (e) {
+      return setError(e instanceof Error ? e.message : '照片上傳失敗，請再試一次');
+    } finally {
+      setUploading(false);
+    }
     const payload = {
       date,
       time: editing ? editing.time : date === toISODate(now) ? toTime(now) : null,
@@ -152,13 +166,16 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
       sourceAccountId: sourceId,
       targetAccountId: type === 'TRANSFER' ? target : null,
       note: note.trim() || null,
+      receiptPath,
     };
     try {
       const id = editing ? await update.mutateAsync({ id: editing.id, ...payload }) : await add.mutateAsync(payload);
+      photo.settle(receiptPath, true);
       flash(id);
       onClose();
       showToast(`${editing ? '已更新' : '已記下'}：${title} ${formatMoney(value)}`);
     } catch (e) {
+      photo.settle(receiptPath, false);
       setError(e instanceof Error ? e.message : '儲存失敗，請再試一次');
     }
   };
@@ -210,7 +227,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
       <>
         {header}
         <SplitSwitch on onChange={toggleSplit} trip={trip?.name} />
-        <SplitEntryPanel initial={{ amount, title: note, categoryId, date }} onDone={onClose} defaultGroupId={trip?.id} />
+        <SplitEntryPanel initial={{ amount, title: note, categoryId, date, receipt: photo.blob }} onDone={onClose} defaultGroupId={trip?.id} />
       </>
     );
   }
@@ -218,7 +235,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   return (
     <>
       {header}
-      {!editing && <AiEntryBar accounts={usable} onDraft={applyDraft} />}
+      {!editing && <AiEntryBar accounts={usable} onDraft={applyDraft} onPhoto={photo.attach} />}
       {!editing && type === 'EXPENSE' && <SplitSwitch on={false} onChange={toggleSplit} trip={trip?.name} />}
 
       {chips(TYPES.map(([id, label]) => ({ id, label })), type, (id) => switchType(id as TransactionType), '類型')}
@@ -268,6 +285,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
         <input id="entry-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input w-[150px] px-3" />
       </div>
 
+      <ReceiptField draft={photo} />
+
       <div role="group" aria-label="數字鍵盤" className="grid grid-cols-3 gap-2">
         {KEYS.map((k) => (
           <button
@@ -285,7 +304,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
       {error && <p role="alert" className="-my-2 text-caption text-alert">{error}</p>}
 
       <button type="button" onClick={save} disabled={!value || busy} className="btn-primary press w-full">
-        {add.isPending || update.isPending ? '儲存中…' : editing ? '儲存變更' : `記下${value ? ` ${formatMoney(value)}` : ''}`}
+        {uploading ? '上傳照片中…' : saving ? '儲存中…' : editing ? '儲存變更' : `記下${value ? ` ${formatMoney(value)}` : ''}`}
       </button>
 
       {editing && (confirmDelete ? (

@@ -143,8 +143,8 @@ export interface AiDraftTransaction {
   * 內部帳戶轉帳（確保投資調撥不污染生活消費報表）。
 * **Phase 2 — AI & Automation**：
   * Web Audio 語音記帳 + LLM 實體萃取（產生 Draft 卡片）。
-  * 發票收據圖片 OCR 解析。
-  * 月報與 Google Sheets 單向匯出備份。（✅ Google Sheets 匯出：在使用者的雲端硬碟建一份試算表，含總覽、月報、明細、帳戶，之後每次更新同一份）
+  * 發票收據圖片 OCR 解析。（✅ 收據照片存檔：拍收據或手動附上的照片存在私人儲存空間，一般記帳與分帳、旅程的花費都能看照片）
+  * 月報與 Google Sheets 單向匯出備份。（✅ Google Sheets 匯出：在使用者的雲端硬碟建一份試算表，含總覽、月報、明細、帳戶，之後每次更新同一份；✅ 資料備份：下載備份檔，也能從備份檔整個還原）
 * **Phase 3 — Monee Invest (獨立專案開發)**：
   * 股票與 ETF 持倉管理。
   * 券商對帳單 OCR 與持股差異同步演算法。

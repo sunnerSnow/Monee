@@ -47,6 +47,8 @@ export interface Transaction {
   originalAmount?: number | null;
   /** 旅程設定「不算進每月預算」的支出 */
   excludeFromBudget?: boolean;
+  /** 收據照片在 Storage 的路徑；沒有照片是 null */
+  receiptPath?: string | null;
 }
 
 export interface Profile {
@@ -103,6 +105,8 @@ export interface SplitExpense {
   createdAt: string;
   /** 朋友從分享連結記的：那位朋友的成員 id；你自己記的是 null */
   addedBy?: string | null;
+  /** 收據照片在 Storage 的路徑；沒有照片是 null */
+  receiptPath?: string | null;
 }
 
 export interface SplitSettlement {
