@@ -6,6 +6,7 @@ import { backupFileName, isOtherAccount, MAX_BACKUP_BYTES, parseBackup, summariz
 import { fetchBackup, fetchBackupSnapshot, useBackupSnapshot, useRestoreBackup, useUser } from '@/lib/data';
 import { shortDateTime, toTime } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
+import { saveFile } from '@/lib/download';
 import { useUi } from '@/lib/ui-store';
 import { Sheet, SheetHeader } from './Sheet';
 
@@ -20,19 +21,6 @@ const fullTime = (iso: string) => {
 };
 /** 2026-04-01 → 2026/4/1 */
 const slashDate = (iso: string) => iso.split('-').map(Number).join('/');
-
-/** 讓瀏覽器下載一個檔案 */
-function saveFile(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  // Safari 要等下載開始才能放掉
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
 
 /** 我的 → 資料：下載備份檔、從備份檔還原（整個換掉）、換回還原前的資料 */
 export function BackupRow() {
@@ -50,7 +38,7 @@ export function BackupRow() {
     setBusy('download');
     try {
       const backup = await fetchBackup();
-      saveFile(backupFileName(new Date()), JSON.stringify(backup));
+      saveFile(backupFileName(new Date()), JSON.stringify(backup), 'application/json');
       showToast(`已下載備份檔（交易 ${count(backup.transactions.length)} 筆）`);
     } catch (e) {
       showToast(e instanceof Error ? e.message : '下載失敗，請再試一次');

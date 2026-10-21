@@ -53,6 +53,27 @@ function monthsBetween(first: string, last: string) {
   return list;
 }
 
+export const LEDGER_HEADER = ['日期', '時間', '類型', '分類', '品項／備註', '金額', '帳戶', '轉入帳戶', '外幣', '外幣金額', '分帳／旅程', '不算進預算'];
+
+/** 明細：全部交易，新的在前。date 決定日期怎麼寫：試算表用日期序號，CSV 用 YYYY-MM-DD */
+export function ledgerRows({ transactions, accounts }: Pick<ExportData, 'transactions' | 'accounts'>, date: (iso: string) => Cell): Cell[][] {
+  const names = new Map(accounts.map((a) => [a.id, a.name]));
+  return sortNewestFirst(transactions).map((t) => [
+    date(t.date),
+    t.time,
+    TYPE_LABEL[t.type],
+    getCategory(t.categoryId).name,
+    t.note,
+    t.amount,
+    names.get(t.sourceAccountId) ?? null,
+    t.targetAccountId ? names.get(t.targetAccountId) ?? null : null,
+    isForeign(t.currency) ? t.currency! : null,
+    isForeign(t.currency) ? t.originalAmount ?? null : null,
+    t.groupName,
+    t.excludeFromBudget ? '是' : null,
+  ]);
+}
+
 export function buildWorkbook({ transactions, accounts, budgets }: ExportData, now: Date): Tab[] {
   const txs = sortNewestFirst(transactions);
   const current = monthKeyOf(now);
@@ -86,21 +107,7 @@ export function buildWorkbook({ transactions, accounts, budgets }: ExportData, n
     ];
   });
 
-  const names = new Map(accounts.map((a) => [a.id, a.name]));
-  const ledger: Cell[][] = txs.map((t) => [
-    sheetDate(t.date),
-    t.time,
-    TYPE_LABEL[t.type],
-    getCategory(t.categoryId).name,
-    t.note,
-    t.amount,
-    names.get(t.sourceAccountId) ?? null,
-    t.targetAccountId ? names.get(t.targetAccountId) ?? null : null,
-    isForeign(t.currency) ? t.currency! : null,
-    isForeign(t.currency) ? t.originalAmount ?? null : null,
-    t.groupName,
-    t.excludeFromBudget ? '是' : null,
-  ]);
+  const ledger = ledgerRows({ transactions: txs, accounts }, sheetDate);
 
   const accountRows: Cell[][] = accounts.map((a) => [
     a.name,
@@ -143,7 +150,7 @@ export function buildWorkbook({ transactions, accounts, budgets }: ExportData, n
     },
     {
       title: '明細',
-      rows: [['日期', '時間', '類型', '分類', '品項／備註', '金額', '帳戶', '轉入帳戶', '外幣', '外幣金額', '分帳／旅程', '不算進預算'], ...ledger],
+      rows: [LEDGER_HEADER, ...ledger],
       freeze: true,
       formats: { 0: 'date', 5: 'money' },
     },

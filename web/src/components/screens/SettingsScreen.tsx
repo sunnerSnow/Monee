@@ -16,6 +16,7 @@ import type { BudgetEntry, PnlColor } from '@/lib/types';
 import { useUi, type ThemePref } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { BackupRow } from '../BackupRow';
+import { CsvExportRow } from '../CsvExportRow';
 import { SheetsExportRow } from '../SheetsExportRow';
 import { Avatar } from '../ui';
 
@@ -201,6 +202,7 @@ export function SettingsScreen() {
         <h2 id="s-data" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">資料</h2>
         <ul className="card">
           <SheetsExportRow />
+          <CsvExportRow />
           <BackupRow />
         </ul>
       </section>
