@@ -1,80 +1,104 @@
 /* 自動產生：請改 design-system/monee/tokens.css，再執行 npm run sync:tokens */
 /* ==========================================================================
-   Monee Design Tokens
-   定案：2026-10-06　視覺參考：recruit.postas.co.jp　範例畫面：monee-home-luxe.html
+   Monee Design Tokens・街頭貼紙版
+   定案：2026-10-21　視覺參考：boomboombrothers.tokyo　範例畫面：monee-home-pop.html（B 全開版）
 
    用法
-   1. 在 <html> 設 data-theme="light" 或 "dark"，由 App 依使用者設定或系統偏好切換。
-   2. 字體請在 HTML <head> 用 <link> 載入（比 @import 快）：
-      https://fonts.googleapis.com/css2?family=Lexend+Exa:wght@200;300;400&family=Noto+Sans+TC:wght@400;500&display=swap
-   3. 元件只引用語意 token（--text、--surface…），不要直接寫色碼。
+   1. 在 <html> 設 data-theme="light" 或 "dark"（預設深色），由 App 依使用者設定切換。
+   2. 字體：Huninn（粉圓，中文標題）與 Noto Sans TC（內文）用 Google Fonts 的 <link> 載入；
+      Rubik（金額）、Luckiest Guy（英文點綴、大金額）、Sedgwick Ave Display（塗鴉小字）由 App 用 next/font 託管。
+   3. 頁面上的字用 --text / --text-2（深色模式是米白）；卡片、面板、按鈕這些「貼紙」不分深淺都是淺色，
+      裡面的字由 App 把 --text / --text-2 換成 --ink / --ink-2（見 web/src/app/globals.css 的 .card 等）。
+   4. 元件只引用語意 token（--text、--surface…），不要直接寫色碼；分類、角色的顏色用下面的角色色。
    ========================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* ---- 品牌 ---- */
-  --yellow: #FED900;            /* 招牌黃：今日卡片色塊、目前分頁、收入圖示、首選操作 */
-  --ink: #1A1A1E;               /* 黃色底上的字與圖示，深淺模式都固定 */
+  /* ---- 墨色：粗框、實心影、貼紙上的字，深淺模式都一樣 ---- */
+  --ink: #1A1A1E;
+  --ink-2: #4E4C55;             /* 貼紙上的次要文字（白底 8.6:1） */
 
-  /* ---- 表面 ---- */
-  --bg: #FCF7D9;                /* 頁面底色（奶油黃） */
-  --surface: #FFFFFF;           /* 卡片、導覽列、面板 */
-  --fill: #F0F0F0;              /* 圖示底、進度軌、支出小卡 */
-  --cream: #F8ECA7;             /* 收入小卡 */
+  /* ---- 角色色：分類、帳戶、角色、漫畫格，深淺模式都一樣；上面的圖示一律用 --ink（每個顏色都 ≥ 3.6:1） ---- */
+  --yellow: #FDE021;            /* 招牌黃：主要按鈕、目前分頁、收入 */
+  --teal: #00A5B5;
+  --teal-deep: #00808C;         /* 上面放白字時用（4.7:1） */
+  --pink: #FF8FB8;
+  --hot: #FF3A81;
+  --purple: #8C7FD0;
+  --purple-deep: #6656B8;       /* 上面放白字時用（5.9:1） */
+  --green: #2DB45A;
+  --blue: #2C8CDB;
+  --red: #E1131E;
+  --orange: #FF9F1C;
+  --brown: #C46A2B;
 
-  /* ---- 文字 ---- */
-  --text: #1A1A1E;              /* 主要文字、預設進度 */
-  --text-2: #626263;            /* 說明文字、次要資訊 */
+  /* ---- 頁面：底色與直接放在底色上的字 ---- */
+  --bg: #FFF3CF;                /* 奶油紙 */
+  --bg-dots: rgba(26, 26, 30, .09);   /* 網點 */
+  --bg-spray: transparent;      /* 深色模式的噴漆色點 */
+  --text: #1A1A1E;
+  --text-2: #55535C;            /* 奶油紙上 7.0:1 */
 
-  /* ---- 線條 ---- */
-  --line: #E7E7E7;              /* 1px 細框、分隔線 */
-  --line-strong: #D5D7DA;       /* 面板把手、色票邊框 */
-  --dash: #B5B7BA;              /* 虛線：轉帳圖示、空狀態框 */
+  /* ---- 貼紙（卡片、面板、按鈕）：深淺模式都是淺色 ---- */
+  --surface: #FFFFFF;
+  --surface-2: #FFF9E8;         /* 底部面板 */
+  --fill: #F1ECDD;              /* 圖示底、進度軌、小卡 */
+  --cream: #FFE98A;             /* 收入小卡 */
+  --line: #E4DECC;              /* 貼紙裡的細分隔線 */
+  --line-strong: #CFC8B2;
+  --dash: #A9A390;              /* 虛線：轉帳圖示、空狀態框 */
+
+  /* ---- 粗框與實心影 ---- */
+  --border: 2.5px;              /* 貼紙外框粗細 */
+  --pop: 4px 4px 0 var(--ink);           /* 卡片、按鈕的實心影 */
+  --pop-sm: 3px 3px 0 var(--ink);        /* 小元件 */
+  --pop-lg: 6px 6px 0 var(--ink);        /* 漫畫格（首頁今日卡片） */
 
   /* ---- 操作 ---- */
-  --primary: #1A1A1E;           /* 主要按鈕底色 */
-  --on-primary: #FFFFFF;        /* 主要按鈕文字 */
-  --fab-bg: #1A1A1E;            /* ＋ 按鈕底色 */
-  --fab-fg: #FED900;            /* ＋ 按鈕圖示 */
+  --primary: #FDE021;           /* 主要按鈕：黃底黑字＋粗框 */
+  --on-primary: #1A1A1E;
+  --fab-bg: #E1131E;            /* ＋：紅色鋸齒徽章 */
+  --fab-fg: #FFFFFF;
 
-  /* ---- 狀態 ---- */
-  --warn: #D9620A;              /* 快用完了：進度條 */
-  --warn-text: #A84A00;         /* 快用完了：標籤文字 */
-  --warn-tint: #FDE9D7;         /* 快用完了：標籤底色 */
-  --alert: #B3261E;             /* 超支：進度條、文字 */
-  --alert-tint: #FCE8E6;        /* 超支：標籤底色 */
-  --gain: #1E6B3A;              /* 綠色漲跌（使用者選「綠漲紅跌」時） */
-  --gain-tint: #E6F2EA;
+  /* ---- 狀態（都放在貼紙上，深淺模式一樣） ---- */
+  --warn: #E86A10;              /* 快用完了：進度條 */
+  --warn-text: #9A4300;         /* 快用完了：標籤文字 */
+  --warn-tint: #FFE3C7;
+  --alert: #C8101A;             /* 超支：進度條、文字（白底 5.9:1） */
+  --alert-tint: #FFDAD6;
+  --gain: #186B37;              /* 淺綠底 5.4:1 */
+  --gain-tint: #D6F1DE;
 
-  /* ---- 疊層與陰影 ---- */
-  --scrim: rgba(26, 26, 30, .4);
-  --hover: rgba(26, 26, 30, .03);
-  --nav-shadow: 0 10px 28px -14px rgba(26, 26, 30, .25);
-  --fab-shadow: 0 10px 22px -8px rgba(26, 26, 30, .55);
+  /* ---- 疊層 ---- */
+  --scrim: rgba(26, 26, 30, .55);
+  --hover: rgba(26, 26, 30, .05);
 
   /* ---- 字體 ---- */
-  --font-num: 'Lexend Exa', 'Noto Sans TC', sans-serif;   /* 金額、數字、英文標籤 */
-  --font-body: 'Noto Sans TC', system-ui, sans-serif;     /* 中文與一般文字 */
-  --fw-thin: 200;
-  --fw-light: 300;
+  --font-body: 'Noto Sans TC', system-ui, sans-serif;            /* 內文 */
+  --font-display: 'Huninn', 'Noto Sans TC', sans-serif;          /* 中文標題、按鈕 */
+  --font-num: 'Rubik', 'Noto Sans TC', sans-serif;               /* 金額、數字 */
+  --font-fun: 'Luckiest Guy', 'Huninn', sans-serif;              /* 英文點綴、首頁大金額 */
+  --font-tag: 'Sedgwick Ave Display', cursive;                   /* 塗鴉小字（只當裝飾） */
   --fw-regular: 400;
-  --fw-medium: 500;             /* 全站最高字重 */
+  --fw-medium: 500;
+  --fw-bold: 700;
+  --fw-black: 800;
 
-  --fs-display-xl: 40px;        /* 今日花費 */
-  --fs-display-l: 32px;         /* 本月結餘 */
-  --fs-display-m: 28px;         /* 淨資產 */
-  --fs-title-l: 22px;           /* 頁面標題 */
-  --fs-title-m: 20px;           /* 面板標題、卡片大標 */
-  --fs-title-s: 16px;           /* 區塊標題 */
-  --fs-body: 15px;              /* 列表標題、一般內文 */
-  --fs-body-s: 13px;            /* 說明句、標籤、連結 */
-  --fs-caption: 12px;           /* 日期、群組標題、英文小標（最小字級） */
+  --fs-display-xl: 56px;        /* 今日花費（Luckiest Guy） */
+  --fs-display-l: 36px;         /* 本月結餘 */
+  --fs-display-m: 30px;         /* 淨資產 */
+  --fs-title-l: 26px;           /* 頁面標題 */
+  --fs-title-m: 21px;           /* 面板標題 */
+  --fs-title-s: 18px;           /* 區塊標題 */
+  --fs-body: 15px;
+  --fs-body-s: 13px;
+  --fs-caption: 12px;           /* 最小字級 */
 
   --tracking-num: 0;
   --tracking-body: .04em;
-  --tracking-caption: .1em;
-  --tracking-title: .14em;
+  --tracking-caption: .08em;
+  --tracking-title: .08em;
 
   /* ---- 間距（4px 格線） ---- */
   --space-1: 4px;
@@ -85,67 +109,56 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
-  --gutter: 20px;               /* 頁面左右邊距 */
+  --gutter: 20px;
 
   /* ---- 圓角 ---- */
   --radius-xs: 12px;            /* 列表圖示底 */
-  --radius-sm: 14px;            /* 收支小卡、大圖示底 */
-  --radius-md: 18px;            /* 面板選項卡 */
-  --radius-lg: 20px;            /* 一般卡片 */
-  --radius-xl: 24px;            /* 今日卡片、底部導覽 */
-  --radius-2xl: 28px;           /* 底部面板上緣 */
-  --radius-pill: 999px;         /* 按鈕、標籤、篩選 */
+  --radius-sm: 12px;            /* 小卡 */
+  --radius-md: 14px;
+  --radius-lg: 18px;            /* 一般卡片 */
+  --radius-xl: 20px;            /* 底部導覽 */
+  --radius-2xl: 24px;           /* 底部面板上緣 */
+  --radius-panel: 8px;          /* 漫畫格 */
+  --radius-pill: 999px;
 
   /* ---- 尺寸 ---- */
-  --touch: 44px;                /* 最小可點範圍 */
-  --row-h: 64px;                /* 列表列高 */
-  --icon-chip: 40px;
-  --fab: 58px;
+  --touch: 44px;
+  --row-h: 64px;
+  --icon-chip: 42px;
+  --fab: 72px;
   --nav-h: 68px;
-  --bar-h: 6px;                 /* 進度條粗細 */
+  --bar-h: 14px;                /* 進度條（含外框） */
+  --tilt: -2deg;                /* 漫畫格的傾斜 */
 
   /* ---- 動態 ---- */
-  --ease-out: cubic-bezier(.165, .84, .44, 1);   /* 進場 */
-  --ease-in: cubic-bezier(.4, 0, 1, 1);          /* 退場 */
-  --dur-press: 160ms;
+  --ease-out: cubic-bezier(.165, .84, .44, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+  --dur-press: 120ms;
   --dur-fade: 180ms;
   --dur-exit: 220ms;
   --dur-enter: 320ms;
 }
 
-/* 深色：底色沿用 POSTAS 的 --color-blacker / --color-black，招牌黃保留，主要按鈕反轉成黃底黑字 */
+/* 深色（預設）：黑色牆面配噴漆色點，貼紙照樣是淺色；實心影外面多一圈米白，黑底上才看得出來 */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0E0E0F;
-  --surface: #1A1A1E;
-  --fill: #26262B;
-  --cream: #3A3418;
+  --bg: #141416;
+  --bg-dots: rgba(255, 255, 255, .06);
+  --bg-spray:
+    radial-gradient(circle at 8% 4%, rgba(255, 58, 129, .28), transparent 260px),
+    radial-gradient(circle at 96% 22%, rgba(0, 165, 181, .26), transparent 280px),
+    radial-gradient(circle at 18% 64%, rgba(253, 224, 33, .14), transparent 260px);
+  --text: #F7F3E8;
+  --text-2: #BDB9AE;
 
-  --text: #F5F3EA;
-  --text-2: #A8AAAE;
+  --pop: 4px 4px 0 var(--ink), 4px 4px 0 2px #F7F3E8;
+  --pop-sm: 3px 3px 0 var(--ink), 3px 3px 0 2px #F7F3E8;
+  --pop-lg: 6px 6px 0 var(--ink), 6px 6px 0 2.5px #F7F3E8;
 
-  --line: #2E2E33;
-  --line-strong: #45464C;
-  --dash: #55575C;
-
-  --primary: #FED900;
-  --on-primary: #1A1A1E;
-  --fab-bg: #FED900;
-  --fab-fg: #1A1A1E;
-
-  --warn: #F08A3C;
-  --warn-text: #FFB27A;
-  --warn-tint: #3D2614;
-  --alert: #FF6B5E;
-  --alert-tint: #3D1A17;
-  --gain: #7FD49B;
-  --gain-tint: #173222;
-
-  --scrim: rgba(0, 0, 0, .6);
-  --hover: rgba(255, 255, 255, .04);
-  --nav-shadow: 0 10px 28px -14px rgba(0, 0, 0, .7);
-  --fab-shadow: 0 10px 24px -10px rgba(254, 217, 0, .35);
+  --scrim: rgba(0, 0, 0, .65);
+  --hover: rgba(26, 26, 30, .05);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,18 +1,15 @@
 import type { Metadata, Viewport } from 'next';
-import { Lexend_Exa } from 'next/font/google';
+import { Luckiest_Guy, Rubik, Sedgwick_Ave_Display } from 'next/font/google';
 import './globals.css';
 
-// 英數字體檔小，由 next/font 自行託管
-const lexend = Lexend_Exa({
-  subsets: ['latin'],
-  weight: ['200', '300', '400'],
-  variable: '--font-lexend-exa',
-  display: 'swap',
-});
+// 英數字體檔小，由 next/font 自行託管：金額用 Rubik、英文點綴和大金額用 Luckiest Guy、塗鴉小字用 Sedgwick Ave Display
+const rubik = Rubik({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-rubik', display: 'swap' });
+const luckiest = Luckiest_Guy({ subsets: ['latin'], weight: '400', variable: '--font-luckiest', display: 'swap' });
+const sedgwick = Sedgwick_Ave_Display({ subsets: ['latin'], weight: '400', variable: '--font-sedgwick', display: 'swap' });
 
-// 中文 Noto Sans TC 有上百個 unicode-range 分片，交給 next/font 下載時只要一片逾時就會讓建置或頁面失敗，
+// 中文字體（粉圓 Huninn、Noto Sans TC）有上百個 unicode-range 分片，交給 next/font 下載時只要一片逾時就會讓建置或頁面失敗，
 // 所以改由瀏覽器向 Google Fonts 按需載入；載入失敗只會先顯示系統字體。
-const NOTO_SANS_TC = 'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500&display=swap';
+const CHINESE_FONTS = 'https://fonts.googleapis.com/css2?family=Huninn&family=Noto+Sans+TC:wght@400;500;700&display=swap';
 
 export const metadata: Metadata = {
   title: { default: 'Monee', template: '%s · Monee' },
@@ -25,23 +22,21 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FCF7D9' },
-    { media: '(prefers-color-scheme: dark)', color: '#0E0E0F' },
-  ],
+  // 預設深色；使用者改成淺色時由 lib/ui-store.ts 的 applyTheme 換掉
+  themeColor: '#141416',
 };
 
 // 在畫面繪製前套用深淺色，避免閃一下（key 與 lib/ui-store.ts 的 THEME_KEY 一致）
-const themeScript = `(function(){try{var p=localStorage.getItem("monee-theme")||"system";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")}catch(e){}})()`;
+const themeScript = `(function(){try{var p=localStorage.getItem("monee-theme")||"dark";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")}catch(e){}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-Hant" data-theme="light" className={lexend.variable} suppressHydrationWarning>
+    <html lang="zh-Hant" data-theme="dark" className={`${rubik.variable} ${luckiest.variable} ${sedgwick.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href={NOTO_SANS_TC} />
+        <link rel="stylesheet" href={CHINESE_FONTS} />
       </head>
       <body>{children}</body>
     </html>

@@ -6,6 +6,7 @@ import { accountSummary } from '@/lib/budget';
 import { useAccounts, useProfile, useSplitGroups } from '@/lib/data';
 import { isEmptyGroup, isSettled, myNet } from '@/lib/split';
 import { formatMoney, money, signedBalance } from '@/lib/money';
+import { ACCOUNT_COLORS } from '@/lib/palette';
 import type { Account, PnlColor, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { Avatars, OweText, kindLabel } from '../split/parts';
@@ -53,7 +54,7 @@ export function AssetsScreen() {
     const Icon = ICONS[a.type];
     const body = (
       <>
-        <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+        <span aria-hidden className="ico" style={{ background: ACCOUNT_COLORS[a.type] }}><Icon size={20} strokeWidth={1.5} /></span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-body">{a.name}</span>
           <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">
@@ -98,10 +99,10 @@ export function AssetsScreen() {
         <span id="net-title" className="caption">淨資產</span>
         <BigMoney value={s.net} className="text-display-l leading-[1.15]" />
         <div className="grid grid-cols-2 gap-2.5">
-          <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3">
+          <div className="flex flex-col gap-1 rounded-sm border-2 border-ink bg-fill px-3.5 py-3">
             <span className="caption">資產</span><span className="num text-[16px]">{money(s.assets, hidden)}</span>
           </div>
-          <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3">
+          <div className="flex flex-col gap-1 rounded-sm border-2 border-ink bg-fill px-3.5 py-3">
             <span className="caption">負債</span><span className="num text-[16px]">{signedBalance(s.liabilities, hidden)}</span>
           </div>
         </div>
@@ -144,7 +145,7 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
         )) : (
           <li>
             <Link href="/split" className="row press">
-              <span aria-hidden className="ico"><Users size={20} strokeWidth={1.5} /></span>
+              <span aria-hidden className="ico" style={{ background: ACCOUNT_COLORS.FRIENDS }}><Users size={20} strokeWidth={1.5} /></span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-body">{active.length ? '都結清了' : groups.length ? '沒有進行中的群組' : '跟朋友分帳'}</span>
                 <span className="truncate text-caption tracking-[.06em] text-muted">{groups.length ? '有新的一起付的花費，到分帳頁記' : '誰先付都能記，你的帳只算你的部分'}</span>

@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useState } from 'react';
 import { budgetFor, expenseByCategory, monthTotals, monthlyExpenses } from '@/lib/budget';
 import { getCategory, useCategories } from '@/lib/categories';
@@ -10,7 +9,8 @@ import { MASK, formatMoney, money } from '@/lib/money';
 import { useNow } from '@/lib/use-now';
 import { MonthlyChart } from '../MonthlyChart';
 import { EmptyBox, ErrorBox, LoadingBlocks, MonthSwitch, PageHeader, useHidden } from '../ui';
-
+
+import { Mascot } from '../Mascot';
 export function ReportsScreen() {
   useCategories(); // 分類改名、隱藏時重畫
   const now = useNow();
@@ -71,7 +71,7 @@ export function ReportsScreen() {
               return (
                 <li key={c.categoryId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
                   <span className="flex items-center gap-2.5 text-[14px]">
-                    <span aria-hidden className="ico sm"><Icon size={16} strokeWidth={1.5} /></span>{cat.name}
+                    <span aria-hidden className="ico sm" style={{ background: cat.color }}><Icon size={16} strokeWidth={1.5} /></span>{cat.name}
                   </span>
                   <span className="num text-[14px]">
                     {money(c.amount, hidden)}
@@ -130,11 +130,11 @@ export function ReportsScreen() {
         )}
       </section>
 
-      <section aria-labelledby="wrapped-title" className="relative min-h-[140px] overflow-hidden rounded-xl bg-brand py-5 pr-[140px] pl-5 text-ink">
-        <span className="num text-caption tracking-[.06em]">{now.getFullYear()} Wrapped</span>
-        <h2 id="wrapped-title" className="my-1.5 text-title-s font-medium tracking-[.14em]">你的年度金錢故事</h2>
+      <section aria-labelledby="wrapped-title" className="sticker panel relative min-h-[140px] rotate-1 overflow-hidden bg-brand py-5 pr-[132px] pl-5 text-ink">
+        <span className="en text-[16px]">{now.getFullYear()} Wrapped</span>
+        <h2 id="wrapped-title" className="my-1.5 font-display text-title-m tracking-[.1em] text-balance">你的年度金錢故事</h2>
         <p className="text-body-s leading-[1.8]">12 月 31 日解鎖：一年花最多的地方、最省的月份，還有 Monee 給你的小結語。</p>
-        <Image src="/monee.png" alt="" width={124} height={90} className="absolute right-2 bottom-0 h-auto w-[124px]" />
+        <Mascot mood="yay" className="absolute right-1 bottom-1 w-[118px] rotate-6" />
       </section>
     </>
   );

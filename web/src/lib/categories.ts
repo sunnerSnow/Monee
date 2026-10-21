@@ -48,6 +48,8 @@ export interface Category {
   hidden: boolean;
   /** 內建的只能改名、換圖示、隱藏，不能刪 */
   builtIn: boolean;
+  /** 圖示底色（tokens.css 的角色色），圖示一律墨色 */
+  color: string;
 }
 
 /** 資料庫 categories 的一列：改過的內建分類，或自己加的分類 */
@@ -62,24 +64,28 @@ export interface CategoryRow {
 
 export const MAX_CATEGORY_NAME = 10;
 
-const builtIn = (id: string, name: string, type: ManagedType, iconKey: string): Category =>
-  ({ id, name, type, icon: ICONS[iconKey], iconKey, hidden: false, builtIn: true });
+const builtIn = (id: string, name: string, type: ManagedType, iconKey: string, color: string): Category =>
+  ({ id, name, type, icon: ICONS[iconKey], iconKey, hidden: false, builtIn: true, color });
 
-/** 內建分類（沒改過時的名字、圖示、順序） */
+/** 內建分類（沒改過時的名字、圖示、順序、顏色） */
 export const BUILT_IN: Category[] = [
-  builtIn('food', '餐飲', 'EXPENSE', 'utensils'),
-  builtIn('transit', '交通', 'EXPENSE', 'tram-front'),
-  builtIn('daily', '日用', 'EXPENSE', 'shopping-basket'),
-  builtIn('shopping', '購物', 'EXPENSE', 'shopping-bag'),
-  builtIn('fun', '娛樂', 'EXPENSE', 'ticket'),
-  builtIn('health', '醫療', 'EXPENSE', 'heart-pulse'),
-  builtIn('other', '其他', 'EXPENSE', 'ellipsis'),
-  builtIn('salary', '薪資', 'INCOME', 'banknote'),
-  builtIn('bonus', '獎金', 'INCOME', 'gift'),
-  builtIn('investment_income', '投資收益', 'INCOME', 'coins'),
-  builtIn('income_other', '其他收入', 'INCOME', 'banknote'),
+  builtIn('food', '餐飲', 'EXPENSE', 'utensils', 'var(--teal)'),
+  builtIn('transit', '交通', 'EXPENSE', 'tram-front', 'var(--blue)'),
+  builtIn('daily', '日用', 'EXPENSE', 'shopping-basket', 'var(--green)'),
+  builtIn('shopping', '購物', 'EXPENSE', 'shopping-bag', 'var(--hot)'),
+  builtIn('fun', '娛樂', 'EXPENSE', 'ticket', 'var(--purple)'),
+  builtIn('health', '醫療', 'EXPENSE', 'heart-pulse', 'var(--red)'),
+  builtIn('other', '其他', 'EXPENSE', 'ellipsis', 'var(--fill)'),
+  builtIn('salary', '薪資', 'INCOME', 'banknote', 'var(--yellow)'),
+  builtIn('bonus', '獎金', 'INCOME', 'gift', 'var(--orange)'),
+  builtIn('investment_income', '投資收益', 'INCOME', 'coins', 'var(--green)'),
+  builtIn('income_other', '其他收入', 'INCOME', 'banknote', 'var(--yellow)'),
 ];
-const TRANSFER: Category = { id: 'transfer', name: '轉帳', type: 'TRANSFER', icon: ArrowLeftRight, iconKey: 'arrow-left-right', hidden: false, builtIn: true };
+const TRANSFER: Category = { id: 'transfer', name: '轉帳', type: 'TRANSFER', icon: ArrowLeftRight, iconKey: 'arrow-left-right', hidden: false, builtIn: true, color: 'transparent' };
+
+/** 自己加的分類照 id 從這組顏色挑一個，每次都一樣 */
+const PALETTE = ['var(--teal)', 'var(--blue)', 'var(--green)', 'var(--hot)', 'var(--purple)', 'var(--orange)', 'var(--pink)', 'var(--yellow)', 'var(--red)', 'var(--brown)'];
+export const colorFor = (id: string) => PALETTE[[...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % PALETTE.length];
 
 /**
  * 內建分類加上使用者的設定：表裡有的照表裡的名字、圖示、順序；
@@ -99,7 +105,10 @@ export function mergeCategories(rows: CategoryRow[]): Category[] {
       seen.add(r.id);
       const base = builtIns.get(r.id);
       const iconKey = ICONS[r.icon] ? r.icon : base?.iconKey ?? 'ellipsis';
-      out.push({ id: r.id, name: r.name.trim() || base?.name || '未命名', type, icon: ICONS[iconKey], iconKey, hidden: r.hidden, builtIn: Boolean(base) });
+      out.push({
+        id: r.id, name: r.name.trim() || base?.name || '未命名', type, icon: ICONS[iconKey], iconKey, hidden: r.hidden, builtIn: Boolean(base),
+        color: base?.color ?? colorFor(r.id),
+      });
     }
     out.push(...BUILT_IN.filter((c) => c.type === type && !seen.has(c.id)));
   }

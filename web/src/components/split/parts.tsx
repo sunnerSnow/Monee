@@ -68,8 +68,8 @@ export function effectLines(
 export function InboxBanner({ count, onOpen }: { count: number; onOpen: () => void }) {
   if (!count) return null;
   return (
-    <button type="button" onClick={onOpen} aria-haspopup="dialog" className="press flex min-h-14 w-full items-center gap-3 rounded-lg bg-brand px-4 py-3 text-left text-body-s tracking-[.06em] text-ink">
-      <Inbox size={20} strokeWidth={1.5} aria-hidden />
+    <button type="button" onClick={onOpen} aria-haspopup="dialog" className="sticker press flex min-h-14 w-full rotate-[.8deg] items-center gap-3 rounded-[var(--radius-panel)] border-[2.5px] border-ink bg-brand px-4 py-3 text-left font-display text-[15px] tracking-[.06em] shadow-[var(--pop)]">
+      <Inbox size={20} strokeWidth={2} aria-hidden />
       <span className="flex-1">有 {count} 件分帳等你確認</span>
       <span className="num inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-ink px-1.5 text-[12px] text-brand">{count}</span>
     </button>

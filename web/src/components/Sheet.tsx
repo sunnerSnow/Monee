@@ -49,9 +49,9 @@ export function Sheet({ open, onClose, labelledBy, children }: {
         aria-modal="true"
         aria-labelledby={labelledBy}
         // [&>*]:shrink-0：內容超過高度時改成捲動，不要把可左右捲動的按鈕列壓成 0 高度
-        className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-h-[calc(100dvh-24px)] w-full max-w-[480px] flex-col gap-[18px] overflow-y-auto overscroll-contain rounded-t-2xl bg-page px-5 pt-2.5 pb-[calc(32px+env(safe-area-inset-bottom))] motion-safe:animate-[sheet-in_var(--dur-enter)_var(--ease-out)] [&>*]:shrink-0"
+        className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-h-[calc(100dvh-24px)] w-full max-w-[480px] flex-col gap-[18px] overflow-y-auto overscroll-contain rounded-t-2xl border-x-[2.5px] border-t-[2.5px] border-ink bg-page px-5 pt-2.5 pb-[calc(32px+env(safe-area-inset-bottom))] motion-safe:animate-[sheet-in_var(--dur-enter)_var(--ease-out)] [&>*]:shrink-0"
       >
-        <div aria-hidden className="h-1 w-9 flex-none self-center rounded-full bg-line-strong" />
+        <div aria-hidden className="h-1.5 w-12 flex-none self-center rounded-full bg-ink" />
         {children}
       </section>
     </>
@@ -75,7 +75,7 @@ export function SheetHeader({ id, title, en, sub, onClose, onBack }: {
           </button>
         )}
         <div>
-          <h2 id={id} className="flex items-baseline gap-2.5 text-title-m font-medium leading-[1.3] tracking-[.14em]">
+          <h2 id={id} className="flex items-baseline gap-2.5 font-display text-title-m leading-[1.3] tracking-[.1em]">
             {title}<span className="en">{en}</span>
           </h2>
           {sub && <p className="caption mt-1">{sub}</p>}

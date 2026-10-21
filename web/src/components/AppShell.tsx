@@ -26,6 +26,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (categoryRows) setCategoryRows(categoryRows);
   }, [categoryRows]);
 
+  // 讀到使用者的偏好後再套用一次，狀態列顏色才會跟著（深淺色本身已由 layout.tsx 的行內腳本先套好）
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
   // 選「跟隨系統」時，系統切換深淺色要即時反映
   useEffect(() => {
     if (theme !== 'system') return;
@@ -43,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="flex flex-col gap-5 px-5 pt-[max(18px,env(safe-area-inset-top))] pb-[calc(128px+env(safe-area-inset-bottom))]"
       >
         {isDemo && (
-          <p role="note" className="caption -mb-2 rounded-full bg-cream px-4 py-2 text-center text-fg">
+          <p role="note" className="sticker caption -mb-2 rounded-full border-2 border-ink bg-cream px-4 py-2 text-center">
             示範模式・資料只存在這個分頁，重新整理就會還原
           </p>
         )}

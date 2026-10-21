@@ -14,7 +14,7 @@ Monee 是給自己用的手機記帳網頁：說一句話或拍張收據就能�
 - **報表**：每月收支、各分類支出、預算比較。
 - **分類管理**：新增自己的分類、改名換圖示、隱藏、排序。
 - **資料**：匯出到 Google Sheets、下載明細 CSV、下載備份檔並整個還原。
-- **其他**：深淺色模式、金額可以一鍵隱藏。
+- **其他**：街頭貼紙風的介面（預設深色，也有淺色）、三個角色任選、金額可以一鍵隱藏。
 
 ## 快速試用
 
@@ -40,7 +40,8 @@ web/                    Monee 網頁（程式、資料庫 migration、測試）
 design-system/monee/    設計系統：MASTER.md（規則）、tokens.css（顏色字級等數值）、styleguide.html（樣式總覽）
 monee_ux.md             產品與 UX 規格、路線圖
 prototype/              互動原型（首頁、分帳）
-monee-home*.html        首頁設計稿
+monee-home*.html        首頁設計稿（monee-home-pop.html 是現在的街頭貼紙版）
+monee-mascot.html       三個角色的設計稿
 ```
 
 ## 文件

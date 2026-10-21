@@ -14,9 +14,10 @@ import { forgetGoogleToken } from '@/lib/google-sheets';
 import { formatMoney, parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/client';
 import type { BudgetEntry, PnlColor } from '@/lib/types';
-import { useUi, type ThemePref } from '@/lib/ui-store';
+import { MASCOTS, useUi, type ThemePref } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { BackupRow } from '../BackupRow';
+import { Mascot, MASCOT_NAMES } from '../Mascot';
 import { CsvExportRow } from '../CsvExportRow';
 import { SheetsExportRow } from '../SheetsExportRow';
 import { Avatar } from '../ui';
@@ -52,6 +53,8 @@ export function SettingsScreen() {
   const now = useNow();
   const theme = useUi((s) => s.theme);
   const setTheme = useUi((s) => s.setTheme);
+  const mascot = useUi((s) => s.mascot);
+  const setMascot = useUi((s) => s.setMascot);
   const showToast = useUi((s) => s.showToast);
   const [budgetInput, setBudgetInput] = useState<string | null>(null);
   const [scope, setScope] = useState<BudgetScope>('from');
@@ -125,7 +128,7 @@ export function SettingsScreen() {
 
       {!isDemo && (
         <Link href="/reset-password" className="card press flex min-h-14 items-center gap-3.5 px-5 py-2 text-body">
-          <span aria-hidden className="ico sm"><KeyRound size={16} strokeWidth={1.5} /></span>
+          <span aria-hidden className="ico sm" style={{ background: 'var(--yellow)' }}><KeyRound size={16} strokeWidth={1.5} /></span>
           修改密碼
           <ChevronRight size={18} strokeWidth={1.5} aria-hidden className="ml-auto text-muted" />
         </Link>
@@ -191,7 +194,7 @@ export function SettingsScreen() {
       <section aria-labelledby="s-categories" className="flex flex-col gap-2">
         <h2 id="s-categories" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">記帳</h2>
         <Link href="/settings/categories" className="card press flex min-h-14 items-center gap-3.5 px-5 py-2">
-          <span aria-hidden className="ico sm"><Tags size={16} strokeWidth={1.5} /></span>
+          <span aria-hidden className="ico sm" style={{ background: 'var(--pink)' }}><Tags size={16} strokeWidth={1.5} /></span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-body">分類管理</span>
             <span className="caption">新增、改名、隱藏、調整順序</span>
@@ -202,7 +205,19 @@ export function SettingsScreen() {
 
       <section aria-labelledby="s-theme" className="flex flex-col gap-2">
         <h2 id="s-theme" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">外觀</h2>
-        <div className="card px-5 py-4">{seg(THEMES, theme, setTheme, '外觀')}</div>
+        <div className="card flex flex-col gap-4 px-5 py-4">
+          {seg(THEMES, theme, setTheme, '外觀')}
+          <div className="flex flex-col gap-2 border-t border-dashed border-line-strong pt-4">
+            <span className="caption">角色（首頁、頭像都會換）</span>
+            <div role="group" aria-label="角色" className="grid grid-cols-3 gap-2">
+              {MASCOTS.map((k) => (
+                <button key={k} type="button" aria-pressed={mascot === k} onClick={() => setMascot(k)} className="pill press h-auto flex-col justify-center gap-1 rounded-[var(--radius-md)] px-1 py-2.5">
+                  <Mascot kind={k} className="w-14" />{MASCOT_NAMES[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section aria-labelledby="s-pnl" className="flex flex-col gap-2">

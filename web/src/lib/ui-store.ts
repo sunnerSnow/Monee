@@ -3,6 +3,9 @@
 import { create } from 'zustand';
 
 export type ThemePref = 'light' | 'dark' | 'system';
+/** 角色：硬幣小子、錢包兄弟、豬撲滿，使用者在「我的 → 外觀」挑 */
+export type MascotKind = 'coin' | 'wallet' | 'piggy';
+export const MASCOTS: MascotKind[] = ['coin', 'wallet', 'piggy'];
 export type SheetState =
   | { kind: 'entry' }
   | { kind: 'transaction'; id: string }
@@ -21,10 +24,16 @@ export type SheetState =
 /** layout.tsx 的行內腳本也讀這個 key，兩邊要一致 */
 export const THEME_KEY = 'monee-theme';
 const HIDDEN_KEY = 'monee-hidden';
+const MASCOT_KEY = 'monee-mascot';
+/** 沒選過就用深色（街頭貼紙版以黑底為主） */
+export const DEFAULT_THEME: ThemePref = 'dark';
+/** 狀態列的顏色跟著頁面底色（tokens.css 的 --bg） */
+const THEME_COLOR = { light: '#FFF3CF', dark: '#141416' };
 
 export function applyTheme(pref: ThemePref) {
   const dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[dark ? 'dark' : 'light']);
 }
 
 const save = (key: string, value: string) => {
@@ -38,6 +47,7 @@ const save = (key: string, value: string) => {
 interface UiState {
   hidden: boolean;
   theme: ThemePref;
+  mascot: MascotKind;
   sheet: SheetState;
   toast: string | null;
   /** 剛新增的交易，列表會短暫高亮 */
@@ -45,6 +55,7 @@ interface UiState {
   hydrate: () => void;
   toggleHidden: () => void;
   setTheme: (theme: ThemePref) => void;
+  setMascot: (mascot: MascotKind) => void;
   openSheet: (sheet: Exclude<SheetState, null>) => void;
   closeSheet: () => void;
   showToast: (message: string) => void;
@@ -56,16 +67,19 @@ let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useUi = create<UiState>((set, get) => ({
   hidden: false,
-  theme: 'system',
+  theme: DEFAULT_THEME,
+  mascot: 'coin',
   sheet: null,
   toast: null,
   flashId: null,
   hydrate: () => {
     try {
       const theme = localStorage.getItem(THEME_KEY);
+      const mascot = localStorage.getItem(MASCOT_KEY) as MascotKind | null;
       set({
         hidden: localStorage.getItem(HIDDEN_KEY) === '1',
-        theme: theme === 'light' || theme === 'dark' ? theme : 'system',
+        theme: theme === 'light' || theme === 'dark' || theme === 'system' ? theme : DEFAULT_THEME,
+        mascot: mascot && MASCOTS.includes(mascot) ? mascot : 'coin',
       });
     } catch {
       // 讀不到偏好就用預設值
@@ -80,6 +94,10 @@ export const useUi = create<UiState>((set, get) => ({
     set({ theme });
     save(THEME_KEY, theme);
     applyTheme(theme);
+  },
+  setMascot: (mascot) => {
+    set({ mascot });
+    save(MASCOT_KEY, mascot);
   },
   openSheet: (sheet) => set({ sheet }),
   closeSheet: () => set({ sheet: null }),

@@ -1,7 +1,6 @@
 'use client';
 
 import { Archive, ArrowRight, Check, ChevronLeft, Ellipsis, Info, Plane, Plus, Share2 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { getCategory, useCategories } from '@/lib/categories';
@@ -18,7 +17,8 @@ import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
 import { Avatars, InboxBanner, MemberAvatar, memberLabel, shortDate } from './parts';
-
+
+import { Mascot } from '../Mascot';
 export function GroupScreen({ id }: { id: string }) {
   const groupsQ = useSplitGroups();
   const hidden = useHidden();
@@ -163,8 +163,8 @@ function TripHero({ g, mine }: { g: SplitGroup; mine: number }) {
       </div>
       {g.budget && (
         <div className="flex flex-col gap-2">
-          <div aria-hidden className="h-[var(--bar-h)] overflow-hidden rounded-full bg-fill">
-            <i className={`block h-full rounded-full ${left < 0 ? 'bg-alert' : used >= 80 ? 'bg-warn' : 'bg-fg'}`} style={{ width: `${Math.min(100, used)}%` }} />
+          <div aria-hidden className="h-[var(--bar-h)] overflow-hidden rounded-full border-2 border-ink bg-fill">
+            <i className={`block h-full border-r-2 border-ink ${left < 0 ? 'bg-alert' : used >= 80 ? 'bg-warn' : 'bg-teal'}`} style={{ width: `${Math.min(100, used)}%` }} />
           </div>
           <div className="flex justify-between gap-2 text-caption text-muted">
             <span>旅程預算 <span className="num">{money(g.budget, hidden)}</span></span>
@@ -222,7 +222,8 @@ function Expenses({ g }: { g: SplitGroup }) {
           </div>
           <ul className="card py-1">
             {items.map((e) => {
-              const Icon = getCategory(e.categoryId).icon;
+              const cat = getCategory(e.categoryId);
+              const Icon = cat.icon;
               const share = myShare(g, e);
               const original = originalOf(e);
               const solo = g.members.length === 1;
@@ -232,7 +233,7 @@ function Expenses({ g }: { g: SplitGroup }) {
               return (
                 <li key={e.id}>
                   <button type="button" onClick={() => openSheet({ kind: 'splitDetail', groupId: g.id, expenseId: e.id })} aria-haspopup="dialog" className="row press">
-                    <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+                    <span aria-hidden className="ico" style={{ background: cat.color }}><Icon size={20} strokeWidth={1.5} /></span>
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-body">{e.title}</span>
                       <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>
@@ -332,7 +333,7 @@ function Settle({ g, net }: { g: SplitGroup; net: Record<string, number> }) {
   if (!transfers.length && isEmptyGroup(g)) {
     return (
       <div className="card flex flex-col items-center gap-2 p-5 text-center">
-        <Image src="/monee.png" alt="" width={110} height={80} className="h-auto w-[110px]" />
+        <Mascot className="w-[96px]" />
         <p className="h-sec">還沒有花費</p>
         <p className="caption leading-[1.8]">到「花費」分頁記第一筆。記了之後，這裡會算出每個人該付多少、怎麼還最省事。</p>
       </div>
@@ -343,7 +344,7 @@ function Settle({ g, net }: { g: SplitGroup; net: Record<string, number> }) {
     return (
       <>
         <div className="card flex flex-col items-center gap-2 p-5 text-center">
-          <Image src="/monee.png" alt="" width={110} height={80} className="h-auto w-[110px]" />
+          <Mascot mood="yay" className="w-[96px]" />
           <p className="h-sec">都結清了</p>
           <p className="caption leading-[1.8]">這個群組沒有人欠錢。{g.rounds.length ? '之前的花費收在「花費」分頁下面的已結清紀錄，' : ''}之後有新花費繼續記在這裡就好。</p>
         </div>

@@ -99,7 +99,8 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
 
   const me = meOf(g)!;
   const mine = myShare(g, e);
-  const Icon = getCategory(e.categoryId).icon;
+  const cat = getCategory(e.categoryId);
+  const Icon = cat.icon;
   const payerAcct = e.payerId === me.id ? accounts.find((a) => a.id === e.accountId)?.name : null;
 
   const destroy = async () => {
@@ -145,7 +146,7 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
         <Field label="在你的明細會顯示成">
           <div className="card py-1">
             <div className="row">
-              <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+              <span aria-hidden className="ico" style={{ background: cat.color }}><Icon size={20} strokeWidth={1.5} /></span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-body">{e.title}</span>
                 <span className="truncate text-caption tracking-[.06em] text-muted">分帳・{g.name}・{e.payerId === me.id ? `實付 ${formatMoney(e.amount)}` : `${memberName(g, e.payerId)}先付`}</span>
@@ -267,11 +268,12 @@ function RoundSheet({ g, roundId }: { g: SplitGroup; roundId: string }) {
       <Field label="花費">
         <ul className="card py-1">
           {expenses.map((e) => {
-            const Icon = getCategory(e.categoryId).icon;
+            const cat = getCategory(e.categoryId);
+            const Icon = cat.icon;
             const share = myShare(g, e);
             return (
               <li key={e.id} className="row">
-                <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+                <span aria-hidden className="ico" style={{ background: cat.color }}><Icon size={20} strokeWidth={1.5} /></span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-body">{e.title}</span>
                   <span className="truncate text-caption tracking-[.06em] text-muted">{shortDate(e.date)}・{memberName(g, e.payerId)}付 {formatMoney(e.amount)}・{modeText(e)}</span>

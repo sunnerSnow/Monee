@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ChevronLeft, Eye, EyeOff, Plus, Trash2 } from 'luci
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
-  BUILT_IN, ICON_LABELS, ICONS, MAX_CATEGORY_NAME, newCategoryId, useCategories, type Category, type ManagedType,
+  BUILT_IN, colorFor, ICON_LABELS, ICONS, MAX_CATEGORY_NAME, newCategoryId, useCategories, type Category, type ManagedType,
 } from '@/lib/categories';
 import { fetchCategoryUsage, useDeleteCategory, useSaveCategories } from '@/lib/data';
 import { useUi } from '@/lib/ui-store';
@@ -70,7 +70,7 @@ export function CategoriesScreen() {
           return (
             <li key={c.id} className="flex items-center gap-1 border-t border-line pr-2 first:border-t-0">
               <button type="button" onClick={() => setEditing({ category: c })} aria-haspopup="dialog" className="row press min-w-0 flex-1">
-                <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+                <span aria-hidden className="ico" style={{ background: c.color }}><Icon size={20} strokeWidth={1.5} /></span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-body">{c.name}</span>
                   {!c.builtIn && <span className="caption">自己加的</span>}
@@ -105,7 +105,7 @@ export function CategoriesScreen() {
               return (
                 <li key={c.id} className="flex items-center gap-2 border-t border-line pr-4 first:border-t-0">
                   <button type="button" onClick={() => setEditing({ category: c })} aria-haspopup="dialog" className="row press min-w-0 flex-1 text-muted">
-                    <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+                    <span aria-hidden className="ico" style={{ background: c.color }}><Icon size={20} strokeWidth={1.5} /></span>
                     <span className="truncate text-body">{c.name}</span>
                   </button>
                   <button type="button" onClick={() => unhide(c)} className="btn-secondary press flex-none">
@@ -175,7 +175,8 @@ function CategoryForm({ type, category, all, onClose, onSave }: {
     if (category) {
       await onSave(all.map((c) => (c.id === category.id ? { ...c, name: clean, iconKey, icon: ICONS[iconKey] } : c)), `已儲存「${clean}」`);
     } else {
-      const added: Category = { id: newCategoryId(), name: clean, type, icon: ICONS[iconKey], iconKey, hidden: false, builtIn: false };
+      const id = newCategoryId();
+      const added: Category = { id, name: clean, type, icon: ICONS[iconKey], iconKey, hidden: false, builtIn: false, color: colorFor(id) };
       await onSave([...shown, added, ...hidden], `已新增「${clean}」`);
     }
     setBusy(false);

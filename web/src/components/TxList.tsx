@@ -33,7 +33,7 @@ export function TxRow({ t, accounts }: { t: Transaction; accounts: Map<string, A
         aria-haspopup="dialog"
         className={`row press ${t.id === flashId ? 'flash' : ''}`}
       >
-        <span aria-hidden className={`ico ${tone}`}><Icon size={20} strokeWidth={1.5} /></span>
+        <span aria-hidden className={`ico ${tone}`} style={tone === 'tr' ? undefined : { background: category.color }}><Icon size={20} strokeWidth={1.5} /></span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-body">{title}</span>

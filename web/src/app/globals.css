@@ -1,17 +1,21 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 
-/* Lexend Exa 由 next/font 託管（字體名稱會被加上雜湊），用它產生的變數取代 tokens.css 裡的名稱；
-   Noto Sans TC 由 layout.tsx 的 Google Fonts 連結載入，沿用原名，系統中文字體當備援 */
+/* 英數字體由 next/font 託管（字體名稱會被加上雜湊），用它產生的變數取代 tokens.css 裡的名稱；
+   粉圓（Huninn）、Noto Sans TC 由 layout.tsx 的 Google Fonts 連結載入，沿用原名，系統中文字體當備援 */
 :root {
-  --font-num: var(--font-lexend-exa), 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --font-num: var(--font-rubik), 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  --font-fun: var(--font-luckiest), 'Huninn', 'Noto Sans TC', sans-serif;
+  --font-tag: var(--font-sedgwick), cursive;
+  --font-display: 'Huninn', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
   --font-body: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
 }
 
-/* 讓 Tailwind 的 utility 讀 tokens：bg-page、text-muted、text-caption… */
+/* 讓 Tailwind 的 utility 讀 tokens：bg-page、text-muted、text-caption、bg-teal… */
 @theme inline {
   --color-page: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-fill: var(--fill);
   --color-cream: var(--cream);
   --color-fg: var(--text);
@@ -30,9 +34,20 @@
   --color-alert-tint: var(--alert-tint);
   --color-gain: var(--gain);
   --color-gain-tint: var(--gain-tint);
+  --color-teal: var(--teal);
+  --color-pink: var(--pink);
+  --color-hot: var(--hot);
+  --color-purple: var(--purple);
+  --color-green: var(--green);
+  --color-blue: var(--blue);
+  --color-red: var(--red);
+  --color-orange: var(--orange);
 
   --font-sans: var(--font-body);
   --font-numeric: var(--font-num);
+  --font-display: var(--font-display);
+  --font-fun: var(--font-fun);
+  --font-tag: var(--font-tag);
 
   --text-display-xl: var(--fs-display-xl);
   --text-display-l: var(--fs-display-l);
@@ -43,64 +58,101 @@
   --text-body: var(--fs-body);
   --text-body-s: var(--fs-body-s);
   --text-caption: var(--fs-caption);
-  /* rounded-xs … rounded-2xl 直接沿用 tokens.css 的 --radius-*（12/14/18/20/24/28px） */
+  /* rounded-xs … rounded-2xl 直接沿用 tokens.css 的 --radius-* */
 }
 
 @layer base {
   body {
-    background: var(--bg);
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--bg-dots) 1.1px, transparent 1.3px);
+    background-size: 14px 14px;
     color: var(--text);
     letter-spacing: var(--tracking-body);
     font-feature-settings: "palt";
     -webkit-font-smoothing: antialiased;
   }
-  :focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+  /* 深色模式牆上的噴漆色點，固定在畫面上不跟著捲 */
+  body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--bg-spray); pointer-events: none; }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   button:not(:disabled), [role="button"] { cursor: pointer; }
-  button:disabled { cursor: not-allowed; opacity: .35; }
+  button:disabled { cursor: not-allowed; opacity: .45; }
   input::placeholder { color: var(--text-2); }
 }
 
 /* 重複出現的元件樣式；版面排列用 Tailwind utility */
 @layer components {
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
-  .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-num); }
-  .display { font-family: var(--font-num); font-weight: var(--fw-light); letter-spacing: -.01em; }
-  .display small { font-size: .5em; font-weight: var(--fw-light); vertical-align: .72em; margin-right: 4px; }
-  .caption { font-size: var(--fs-caption); color: var(--text-2); letter-spacing: var(--tracking-caption); }
-  .en { font-family: var(--font-num); font-size: var(--fs-caption); font-weight: var(--fw-light); letter-spacing: .06em; color: var(--text-2); }
-  .h-sec { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-title-s); font-weight: var(--fw-medium); letter-spacing: var(--tracking-title); }
-  .h-page { display: flex; align-items: baseline; gap: 10px; font-size: var(--fs-title-l); font-weight: var(--fw-medium); line-height: 1.3; letter-spacing: var(--tracking-title); }
+  /* ---- 貼紙：卡片、面板、按鈕、輸入框不分深淺都是淺色，裡面的字一律用墨色 ---- */
+  .card, .sticker, [role="dialog"], [role="alertdialog"], .pill, .btn-primary, .btn-secondary, .field-input,
+  .seg-tabs, .chip, .icon-btn:not(.ghost), .check-btn, .empty-box, .skeleton {
+    --text: var(--ink);
+    --text-2: var(--ink-2);
+    --bg: var(--surface-2);
+    /* 字的顏色是繼承「算好的顏色」，換變數還不夠，要在這裡重新指定一次 */
+    color: var(--text);
+  }
 
-  .press { transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-press) ease-out; }
+  .card { background: var(--surface); border: var(--border) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--pop); color: var(--text); }
+  /* 漫畫格：首頁今日卡片這類主角，方一點、影子更大、稍微傾斜 */
+  .panel { border: 3px solid var(--ink); border-radius: var(--radius-panel); box-shadow: var(--pop-lg); }
+  .num { font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-num); }
+  .display { font-family: var(--font-num); font-weight: var(--fw-black); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .display small { font-size: .5em; font-weight: var(--fw-bold); vertical-align: .72em; margin-right: 3px; }
+  /* 卡通大字：首頁大金額、英文點綴；白字或黃字加粗黑描邊和實心影 */
+  .fun-text {
+    font-family: var(--font-fun); font-weight: 400; letter-spacing: .01em;
+    -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; text-shadow: 3px 3px 0 var(--ink);
+  }
+  .fun-text small { font-size: .55em; vertical-align: .6em; margin-right: 3px; }
+  .tag-text { font-family: var(--font-tag); font-weight: 400; text-shadow: 2px 2px 0 var(--ink); }
+  .caption { font-size: var(--fs-caption); color: var(--text-2); letter-spacing: var(--tracking-caption); }
+  /* 英文點綴：字用一般文字色（對比夠），藍綠色當錯開的影子 */
+  .en {
+    font-family: var(--font-fun); font-size: 15px; font-weight: 400; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text); text-shadow: 2px 2px 0 var(--teal);
+  }
+  .h-sec { display: flex; align-items: baseline; gap: 10px; font-family: var(--font-display); font-size: var(--fs-title-s); font-weight: 400; letter-spacing: var(--tracking-title); }
+  .h-page { display: flex; align-items: baseline; gap: 12px; font-family: var(--font-display); font-size: var(--fs-title-l); font-weight: 400; line-height: 1.3; letter-spacing: var(--tracking-title); }
+  .h-page .en { font-size: 17px; }
+
+  .press { transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out), background-color var(--dur-press) ease-out; }
   .press:active:not(:disabled) { transform: scale(.98); }
+  /* 有實心影的東西按下去是「壓扁」：往右下移、影子變短 */
+  .card.press:active:not(:disabled), .btn-primary.press:active:not(:disabled), .btn-secondary.press:active:not(:disabled),
+  .pill.press:active:not(:disabled), .icon-btn:not(.ghost).press:active:not(:disabled) {
+    transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink);
+  }
 
   .icon-btn {
     flex: none; width: var(--touch); height: var(--touch); border-radius: var(--radius-pill);
-    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    border: var(--border) solid var(--ink); background: var(--surface); color: var(--text); box-shadow: var(--pop-sm);
     display: inline-flex; align-items: center; justify-content: center;
   }
-  .icon-btn.ghost { border-color: transparent; background: transparent; }
-  .icon-btn.soft { border-color: transparent; background: var(--fill); }
+  .icon-btn.ghost { border-color: transparent; background: transparent; box-shadow: none; }
+  .icon-btn.soft { background: var(--fill); }
 
   .btn-primary {
     min-height: 52px; padding: 0 var(--space-6); border-radius: var(--radius-pill);
     display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-    background: var(--primary); color: var(--on-primary);
-    font-size: 15px; font-weight: var(--fw-medium); letter-spacing: var(--tracking-title);
+    background: var(--primary); color: var(--on-primary); border: var(--border) solid var(--ink); box-shadow: var(--pop);
+    font-family: var(--font-display); font-size: 17px; font-weight: 400; letter-spacing: var(--tracking-title);
   }
   .btn-secondary {
     min-height: var(--touch); padding: 0 var(--space-4); border-radius: var(--radius-pill);
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-body-s);
+    border: var(--border) solid var(--ink); background: var(--surface); color: var(--text); box-shadow: var(--pop-sm);
+    font-family: var(--font-display); font-size: 14px;
   }
+  .btn-primary:disabled, .btn-secondary:disabled { box-shadow: none; }
 
   .pill {
     flex: none; min-height: var(--touch); padding: 0 var(--space-4); border-radius: var(--radius-pill);
     display: inline-flex; align-items: center; gap: 6px;
-    border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-body-s); white-space: nowrap;
+    border: 2px solid var(--ink); background: var(--surface); color: var(--text); box-shadow: 2px 2px 0 var(--ink);
+    font-family: var(--font-display); font-size: 14px; white-space: nowrap;
   }
-  .pill[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-  .pills { display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; }
+  .pill[aria-pressed="true"] { background: var(--yellow); color: var(--ink); }
+  /* 左右滑的按鈕列：留一點空間給實心影，不會被捲動範圍切掉 */
+  .pills { display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none; padding: 2px 4px 5px 2px; margin: -2px -4px -5px -2px; }
   .pills::-webkit-scrollbar { display: none; }
   /* 桌機用滑鼠時顯示細的捲軸：看得出後面還有，也拖得動（手機維持隱藏，用手指滑）；滾輪左右捲見 lib/wheel-pills.ts */
   @media (hover: hover) and (pointer: fine) {
@@ -111,7 +163,7 @@
 
   .field-input {
     width: 100%; height: 48px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
-    border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 16px;
+    border: var(--border) solid var(--ink); background: var(--surface); color: var(--text); font-size: 16px;
   }
 
   .row {
@@ -121,55 +173,58 @@
   @media (hover: hover) { button.row:hover, a.row:hover { background: var(--hover); } }
   .row.flash { animation: flash 1.6s var(--ease-out); }
 
+  /* 圖示底：分類、帳戶各有自己的顏色（style 帶進來），圖示一律墨色 */
   .ico {
     flex: none; width: var(--icon-chip); height: var(--icon-chip); border-radius: var(--radius-xs);
-    background: var(--fill); color: var(--text); display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid var(--ink); background: var(--fill); color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
   }
-  .ico.in { background: var(--yellow); color: var(--ink); }
-  .ico.tr { background: transparent; border: 1px dashed var(--dash); color: var(--text-2); }
-  .ico.sm { width: 28px; height: 28px; border-radius: 8px; }
+  .ico.in { background: var(--yellow); }
+  .ico.tr { background: transparent; border-style: dashed; border-color: var(--dash); color: var(--text-2); }
+  .ico.sm { width: 30px; height: 30px; border-radius: 9px; }
 
-  .chip { padding: 5px 12px; border-radius: var(--radius-pill); border: 1px solid var(--text); font-size: var(--fs-body-s); font-weight: var(--fw-medium); white-space: nowrap; }
-  .chip.tight { border-color: transparent; background: var(--warn-tint); color: var(--warn-text); }
-  .chip.over { border-color: transparent; background: var(--alert-tint); color: var(--alert); }
+  .chip { padding: 5px 12px; border-radius: var(--radius-pill); border: 2px solid var(--ink); background: var(--surface); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); font-family: var(--font-num); font-size: var(--fs-body-s); font-weight: 700; white-space: nowrap; }
+  .chip.tight { background: var(--warn-tint); color: var(--warn-text); }
+  .chip.over { background: var(--alert-tint); color: var(--alert); }
 
-  .pnl { padding: 2px 8px; border-radius: var(--radius-pill); font-family: var(--font-num); font-size: var(--fs-caption); letter-spacing: 0; white-space: nowrap; }
+  .pnl { padding: 2px 8px; border-radius: var(--radius-pill); border: 1.5px solid currentColor; font-family: var(--font-num); font-weight: 600; font-size: var(--fs-caption); letter-spacing: 0; white-space: nowrap; }
   .pnl.red_up { background: var(--alert-tint); color: var(--alert); }
   .pnl.green_up { background: var(--gain-tint); color: var(--gain); }
 
-  .empty-box { display: flex; flex-direction: column; gap: 6px; padding: 18px var(--space-5); border-radius: var(--radius-lg); border: 1px dashed var(--dash); }
+  .empty-box { display: flex; flex-direction: column; gap: 6px; padding: 18px var(--space-5); border-radius: var(--radius-lg); border: var(--border) dashed var(--ink); background: var(--surface-2); color: var(--text); }
 
-  .skeleton { border-radius: var(--radius-lg); background: var(--fill); animation: pulse 1.4s ease-in-out infinite; }
+  .skeleton { border-radius: var(--radius-lg); background: var(--fill); border: var(--border) solid var(--ink); opacity: .35; animation: pulse 1.4s ease-in-out infinite; }
 
   /* 分帳：朋友只有名字，用一個字當頭像；你自己是招牌黃 */
   .av {
     flex: none; width: 32px; height: 32px; border-radius: var(--radius-pill);
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--fill); color: var(--text); font-size: 13px; font-weight: var(--fw-medium); letter-spacing: 0;
-    box-shadow: 0 0 0 2px var(--surface);
+    background: var(--fill); color: var(--ink); border: 2px solid var(--ink);
+    font-family: var(--font-display); font-size: 13px; letter-spacing: 0;
   }
-  .av.me { background: var(--yellow); color: var(--ink); }
+  .av.me { background: var(--yellow); }
   .avs { display: flex; }
   .avs .av + .av { margin-left: -8px; }
-  .seg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--radius-pill); background: var(--fill); }
-  .seg-tabs button { min-height: 44px; border-radius: var(--radius-pill); font-size: var(--fs-body-s); letter-spacing: .1em; color: var(--text-2); }
-  .seg-tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: var(--fw-medium); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+  .seg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: var(--radius-pill); background: var(--surface); border: var(--border) solid var(--ink); box-shadow: var(--pop-sm); }
+  .seg-tabs button { min-height: 44px; border-radius: var(--radius-pill); font-family: var(--font-display); font-size: 15px; letter-spacing: .08em; color: var(--text-2); }
+  .seg-tabs button[aria-selected="true"] { background: var(--yellow); color: var(--ink); border: 2px solid var(--ink); }
   .check-btn {
-    flex: none; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface);
+    flex: none; width: 40px; height: 40px; border: 2px solid var(--ink); border-radius: var(--radius-pill); background: var(--surface);
     display: inline-flex; align-items: center; justify-content: center; color: transparent;
   }
-  .check-btn[aria-pressed="true"], .check-btn.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-  .switch { position: relative; flex: none; width: 52px; height: 32px; border-radius: var(--radius-pill); background: var(--line-strong); transition: background var(--dur-press) ease-out; }
-  .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); transition: transform var(--dur-press) var(--ease-out); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+  .check-btn[aria-pressed="true"], .check-btn.on { background: var(--yellow); color: var(--ink); }
+  .switch { position: relative; flex: none; width: 54px; height: 32px; border-radius: var(--radius-pill); border: 2px solid var(--ink); background: var(--fill); transition: background var(--dur-press) ease-out; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); background: var(--surface); transition: transform var(--dur-press) var(--ease-bounce); }
   /* 開關可以是按鈕本身，也可以是整列按鈕（SwitchRow）裡的圖形 */
-  .switch[aria-checked="true"], [aria-checked="true"] > .switch { background: var(--primary); }
-  .switch[aria-checked="true"]::after, [aria-checked="true"] > .switch::after { transform: translateX(20px); background: var(--on-primary); }
+  .switch[aria-checked="true"], [aria-checked="true"] > .switch { background: var(--teal); }
+  .switch[aria-checked="true"]::after, [aria-checked="true"] > .switch::after { transform: translateX(22px); background: var(--yellow); }
 }
 
-@keyframes flash { from { background: rgba(254, 217, 0, .4); } to { background: transparent; } }
-@keyframes pulse { 50% { opacity: .5; } }
+@keyframes flash { from { background: rgba(253, 224, 33, .55); } to { background: transparent; } }
+@keyframes pulse { 50% { opacity: .2; } }
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wiggle { 0%, 100% { rotate: 0deg; } 50% { rotate: -6deg; } }
 
 @media (prefers-reduced-motion: reduce) {
   .press:active:not(:disabled) { transform: none; }

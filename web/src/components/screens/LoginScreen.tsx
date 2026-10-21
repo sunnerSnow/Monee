@@ -1,14 +1,15 @@
 'use client';
 
 import { ArrowLeft, ArrowRight, MailCheck } from 'lucide-react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { authErrorMessage } from '@/lib/auth-errors';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { PasswordInput } from '../PasswordInput';
-
+
+import { Mascot } from '../Mascot';
+import { BubbleLogo } from '../ui';
 type Mode = 'login' | 'signup' | 'forgot';
 type Sent = null | 'confirm' | 'reset';
 
@@ -77,10 +78,11 @@ export function LoginScreen({ linkError }: { linkError: boolean }) {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col justify-center gap-8 px-5 py-10">
       <div className="flex flex-col items-start gap-4">
-        <Image src="/monee.png" alt="" width={124} height={90} priority className="h-auto w-[124px]" />
-        <h1 className="flex flex-col gap-1.5">
-          <span className="display text-[40px] font-extralight leading-none">Monee</span>
-          <span className="text-title-m font-medium tracking-[.14em]">懂你金流的生活財務助理</span>
+        <Mascot mood="yay" className="w-[120px]" />
+        <h1 className="flex flex-col gap-2">
+          <span className="sr-only">Monee</span>
+          <BubbleLogo className="text-[56px]" />
+          <span className="font-display text-title-m tracking-[.1em]">懂你金流的生活財務助理</span>
         </h1>
         <p className="num text-caption tracking-[.08em] text-muted">Know your money. Grow your money.</p>
       </div>

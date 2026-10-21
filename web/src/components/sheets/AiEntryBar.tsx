@@ -1,14 +1,14 @@
 'use client';
 
 import { Camera, Keyboard, Mic, Play, Sparkles, Square, X } from 'lucide-react';
-import Image from 'next/image';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { requestDraft, shrinkImage } from '@/lib/ai-client';
 import type { AiDraftTransaction, DraftContext, DraftSource } from '@/lib/ai-draft';
 import type { Account } from '@/lib/types';
 import { canTranscribe, useLiveTranscript } from '@/lib/use-live-transcript';
 import { canRecord, useRecorder } from '@/lib/use-recorder';
-
+
+import { Mascot } from '../Mascot';
 const MAX_SECONDS = 30;
 const LOW_CONFIDENCE = 0.7;
 
@@ -200,7 +200,7 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
     const heard = phase.source === 'voice' && live.text;
     return (
       <div role="status" aria-live="polite" className="card flex items-center gap-3 rounded-sm py-3 pr-2 pl-4">
-        <Image src="/monee.png" alt="" width={44} height={32} className="h-auto w-11 flex-none animate-[pulse_1.4s_ease-in-out_infinite] motion-reduce:animate-none" />
+        <Mascot className="w-11 flex-none motion-safe:animate-[wiggle_1s_ease-in-out_infinite]" />
         <span className="line-clamp-2 min-w-0 text-body-s">
           Monee 正在整理{heard ? `「${heard}」` : phase.source === 'receipt' ? '收據' : phase.source === 'voice' ? '你說的話' : '你打的字'}…
         </span>

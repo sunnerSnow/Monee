@@ -1,7 +1,6 @@
 'use client';
 
 import { Check, Copy, Info, Plus } from 'lucide-react';
-import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { getCategory, setCategoryRows, useCategories } from '@/lib/categories';
 import { copyText } from '@/lib/clipboard';
@@ -14,7 +13,8 @@ import {
 import type { PublicSplit, SplitGroup, SplitMember } from '@/lib/types';
 import { FriendExpenseForm } from './FriendExpenseForm';
 import { kindLabel, shortDate } from './parts';
-
+
+import { Mascot } from '../Mascot';
 const whoKey = (token: string) => `monee-share-${token}`;
 
 /**
@@ -61,8 +61,8 @@ export function SharedSplit({ token }: { token: string }) {
   if (!q.data) {
     return (
       <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <Image src="/monee.png" alt="" width={124} height={90} className="h-auto w-[124px]" />
-        <h1 className="text-title-m font-medium tracking-[.14em]">連結已失效</h1>
+        <Mascot mood="over" className="w-[110px]" />
+        <h1 className="font-display text-title-m tracking-[.1em]">連結已失效</h1>
         <p className="text-body-s leading-[1.8] text-muted">分享的人可能重設或停止了分享，請跟對方要新的連結。</p>
       </div>
     );
@@ -78,7 +78,7 @@ export function SharedSplit({ token }: { token: string }) {
 function Footer() {
   return (
     <p className="flex items-center justify-center gap-2 pt-2 text-caption tracking-[.06em] text-muted">
-      <Image src="/monee.png" alt="" width={28} height={20} className="h-auto w-7" />Monee 分帳・只看得到這個群組
+      <Mascot className="w-7" />Monee 分帳・只看得到這個群組
     </p>
   );
 }
@@ -222,10 +222,11 @@ function FriendView({ view, token, me, onSwitch }: { view: PublicSplit; token: s
         {mine.length ? (
           <ul className="card py-1">
             {mine.map((e) => {
-              const Icon = getCategory(e.categoryId).icon;
+              const cat = getCategory(e.categoryId);
+              const Icon = cat.icon;
               return (
                 <li key={e.id} className="row">
-                  <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
+                  <span aria-hidden className="ico" style={{ background: cat.color }}><Icon size={20} strokeWidth={1.5} /></span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-body">{e.title}</span>
                     <span className="truncate text-caption tracking-[.06em] text-muted">{shortDate(e.date)}・{nameOf(e.payerId)}付 {fullAmount(e)}・{modeText(e)}</span>

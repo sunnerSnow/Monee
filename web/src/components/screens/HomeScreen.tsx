@@ -6,13 +6,15 @@ import { accountSummary, budgetFor, budgetPace, countsForBudget, dailyBudget, mo
 import { useAccounts, useBudgets, useSplitGroups, useTransactions } from '@/lib/data';
 import { daysInMonth, greeting, longDate, monthKeyOf, toISODate } from '@/lib/dates';
 import { money, signedBalance } from '@/lib/money';
+import { ACCOUNT_COLORS } from '@/lib/palette';
 import { inboxCount } from '@/lib/split';
 import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { TxGroups } from '../TxList';
 import { InboxBanner } from '../split/parts';
-import { Avatar, BigMoney, EmptyBox, ErrorBox, HeroCard, LoadingBlocks, SectionHeader, useHidden } from '../ui';
+import type { Mood } from '../Mascot';
+import { Avatar, BigMoney, BubbleLogo, EmptyBox, ErrorBox, HeroCard, LoadingBlocks, SectionHeader, useHidden } from '../ui';
 
 const MORE = 'press inline-flex min-h-11 items-center gap-1 px-1 text-body-s tracking-[.08em]';
 
@@ -43,9 +45,9 @@ function TopBar({ now, showEye = true }: { now: Date; showEye?: boolean }) {
   const toggleHidden = useUi((s) => s.toggleHidden);
   return (
     <header className="flex min-h-12 items-center justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="caption">{longDate(now)}</span>
-        <h1 className="h-page">{greeting(now)}</h1>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <BubbleLogo className="text-[34px]" />
+        <h1 className="font-display text-body tracking-[.08em]">{greeting(now)}<span className="caption ml-2">{longDate(now)}</span></h1>
       </div>
       <div className="flex gap-2">
         {showEye && (
@@ -85,7 +87,9 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
     : daily.status === 'tight'
       ? { tone: 'tight', text: `只剩 ${money(daily.left, hidden)}` }
       : { tone: '', text: `還能花 ${money(daily.left, hidden)}` });
-  const barColor = daily?.status === 'over' ? 'var(--alert)' : daily?.status === 'tight' ? 'var(--warn)' : 'var(--text)';
+  const barColor = daily?.status === 'over' ? 'var(--alert)' : daily?.status === 'tight' ? 'var(--warn)' : 'var(--teal)';
+  const face: Mood = daily?.status === 'over' ? 'over' : daily?.status === 'tight' ? 'tight' : 'ok';
+  const tag = !daily ? "let's go!" : daily.status === 'over' ? "it's ok!" : daily.status === 'tight' ? 'easy now…' : 'keep it up!';
 
   return (
     <>
@@ -93,15 +97,17 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
 
       <HeroCard
         labelledBy="today-title"
+        mood={face}
+        tag={tag}
         top={<>
-          <h2 id="today-title" className="m-0 text-body-s tracking-[.18em] text-muted">今天花了</h2>
-          <BigMoney value={todaySpent} className="text-display-xl leading-[1.15]" />
+          <h2 id="today-title" className="m-0 font-display text-body tracking-[.12em]">今天花了</h2>
+          <BigMoney value={todaySpent} fun className="text-display-xl leading-[1.1]" />
           <p className="text-body-s leading-[1.8]">{mood}</p>
           {todayTrip > 0 && <p className="caption leading-[1.7]">另有旅程花費 {money(todayTrip, hidden)}，不算進今日額度</p>}
         </>}
         bottom={daily && chip ? <>
-          <div aria-hidden className="h-[var(--bar-h)] overflow-hidden rounded-full bg-fill">
-            <i className="block h-full rounded-full" style={{ width: `${daily.allowance ? Math.min(100, Math.round((todaySpent / daily.allowance) * 100)) : 100}%`, background: barColor }} />
+          <div aria-hidden className="h-[var(--bar-h)] overflow-hidden rounded-full border-2 border-ink bg-fill">
+            <i className="block h-full border-r-2 border-ink" style={{ width: `${daily.allowance ? Math.min(100, Math.round((todaySpent / daily.allowance) * 100)) : 100}%`, background: barColor }} />
           </div>
           <div className="flex items-center justify-between gap-2 text-body-s text-muted">
             <span>今日額度 <span className="num">{money(daily.allowance, hidden)}</span></span>
@@ -121,11 +127,11 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
         </div>
         <BigMoney value={totals.income - totals.expense} className="text-display-l leading-[1.15]" />
         <div className="grid grid-cols-2 gap-2.5">
-          <div className="flex flex-col gap-1 rounded-sm bg-cream px-3.5 py-3">
+          <div className="flex flex-col gap-1 rounded-sm border-2 border-ink bg-cream px-3.5 py-3">
             <span className="caption">收入</span>
             <span className="num text-[16px]">{hidden ? money(0, true) : `+${money(totals.income, false)}`}</span>
           </div>
-          <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3">
+          <div className="flex flex-col gap-1 rounded-sm border-2 border-ink bg-fill px-3.5 py-3">
             <span className="caption">支出</span>
             <span className="num text-[16px]">{money(totals.expense, hidden)}</span>
           </div>
@@ -139,9 +145,9 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
               </Link>
               <span>已用 <span className="num">{pace.usedPct}%</span></span>
             </div>
-            <div aria-hidden className="relative mt-5 h-[var(--bar-h)] rounded-full bg-fill">
-              <i className="block h-full rounded-full bg-fg" style={{ width: `${Math.min(100, pace.usedPct)}%` }} />
-              <span className="absolute -top-[5px] h-4 w-0.5 rounded-sm bg-fg shadow-[0_0_0_2px_var(--surface)]" style={{ left: `${pace.timePct}%` }}>
+            <div aria-hidden className="relative mt-5 h-[var(--bar-h)] rounded-full border-2 border-ink bg-fill">
+              <i className="block h-full rounded-l-full border-r-2 border-ink bg-purple" style={{ width: `${Math.min(100, pace.usedPct)}%` }} />
+              <span className="absolute -top-[6px] h-[22px] w-1 rounded-sm bg-ink shadow-[0_0_0_2px_var(--surface)]" style={{ left: `${pace.timePct}%` }}>
                 <span className="absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-caption">今天</span>
               </span>
             </div>
@@ -185,13 +191,14 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
               <BigMoney value={assets.net} className="text-display-m leading-[1.2]" />
             </div>
             <ul>
-              {assets.liquid.length > 0 && <SummaryRow icon={<Landmark size={20} strokeWidth={1.5} />} title="現金與存款" sub={assets.liquid.map((a) => a.name).join('・')} amount={money(assets.liquidSum, hidden)} />}
-              {assets.cards.length > 0 && <SummaryRow icon={<CreditCard size={20} strokeWidth={1.5} />} title="信用卡待繳" sub={assets.cards.map((a) => a.name).join('・')} amount={signedBalance(assets.cardSum, hidden)} />}
-              {assets.investments.length > 0 && <SummaryRow icon={<TrendingUp size={20} strokeWidth={1.5} />} title="投資帳戶" sub={assets.investments.map((a) => a.name).join('・')} amount={money(assets.investSum, hidden)} />}
+              {assets.liquid.length > 0 && <SummaryRow icon={<Landmark size={20} strokeWidth={1.5} />} color={ACCOUNT_COLORS.BANK} title="現金與存款" sub={assets.liquid.map((a) => a.name).join('・')} amount={money(assets.liquidSum, hidden)} />}
+              {assets.cards.length > 0 && <SummaryRow icon={<CreditCard size={20} strokeWidth={1.5} />} color={ACCOUNT_COLORS.CREDIT_CARD} title="信用卡待繳" sub={assets.cards.map((a) => a.name).join('・')} amount={signedBalance(assets.cardSum, hidden)} />}
+              {assets.investments.length > 0 && <SummaryRow icon={<TrendingUp size={20} strokeWidth={1.5} />} color={ACCOUNT_COLORS.INVESTMENT_MIRROR} title="投資帳戶" sub={assets.investments.map((a) => a.name).join('・')} amount={money(assets.investSum, hidden)} />}
               {assets.friends.length > 0 && (
                 <SummaryRow
                   href="/split"
                   icon={<Users size={20} strokeWidth={1.5} />}
+                  color={ACCOUNT_COLORS.FRIENDS}
                   title="朋友往來"
                   sub={assets.friendsSum > 0 ? '分帳・朋友欠你' : assets.friendsSum < 0 ? '分帳・你欠朋友' : '分帳・都結清了'}
                   amount={signedBalance(assets.friendsSum, hidden)}
@@ -205,11 +212,11 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
   );
 }
 
-function SummaryRow({ icon, title, sub, amount, href = '/assets' }: { icon: React.ReactNode; title: string; sub: string; amount: string; href?: string }) {
+function SummaryRow({ icon, color, title, sub, amount, href = '/assets' }: { icon: React.ReactNode; color: string; title: string; sub: string; amount: string; href?: string }) {
   return (
     <li>
       <Link href={href} className="row press">
-        <span aria-hidden className="ico">{icon}</span>
+        <span aria-hidden className="ico" style={{ background: color }}>{icon}</span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-body">{title}</span>
           <span className="truncate text-caption tracking-[.06em] text-muted">{sub}</span>

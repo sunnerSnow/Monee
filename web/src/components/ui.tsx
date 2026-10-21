@@ -1,34 +1,41 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
-import { useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useId, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 import { monthTitle } from '@/lib/dates';
 import { splitMoney } from '@/lib/money';
 import { useUi } from '@/lib/ui-store';
+import { Mascot, type Mood } from './Mascot';
 
 export const useHidden = () => useUi((s) => s.hidden);
 
-/** 使用者頭像：破殼小雞（public/avatar.png，由根目錄的 Monee user.png 置中放進圓形）；外層按鈕或連結負責無障礙名稱 */
+/** 使用者頭像：使用者挑的角色放在黃色圓形裡；外層按鈕或連結負責無障礙名稱 */
 export function Avatar({ size }: { size: number }) {
   return (
-    <Image
-      src="/avatar.png"
-      alt=""
-      width={size}
-      height={size}
-      className="flex-none rounded-full border border-line"
-      style={{ width: size, height: size }}
-    />
+    <span className="flex flex-none items-end justify-center overflow-hidden rounded-full border-[2.5px] border-ink bg-brand" style={{ width: size, height: size }}>
+      <Mascot className="-mb-[18%] w-[118%] max-w-none flex-none" />
+    </span>
   );
 }
 
-/** 大金額：$ 縮成上標、數字細體；隱藏模式顯示 •••• */
-export function BigMoney({ value, className = '' }: { value: number; className?: string }) {
+/** 泡泡字 Logo：每個字母一個顏色、粗黑描邊、各自歪一點 */
+const LOGO: [string, string, number][] = [['M', 'var(--teal)', -6], ['O', 'var(--pink)', 4], ['N', 'var(--yellow)', -3], ['E', 'var(--green)', 5], ['E', 'var(--purple)', -4]];
+export function BubbleLogo({ className = '' }: { className?: string }) {
+  return (
+    <span aria-hidden className={`inline-flex leading-none ${className}`}>
+      {LOGO.map(([ch, color, deg], i) => (
+        <span key={i} className="fun-text inline-block" style={{ color, transform: `rotate(${deg}deg) translateY(${i % 2 ? -2 : 1}px)` }}>{ch}</span>
+      ))}
+    </span>
+  );
+}
+
+/** 大金額：$ 縮成上標；fun 是首頁今日卡片用的卡通大字（黃字黑描邊）；隱藏模式顯示 •••• */
+export function BigMoney({ value, className = '', fun = false }: { value: number; className?: string; fun?: boolean }) {
   const hidden = useHidden();
   const { sign, digits } = splitMoney(value, hidden);
   return (
-    <p className={`display m-0 ${className}`}>
+    <p className={`m-0 ${fun ? 'fun-text text-brand' : 'display'} ${className}`}>
       <small>$</small>{sign}{digits}
     </p>
   );
@@ -102,25 +109,24 @@ export function MonthSwitch({ month, onPrev, onNext, canPrev, canNext }: {
 }
 
 /**
- * 今日卡片外框：上半右上角是招牌黃圓塊與吉祥物，吉祥物底邊貼齊上下兩區的分隔線
- * （圖檔底部被切到，一定要貼齊分隔線，見 MASTER.md「吉祥物」）。
+ * 今日卡片：傾斜的藍綠色漫畫格，右上角是使用者挑的角色（表情跟著預算狀態），下半是白底的額度列。
+ * 藍綠底上放白字對比不夠，上半的字一律墨色（--text-2 也換成墨色）。tag 是裝飾用的塗鴉小字。
  */
-export function HeroCard({ labelledBy, top, bottom }: { labelledBy: string; top: ReactNode; bottom: ReactNode }) {
+export function HeroCard({ labelledBy, top, bottom, mood = 'ok', tag }: {
+  labelledBy: string;
+  top: ReactNode;
+  bottom: ReactNode;
+  mood?: Mood;
+  tag?: string;
+}) {
   return (
-    <section aria-labelledby={labelledBy} className="relative overflow-hidden rounded-xl border border-line bg-surface">
-      <div className="relative flex min-h-[152px] flex-col gap-1.5 px-5 pt-[22px] pb-[18px]">
-        <span aria-hidden className="absolute -top-[84px] -right-[90px] h-60 w-60 rounded-full bg-brand" />
-        <Image
-          src="/monee.png"
-          alt=""
-          width={124}
-          height={90}
-          priority
-          className="pointer-events-none absolute right-1.5 bottom-0 h-auto w-[124px] select-none"
-        />
-        <div className="relative flex flex-col gap-1.5 pr-[130px]">{top}</div>
+    <section aria-labelledby={labelledBy} className="sticker panel relative -rotate-[1.5deg] overflow-hidden bg-teal" style={{ '--text-2': 'var(--ink)' } as CSSProperties}>
+      <div className="relative flex min-h-[160px] flex-col gap-1.5 px-5 pt-5 pb-4">
+        <Mascot mood={mood} className="pointer-events-none absolute -top-1 -right-3 w-[128px] rotate-[8deg] select-none" />
+        {tag && <span aria-hidden className="tag-text absolute right-5 bottom-2 -rotate-6 text-[22px] text-pink">{tag}</span>}
+        <div className="relative flex flex-col gap-1.5 pr-[112px]">{top}</div>
       </div>
-      <div className="relative flex flex-col gap-3 border-t border-line bg-surface px-5 pt-4 pb-[18px]">{bottom}</div>
+      <div className="relative flex flex-col gap-3 border-t-[3px] border-ink bg-surface px-5 pt-4 pb-[18px]">{bottom}</div>
     </section>
   );
 }

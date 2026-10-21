@@ -59,7 +59,7 @@ export function SheetsExportRow() {
   return (
     <li className="flex flex-col gap-1 px-5 py-3">
       <div className="flex min-h-11 items-center gap-3.5">
-        <span aria-hidden className="ico sm"><SheetIcon size={16} strokeWidth={1.5} /></span>
+        <span aria-hidden className="ico sm" style={{ background: 'var(--green)' }}><SheetIcon size={16} strokeWidth={1.5} /></span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-body">匯出到 Google Sheets</span>
           <span className="caption leading-[1.6]" aria-live="polite">{status}</span>

@@ -56,8 +56,8 @@ export function SplitScreen() {
     <>
       {header}
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="flex flex-col gap-1 rounded-sm bg-cream px-3.5 py-3"><span className="caption">朋友欠你</span><span className="num text-[16px]">{money(totals.recv, hidden)}</span></div>
-        <div className="flex flex-col gap-1 rounded-sm bg-fill px-3.5 py-3"><span className="caption">你欠朋友</span><span className="num text-[16px]">{money(totals.pay, hidden)}</span></div>
+        <div className="sticker flex flex-col gap-1 rounded-sm border-[2.5px] border-ink bg-cream px-3.5 py-3 shadow-[var(--pop-sm)]"><span className="caption">朋友欠你</span><span className="num text-[16px]">{money(totals.recv, hidden)}</span></div>
+        <div className="sticker flex flex-col gap-1 rounded-sm border-[2.5px] border-ink bg-surface px-3.5 py-3 shadow-[var(--pop-sm)]"><span className="caption">你欠朋友</span><span className="num text-[16px]">{money(totals.pay, hidden)}</span></div>
       </div>
 
       <InboxBanner count={groups.reduce((s, g) => s + inboxCount(g), 0)} onOpen={() => openSheet({ kind: 'splitInbox' })} />
