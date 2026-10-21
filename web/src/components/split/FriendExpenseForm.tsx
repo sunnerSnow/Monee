@@ -170,7 +170,7 @@ export function FriendExpenseForm({ g, token, me, ownerName, onDone, onCancel }:
                   <span aria-hidden className={`av ${m.id === me.id ? 'me' : ''}`}>{initialOf(m.isMe ? ownerName : m.name)}</span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-body">
-                      {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}
+                      {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[12px] text-muted">付款</span>}
                     </span>
                     {on && foreign && <span className="num text-caption text-muted">≈ {formatMoney(amounts[m.id] ?? 0)}</span>}
                   </span>

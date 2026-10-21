@@ -301,7 +301,7 @@ function FriendAdded({ g, token, me, ownerName, nameOf, onNotify }: {
                     {shortDate(r.date)}・{mine ? '你' : nameOf(r.addedBy)}記的・{nameOf(r.payerId)}付 {amountText}
                   </span>
                 </span>
-                <span className={`flex-none rounded-full px-2 py-px text-[11px] ${r.state === 'rejected' ? 'bg-alert-tint text-alert' : r.state === 'waiting' ? 'bg-warn-tint text-warn-fg' : 'bg-fill text-muted'}`}>
+                <span className={`flex-none rounded-full px-2 py-px text-[12px] ${r.state === 'rejected' ? 'bg-alert-tint text-alert' : r.state === 'waiting' ? 'bg-warn-tint text-warn-fg' : 'bg-fill text-muted'}`}>
                   {status[r.state]}
                 </span>
               </div>

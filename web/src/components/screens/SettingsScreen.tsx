@@ -147,7 +147,7 @@ export function SettingsScreen() {
                 onChange={(e) => setBudgetInput(e.target.value.replace(/\D/g, ''))}
                 placeholder="例如 24000"
                 autoComplete="off"
-                className="display min-w-0 flex-1 bg-transparent text-[26px] outline-none"
+                className="display h-11 min-w-0 flex-1 bg-transparent text-[26px] outline-none"
               />
             </div>
             <button type="button" onClick={saveBudget} disabled={setBudget.isPending || !plan} className="btn-secondary press">
@@ -226,7 +226,7 @@ export function SettingsScreen() {
           <LogOut size={16} strokeWidth={1.5} aria-hidden />{signingOut ? '登出中…' : '登出'}
         </button>
       )}
-      <p className="caption text-center">Monee 0.1.0・Phase 1</p>
+      <p className="caption text-center">Monee 0.1.0・Phase 2</p>
     </>
   );
 }

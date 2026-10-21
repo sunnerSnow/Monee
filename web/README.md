@@ -153,4 +153,3 @@ supabase/migrations/    資料表、RLS、帳戶餘額 view
 ## 還沒做（依 monee_ux.md 路線圖）
 
 - Phase 3：Monee Invest 同步投資快照
-- 帳戶編輯／封存、帳戶排序

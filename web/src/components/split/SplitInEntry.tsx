@@ -2,25 +2,25 @@
 
 import { Plane, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCreateSplitGroup, useSplitGroups } from '@/lib/data';
 import { isSettled, parseMemberNames } from '@/lib/split';
 import type { Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
-import { EmptyBox } from '../ui';
+import { EmptyBox, SwitchRow } from '../ui';
 import { Field } from './parts';
 import { SplitExpenseForm, type SplitInitial } from './SplitExpenseForm';
 
 /** 記一筆的「分帳」開關 */
 export function SplitSwitch({ on, onChange, trip }: { on: boolean; onChange: (on: boolean) => void; trip?: string }) {
   return (
-    <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-1.5">
-      <span className="flex flex-col gap-0.5">
-        <span className="text-body">{trip ? `記到旅程・${trip}` : '分帳'}</span>
-        <span className="caption">{trip ? '旅程期間會自動記到這趟旅程；關掉就記成一般支出' : '跟朋友一起付的，只算你的部分'}</span>
-      </span>
-      <button type="button" role="switch" aria-checked={on} aria-label="分帳" data-split-switch onClick={() => onChange(!on)} className="switch" />
-    </div>
+    <SwitchRow
+      title={trip ? `記到旅程・${trip}` : '分帳'}
+      hint={trip ? '旅程期間會自動記到這趟旅程；關掉就記成一般支出' : '跟朋友一起付的，只算你的部分'}
+      checked={on}
+      onChange={onChange}
+      data-split-switch
+    />
   );
 }
 
@@ -34,6 +34,18 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
   const listed = groups.filter((g) => !g.archivedAt || g.id === defaultGroupId);
   const ordered = [...listed.filter((g) => !isSettled(g)), ...listed.filter(isSettled)];
   const [groupId, setGroupId] = useState<string | null>(defaultGroupId ?? null);
+  // 選好群組後收成一行，騰出位置給金額；還沒選（自己打開分帳）時先展開讓使用者挑
+  const [picking, setPicking] = useState(!defaultGroupId);
+  const picker = useRef<HTMLDivElement>(null);
+  const changeButton = useRef<HTMLButtonElement>(null);
+  const wasPicking = useRef(picking);
+  // 展開、收起時按的按鈕會消失，焦點移到選好的群組或「換群組」，鍵盤使用者才不會迷路（剛打開時不動焦點）
+  useEffect(() => {
+    if (wasPicking.current === picking) return;
+    wasPicking.current = picking;
+    if (picking) picker.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus();
+    else changeButton.current?.focus();
+  }, [picking]);
   const [quickOpen, setQuickOpen] = useState(false);
   const [names, setNames] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -54,6 +66,7 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
       });
       setGroupId(id);
       setQuickOpen(false);
+      setPicking(false);
       setNames('');
       setGroupName('');
       setError('');
@@ -65,22 +78,32 @@ export function SplitEntryPanel({ initial, onDone, defaultGroupId }: { initial: 
 
   return (
     <>
-      <Field label="跟誰分（選群組）">
-        <div role="group" aria-label="群組" className="pills flex-wrap">
-          {ordered.map((x) => (
-            <button key={x.id} type="button" aria-pressed={!showQuick && x.id === currentId} onClick={() => { setGroupId(x.id); setQuickOpen(false); }} className="pill press">
-              {x.name}
-            </button>
-          ))}
-          <button type="button" aria-pressed={showQuick} onClick={() => setQuickOpen(true)} className="pill press">
-            <Plus size={16} strokeWidth={1.5} aria-hidden />新群組
-          </button>
-          {/* 旅程要填日期、幣別，改開建立旅程的面板；建好會直接到旅程頁 */}
-          <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupKind: 'trip' })} aria-haspopup="dialog" className="pill press">
-            <Plane size={16} strokeWidth={1.5} aria-hidden />新旅程
-          </button>
+      {!picking && !showQuick && g ? (
+        <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg bg-fill px-4 py-2">
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="caption">跟誰分</span>
+            <span className="truncate text-body">{g.name}</span>
+          </span>
+          <button ref={changeButton} type="button" onClick={() => setPicking(true)} className="btn-secondary press flex-none">換群組</button>
         </div>
-      </Field>
+      ) : (
+        <Field label="跟誰分（選群組）">
+          <div ref={picker} role="group" aria-label="群組" className="pills flex-wrap">
+            {ordered.map((x) => (
+              <button key={x.id} type="button" aria-pressed={!showQuick && x.id === currentId} onClick={() => { setGroupId(x.id); setQuickOpen(false); setPicking(false); }} className="pill press">
+                {x.name}
+              </button>
+            ))}
+            <button type="button" aria-pressed={showQuick} onClick={() => setQuickOpen(true)} className="pill press">
+              <Plus size={16} strokeWidth={1.5} aria-hidden />新群組
+            </button>
+            {/* 旅程要填日期、幣別，改開建立旅程的面板；建好會直接到旅程頁 */}
+            <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupKind: 'trip' })} aria-haspopup="dialog" className="pill press">
+              <Plane size={16} strokeWidth={1.5} aria-hidden />新旅程
+            </button>
+          </div>
+        </Field>
+      )}
 
       {showQuick ? (
         <div className="card flex flex-col gap-3 p-4">

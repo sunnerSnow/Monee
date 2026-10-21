@@ -88,7 +88,7 @@ export function ReportsScreen() {
       </section>
 
       <section aria-labelledby="trend-title" className="card flex flex-col gap-4 p-5">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-col gap-1">
           <h2 id="trend-title" className="h-sec">每月支出<span className="en">Monthly</span></h2>
           {hasAnyBudget && <span className="caption">虛線＝當月預算{series.some((p) => p.value !== p.budgetValue) ? '（不含旅程）' : ''}</span>}
         </div>

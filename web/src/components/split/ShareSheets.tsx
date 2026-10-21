@@ -15,7 +15,7 @@ import { meOf, memberName, myShare, waitingClaims, waitingProposals } from '@/li
 import type { SplitClaim, SplitGroup, SplitProposal } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { SheetHeader } from '../Sheet';
-import { EmptyBox } from '../ui';
+import { EmptyBox, SwitchRow } from '../ui';
 import { EffectBox, Field, Pills, effectLines, payableAccounts, receivingAccounts, shortDate } from './parts';
 
 export const SHARE_TITLE_ID = 'split-sheet-title';
@@ -116,21 +116,13 @@ function ShareForm({ g, initial }: { g: SplitGroup; initial: { name: string; ban
               其他分享方式
             </button>
           )}
-          <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-2">
-            <span className="flex flex-col gap-0.5">
-              <span className="text-body">朋友可以新增花費</span>
-              <span className="caption leading-[1.7]">誰先付都能自己記；跟你有關的要你確認，朋友之間的直接記進群組</span>
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={g.allowFriendAdd}
-              aria-label="朋友可以新增花費"
-              onClick={() => run(() => friendAdd.mutateAsync({ groupId: g.id, allow: !g.allowFriendAdd }), g.allowFriendAdd ? '已關閉，朋友只能看帳、說已付款' : '已開放朋友新增花費')}
-              disabled={busy}
-              className="switch"
-            />
-          </div>
+          <SwitchRow
+            title="朋友可以新增花費"
+            hint="誰先付都能自己記；跟你有關的要你確認，朋友之間的直接記進群組"
+            checked={g.allowFriendAdd}
+            onChange={(allow) => run(() => friendAdd.mutateAsync({ groupId: g.id, allow }), allow ? '已開放朋友新增花費' : '已關閉，朋友只能看帳、說已付款')}
+            disabled={busy}
+          />
           <p className="flex items-start gap-2 px-1 text-caption leading-[1.7] text-muted">
             <Info size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 flex-none" />
             <span>朋友只看得到這個群組的花費與結算，看不到你的個人記帳。連結外流的話，重設後舊連結立刻失效。</span>

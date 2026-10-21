@@ -264,12 +264,6 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
         />
       )}
 
-      {currencyChoices.length > 1 && (
-        <Field label="幣別">
-          <Pills items={currencyChoices.map((c) => ({ id: c, label: `${getCurrency(c).name} ${c}` }))} value={currency} onPick={switchCurrency} label="幣別" />
-        </Field>
-      )}
-
       <Field label="金額" htmlFor="split-amount">
         <div className="flex items-baseline gap-1.5 border-b border-fg px-0.5 pb-2 focus-within:border-b-2 focus-within:pb-[7px]">
           <span className="display text-[22px]">{cur.symbol.trim()}</span>
@@ -295,7 +289,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
               onChange={(e) => setRateInput(e.target.value.replace(/[^\d.]/g, '').slice(0, 12))}
               placeholder={fx.isPending ? '載入中' : '輸入匯率'}
               autoComplete="off"
-              className="num h-9 w-24 rounded-xs border border-line bg-page px-2 text-right text-[14px] text-fg"
+              className="num h-11 w-24 rounded-xs border border-line bg-page px-2 text-right text-[14px] text-fg"
             />
             <span>元</span>
             <span className="w-full leading-[1.7]">
@@ -304,6 +298,12 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
           </div>
         )}
       </Field>
+
+      {currencyChoices.length > 1 && (
+        <Field label="幣別">
+          <Pills items={currencyChoices.map((c) => ({ id: c, label: `${getCurrency(c).name} ${c}` }))} value={currency} onPick={switchCurrency} label="幣別" />
+        </Field>
+      )}
 
       <Field label="品項與日期" htmlFor="split-title">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -341,7 +341,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
                       <MemberAvatar member={m} />
                       <span className="flex min-w-0 flex-col">
                         <span className="truncate text-body">
-                          {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}
+                          {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[12px] text-muted">付款</span>}
                         </span>
                         {foreign && on && <span className="num text-caption text-muted">≈ {formatMoney(amounts[m.id] ?? 0)}</span>}
                       </span>
@@ -358,7 +358,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
                       <span aria-hidden className={`check-btn ${on ? 'on' : ''}`}><Check size={18} strokeWidth={2} /></span>
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-body">
-                          {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}
+                          {name}{m.id === payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[12px] text-muted">付款</span>}
                         </span>
                         {on && (mode === 'shares' || foreign) && (
                           <span className="num text-caption text-muted">{mode === 'shares' ? shareText(m.id) : ''}{foreign ? `${mode === 'shares' ? '・' : ''}≈ ${formatMoney(amounts[m.id] ?? 0)}` : ''}</span>

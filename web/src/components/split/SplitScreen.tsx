@@ -75,12 +75,10 @@ export function SplitScreen() {
                 <span className="flex-none rounded-full bg-fill px-2.5 py-0.5 text-caption text-muted">{kindLabel(g)}</span>
               </span>
               <span className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <Avatars members={g.members} />
-                  <span className="caption truncate">{list.length ? `未結清 ${list.length} 筆・${money(total, hidden)}` : '還沒有花費'}</span>
-                </span>
+                <Avatars members={g.members} />
                 {!isEmptyGroup(g) && <OweText value={myNet(g)} hidden={hidden} />}
               </span>
+              <span className="caption -mt-1">{list.length ? `未結清 ${list.length} 筆・共 ${money(total, hidden)}` : '還沒有花費'}</span>
             </Link>
           );
         })}

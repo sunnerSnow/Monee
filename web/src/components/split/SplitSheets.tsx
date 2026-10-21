@@ -16,7 +16,7 @@ import type { SplitGroup, SplitKind } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { ReceiptView } from '../Receipt';
 import { Sheet, SheetHeader } from '../Sheet';
-import { EmptyBox } from '../ui';
+import { EmptyBox, SwitchRow } from '../ui';
 import { EffectBox, Field, MemberAvatar, Pills, effectLines, memberLabel, payableAccounts, receivingAccounts, shortDate } from './parts';
 import { RangeCalendar } from './RangeCalendar';
 import { InboxSheet, ShareSheet } from './ShareSheets';
@@ -131,7 +131,7 @@ function DetailSheet({ g, expenseId }: { g: SplitGroup; expenseId: string }) {
             <li key={m.id} className="flex min-h-14 items-center gap-3 border-t border-line px-4 py-1.5 first:border-t-0">
               <MemberAvatar member={m} />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-body">{memberLabel(m)}{m.id === e.payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[11px] text-muted">付款</span>}</span>
+                <span className="truncate text-body">{memberLabel(m)}{m.id === e.payerId && <span className="ml-1.5 rounded-full bg-fill px-2 py-px text-[12px] text-muted">付款</span>}</span>
                 {e.mode === 'shares' && <span className="num text-caption text-muted">{e.weights[m.id] ?? 0} 份</span>}
               </span>
               <span className="num flex-none text-body">{e.amounts[m.id] ? formatMoney(e.amounts[m.id]) : '不分'}</span>
@@ -436,13 +436,12 @@ function GroupForm({ groupId, initialKind }: { groupId?: string; initialKind?: S
               <input id="trip-budget" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="例如 30000" autoComplete="off" className="num h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none" />
             </div>
           </Field>
-          <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-2">
-            <span className="flex flex-col gap-0.5">
-              <span className="text-body">不算進每月預算</span>
-              <span className="caption leading-[1.7]">旅程花費另外看旅程預算，首頁的今日額度不受影響；報表的總支出照樣會算</span>
-            </span>
-            <button type="button" role="switch" aria-checked={exclude} aria-label="不算進每月預算" onClick={() => setExclude(!exclude)} className="switch" />
-          </div>
+          <SwitchRow
+            title="不算進每月預算"
+            hint="旅程花費另外看旅程預算，首頁的今日額度不受影響；報表的總支出照樣會算"
+            checked={exclude}
+            onChange={setExclude}
+          />
         </>
       )}
       <Field label={trip ? '一起去的朋友（一個人旅行就不用加）' : '成員（只要名字，不用帳號）'}>

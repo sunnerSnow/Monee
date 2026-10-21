@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
-import type { ReactNode } from 'react';
+import { useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { monthTitle } from '@/lib/dates';
 import { splitMoney } from '@/lib/money';
 import { useUi } from '@/lib/ui-store';
@@ -122,5 +122,36 @@ export function HeroCard({ labelledBy, top, bottom }: { labelledBy: string; top:
       </div>
       <div className="relative flex flex-col gap-3 border-t border-line bg-surface px-5 pt-4 pb-[18px]">{bottom}</div>
     </section>
+  );
+}
+
+/**
+ * 開關列：整列都能點（不只右邊的小開關），螢幕閱讀器唸標題當名稱、說明另外唸。
+ * 其他屬性（例如 data-split-switch）放在按鈕上。
+ */
+export function SwitchRow({ title, hint, checked, onChange, ...rest }: {
+  title: string;
+  hint: ReactNode;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange' | 'title'>) {
+  const id = useId();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={`${id}-title`}
+      aria-describedby={`${id}-hint`}
+      onClick={() => onChange(!checked)}
+      className="press flex min-h-14 w-full items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-2 text-left disabled:opacity-60"
+      {...rest}
+    >
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span id={`${id}-title`} className="text-body">{title}</span>
+        <span id={`${id}-hint`} className="caption leading-[1.7]">{hint}</span>
+      </span>
+      <span aria-hidden className="switch" />
+    </button>
   );
 }

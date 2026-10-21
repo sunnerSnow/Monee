@@ -389,7 +389,7 @@ function Settle({ g, net }: { g: SplitGroup; net: Record<string, number> }) {
               <li key={`${t.fromId}-${t.toId}`} className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-4 py-3">
                 <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-body-s">
                   {memberName(g, t.fromId)}<ArrowRight size={14} strokeWidth={1.5} aria-label="付給" className="text-muted" />{memberName(g, t.toId)}
-                  {claimed && <span className="rounded-full bg-warn-tint px-2 py-px text-[11px] text-warn-fg">說已付 {money(claimed.amount, hidden)}</span>}
+                  {claimed && <span className="rounded-full bg-warn-tint px-2 py-px text-[12px] text-warn-fg">說已付 {money(claimed.amount, hidden)}</span>}
                 </span>
                 <span className="num text-body">{money(t.amount, hidden)}</span>
                 <button

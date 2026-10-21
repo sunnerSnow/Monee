@@ -56,7 +56,7 @@ export function AssetsScreen() {
         <span aria-hidden className="ico"><Icon size={20} strokeWidth={1.5} /></span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-body">{a.name}</span>
-          <span className="truncate text-caption tracking-[.06em] text-muted">
+          <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">
             {a.type === 'INVESTMENT_MIRROR' ? (a.investmentSnapshot ? 'Monee Invest 同步' : '手動填寫・之後由 Monee Invest 同步') : `${a.type === 'CREDIT_CARD' ? '本期待繳・' : ''}${reconciledLabel(a)}`}
           </span>
         </span>
@@ -136,7 +136,7 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
               <Avatars members={g.members.filter((m) => !m.isMe)} max={3} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-body">{g.name}</span>
-                <span className="truncate text-caption tracking-[.06em] text-muted">{kindLabel(g)}・{g.members.length} 人</span>
+                <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">{kindLabel(g)}・{g.members.length} 人</span>
               </span>
               <OweText value={myNet(g)} hidden={hidden} empty={isEmptyGroup(g)} />
             </Link>
