@@ -233,7 +233,7 @@ export function SettingsScreen() {
         <div className="card flex flex-col gap-4 px-5 py-4">
           {seg(THEMES, theme, setTheme, '外觀')}
           <div className="flex flex-col gap-2 border-t border-dashed border-line-strong pt-4">
-            <span className="caption">角色（首頁、頭像都會換）</span>
+            <span className="caption">角色（首頁、頭像、App 圖示都會換）</span>
             <div role="group" aria-label="角色" className="grid grid-cols-3 gap-2">
               {MASCOTS.map((k) => (
                 <button key={k} type="button" aria-pressed={mascot === k} onClick={() => setMascot(k)} className="pill press h-auto flex-col justify-center gap-1 rounded-[var(--radius-md)] px-1 py-2.5">
@@ -241,6 +241,7 @@ export function SettingsScreen() {
                 </button>
               ))}
             </div>
+            <p className="caption leading-[1.7]">已經加到主畫面的 App，要先從主畫面刪掉，再重新「加入主畫面」，圖示才會換成新的角色。</p>
           </div>
         </div>
       </section>

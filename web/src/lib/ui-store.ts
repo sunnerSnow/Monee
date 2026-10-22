@@ -30,6 +30,20 @@ export const DEFAULT_THEME: ThemePref = 'dark';
 /** 狀態列的顏色跟著頁面底色（tokens.css 的 --bg） */
 const THEME_COLOR = { light: '#FFF3CF', dark: '#141416' };
 
+/**
+ * App 圖示換成這個角色：瀏覽器分頁的圖示、iPhone「加入主畫面」用的圖示、Android 安裝用的設定檔。
+ * 已經加到主畫面的圖示不會自己變（iPhone 是加入當下就存起來了），要刪掉再重新加入。layout.tsx 的 iconScript 在頁面一開始做一樣的事
+ */
+export function applyAppIcon(kind: MascotKind) {
+  const set = (id: string, href: string) => {
+    const link = document.getElementById(id) as HTMLLinkElement | null;
+    if (link) link.href = href;
+  };
+  set('app-icon', `/icons/${kind}-192.png`);
+  set('app-apple-icon', `/icons/${kind}-180.png`);
+  set('app-manifest', `/manifests/${kind}.webmanifest`);
+}
+
 export function applyTheme(pref: ThemePref) {
   const dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -98,6 +112,7 @@ export const useUi = create<UiState>((set, get) => ({
   setMascot: (mascot) => {
     set({ mascot });
     save(MASCOT_KEY, mascot);
+    applyAppIcon(mascot);
   },
   openSheet: (sheet) => set({ sheet }),
   closeSheet: () => set({ sheet: null }),

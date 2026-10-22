@@ -1,0 +1,16 @@
+{
+  "name": "Monee",
+  "short_name": "Monee",
+  "description": "可愛輕量、懂你金流的個人生活財務助理",
+  "lang": "zh-Hant",
+  "id": "/",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#141416",
+  "theme_color": "#141416",
+  "icons": [
+    { "src": "/icons/coin-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/coin-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/coin-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
