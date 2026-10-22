@@ -57,81 +57,43 @@ function Mouth({ mood, cx, y, w }: { mood: Mood; cx: number; y: number; w: numbe
   return null;
 }
 
-/** 黃色的手腳：先畫一條粗的墨線當外框，再疊黃色 */
-const Limb = ({ d }: { d: string }) => (
-  <>
-    <path d={d} fill="none" stroke={INK} strokeWidth={22} strokeLinecap="round" />
-    <path d={d} fill="none" stroke="#FDE021" strokeWidth={11} strokeLinecap="round" />
-  </>
-);
-
-/** 白手套 */
-const Glove = ({ x, y }: { x: number; y: number }) => <circle cx={x} cy={y} r={11} fill="#FFFFFF" stroke={INK} strokeWidth={5} />;
-
-/** 硬幣小子：圓滾滾的硬幣戴頭盔，豆豆眼加三根睫毛；手腳跟著心情擺 */
 function CoinKid({ mood }: { mood: Mood }) {
-  const leftUp = mood === 'yay';
-  const rightUp = mood === 'ok' || mood === 'yay';
   return (
     <>
-      <Limb d="M84 166 V180" />
-      <Limb d="M116 166 V180" />
-      <ellipse cx="82" cy="188" rx="16" ry="8" fill="#FFFFFF" stroke={INK} strokeWidth={5} />
-      <ellipse cx="118" cy="188" rx="16" ry="8" fill="#FFFFFF" stroke={INK} strokeWidth={5} />
-      <Limb d={leftUp ? 'M46 122 Q26 110 28 88' : 'M46 134 Q28 144 30 162'} />
-      <Glove x={leftUp ? 28 : 30} y={leftUp ? 84 : 166} />
-      <Limb d={rightUp ? 'M154 122 Q174 110 172 88' : 'M154 134 Q172 144 170 162'} />
-      <Glove x={rightUp ? 172 : 170} y={rightUp ? 84 : 166} />
       <g {...line}>
-        {/* 硬幣的厚度、正面 */}
-        <circle cx="106" cy="118" r="63" fill="#D99A00" />
-        <circle cx="100" cy="112" r="63" fill="#FDE021" />
+        {/* 反戴的帽簷（在頭後面）、硬幣的厚度、正面 */}
+        <path d="M58 74 C 36 58, 6 62, 10 82 C 14 96, 44 94, 62 86 Z" fill="#00747F" />
+        <circle cx="107" cy="118" r="64" fill="#D99A00" />
+        <circle cx="100" cy="112" r="64" fill="#FDE021" />
       </g>
-      <circle cx="100" cy="112" r="53" fill="none" stroke="#E9B800" strokeWidth={4} />
+      <circle cx="100" cy="112" r="51" fill="none" stroke="#E2B000" strokeWidth={5} strokeDasharray="0.1 10" strokeLinecap="round" />
       <g {...line}>
-        {/* 頭盔 */}
-        <path d="M42 96 C 42 32, 158 32, 158 96 Z" fill="#00A5B5" />
-        <path d="M100 38 C 84 52, 76 72, 75 95 M100 38 C 116 52, 124 72, 125 95" fill="none" strokeWidth={3.5} opacity={0.5} />
-        <circle cx="100" cy="36" r="7" fill="#00A5B5" />
-        <path d="M32 96 Q 100 80, 168 96 Q 172 110, 156 110 Q 100 100, 44 110 Q 28 110, 32 96 Z" fill="#00747F" />
+        <path d="M34 96 C 34 26, 166 26, 166 96 Z" fill="#00A5B5" />
+        <path d="M100 32 C 82 48, 72 70, 70 95 M100 32 C 118 48, 128 70, 130 95" fill="none" strokeWidth={3.5} opacity={0.55} />
+        <circle cx="100" cy="30" r="7" fill="#00A5B5" />
+        <path d="M82 96 A 18 16 0 0 1 118 96 Z" fill="#FDE021" strokeWidth={5} />
+        <path d="M80 88 H120" stroke="#FFFFFF" strokeWidth={5} />
+        {/* 墨鏡 */}
+        <path d="M48 104 H96 V114 C 96 128 86 134 72 134 C 56 134 48 124 48 112 Z" fill={INK} />
+        <path d="M104 104 H152 V112 C 152 124 144 134 128 134 C 114 134 104 128 104 114 Z" fill={INK} />
+        <path d="M94 106 H106" />
       </g>
-      {/* 頭盔側邊的 $ 布章 */}
-      <g transform="rotate(14 134 66)">
-        <circle cx="134" cy="66" r="12" fill="#FDE021" stroke={INK} strokeWidth={4.5} />
-        <path d="M138.5 60.5 C 133 57, 128 60.5, 131.5 65 C 135 68.5, 138.5 72, 129.5 72" fill="none" stroke={INK} strokeWidth={3.2} strokeLinecap="round" />
-        <path d="M134 56 V76" stroke={INK} strokeWidth={2.8} strokeLinecap="round" />
+      <path d="M58 112 L72 112 M120 112 L134 112" stroke="#FFFFFF" strokeWidth={4} strokeLinecap="round" />
+      <circle cx="52" cy="144" r="8" fill="#FF8FB8" />
+      <circle cx="150" cy="144" r="8" fill="#FF8FB8" />
+      {mood === 'ok' ? (
+        <>
+          <path d="M72 146 C 84 170, 122 170, 134 144 Z" fill="#FFFFFF" stroke={INK} strokeWidth={5.5} strokeLinejoin="round" />
+          <path d="M74 150 H131" stroke={INK} strokeWidth={3} />
+          <rect x="104" y="149.5" width="9" height="9" fill={INK} />
+        </>
+      ) : <Mouth mood={mood} cx={103} y={146} w={58} />}
+      {/* 帽子側邊的 $ 布章 */}
+      <g transform="rotate(14 136 62)">
+        <circle cx="136" cy="62" r="13" fill="#FDE021" stroke={INK} strokeWidth={4.5} />
+        <path d="M141 56 C 135 52, 129 56, 133 61 C 137 65, 141 69, 131 69" fill="none" stroke={INK} strokeWidth={3.5} strokeLinecap="round" />
+        <path d="M136 51 V73" stroke={INK} strokeWidth={3} strokeLinecap="round" />
       </g>
-      <circle cx="63" cy="146" r="7.5" fill="#FF8FB8" />
-      <circle cx="137" cy="146" r="7.5" fill="#FF8FB8" />
-      {/* 眼睛：剛好、快用完了是豆豆眼加睫毛；超支換成皺眉、掉眼淚；慶祝笑瞇瞇 */}
-      {mood === 'over' ? (
-        <>
-          <path d="M66 114 L90 121 M134 114 L110 121" stroke={INK} strokeWidth={5} strokeLinecap="round" />
-          <circle cx="80" cy="131" r="5.5" fill={INK} />
-          <circle cx="120" cy="131" r="5.5" fill={INK} />
-          <path d="M78 141 Q 80 150, 78 158 M122 141 Q 120 150, 122 158" fill="none" stroke="#8FDBFF" strokeWidth={5} strokeLinecap="round" />
-        </>
-      ) : mood === 'yay' ? (
-        <path d="M71 131 Q 80 118, 89 131 M111 131 Q 120 118, 129 131" fill="none" stroke={INK} strokeWidth={5.5} strokeLinecap="round" />
-      ) : (
-        <>
-          <path d="M71 115 L67 109 M80 112 V105 M89 115 L93 109 M111 115 L107 109 M120 112 V105 M129 115 L133 109" stroke={INK} strokeWidth={4} strokeLinecap="round" />
-          <ellipse cx="80" cy="128" rx="6" ry="8.5" fill={INK} />
-          <ellipse cx="120" cy="128" rx="6" ry="8.5" fill={INK} />
-          <circle cx="82" cy="124" r="2" fill="#FFFFFF" />
-          <circle cx="122" cy="124" r="2" fill="#FFFFFF" />
-        </>
-      )}
-      <path d="M94 141 Q 100 137, 106 141 Q 103 148, 100 148 Q 97 148, 94 141 Z" fill={INK} />
-      {mood === 'ok' && <path d="M88 155 Q 100 167, 112 155" fill="none" stroke={INK} strokeWidth={5} strokeLinecap="round" />}
-      {mood === 'tight' && <path d="M84 159 Q 90 153, 96 159 Q 102 165, 108 159 Q 114 153, 118 158" fill="none" stroke={INK} strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />}
-      {mood === 'over' && <ellipse cx="100" cy="161" rx="8" ry="9" fill={INK} />}
-      {mood === 'yay' && (
-        <>
-          <path d="M84 153 Q 100 181, 116 153 Z" fill={INK} stroke={INK} strokeWidth={4} strokeLinejoin="round" />
-          <path d="M91 164 Q 100 159, 109 164 Q 105 171, 100 171 Q 95 171, 91 164 Z" fill="#FF3A81" />
-        </>
-      )}
     </>
   );
 }
