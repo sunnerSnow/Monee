@@ -21,6 +21,24 @@ Monee 是給自己用的手機記帳網頁：說一句話或拍張收據就能�
 
 > 截圖來自示範模式（`npm run dev:demo`），預設深色；角色、深淺色在「我的 → 外觀」切換。
 
+## 主題公仔：記帳戰隊 MONEE KEEPERS
+
+參考 [kumaweb-coding.jp](https://kumaweb-coding.jp/) 的「除蟲戰隊」風格設計的主題公仔：白色頭盔加紅色 M 記號是戰隊制服，一起對抗偷偷吃掉錢的亂花錢蟲。完整的設計稿（主視覺、隊員介紹、表情、敵人與 App 應用）在 [`monee-keepers.html`](monee-keepers.html)，下載後直接用瀏覽器打開。
+
+<table>
+  <tr>
+    <td align="center" width="14%"><img src="docs/mascots/boss.png" width="96" alt="錢錢老大"><br><b>錢錢老大</b><br>隊長</td>
+    <td align="center" width="14%"><img src="docs/mascots/coin-kid.png" width="96" alt="硬幣小子"><br><b>硬幣小子</b><br>記帳</td>
+    <td align="center" width="14%"><img src="docs/mascots/wallet-bro.png" width="96" alt="錢包兄弟"><br><b>錢包兄弟</b><br>預算</td>
+    <td align="center" width="14%"><img src="docs/mascots/piggy.png" width="96" alt="豬撲滿"><br><b>豬撲滿</b><br>存錢</td>
+    <td align="center" width="14%"><img src="docs/mascots/receipt.png" width="96" alt="收據妹"><br><b>收據妹</b><br>收據</td>
+    <td align="center" width="14%"><img src="docs/mascots/card.png" width="96" alt="卡卡"><br><b>卡卡</b><br>帳戶</td>
+    <td align="center" width="14%"><img src="docs/mascots/bug.png" width="96" alt="亂花錢蟲"><br><b>亂花錢蟲</b><br>敵人</td>
+  </tr>
+</table>
+
+> App 裡目前用的是硬幣小子、錢包兄弟、豬撲滿原本的街頭貼紙造型；這組是另外的主題設計。頭像原圖（512×512）在 `docs/mascots/`。
+
 ## 功能
 
 - **記帳**：手動輸入、說一句（「午餐拉麵 260 刷國泰」）、拍收據；AI（Gemini）只整理成草稿，確認後才記下。收據照片會留著，之後點那筆就看得到。
@@ -63,7 +81,9 @@ monee_ux.md             產品與 UX 規格、路線圖
 prototype/              互動原型（首頁、分帳）
 monee-home*.html        首頁設計稿（monee-home-pop.html 是現在的街頭貼紙版）
 monee-mascot.html       三個角色的設計稿
+monee-keepers.html      主題公仔設計稿：記帳戰隊 MONEE KEEPERS（主視覺、隊員介紹、表情與 App 應用）
 docs/screenshots/       README 的畫面截圖
+docs/mascots/           主題公仔的頭像（512×512，圓形）
 ```
 
 ## 文件
