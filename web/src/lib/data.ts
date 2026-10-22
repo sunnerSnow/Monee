@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/
 import { useEffect } from 'react';
 import { prepareRestore, type Backup } from './backup';
 import type { Frequency, RecurringRule } from './recurring';
+import type { SavingsDeposit, SavingsGoal } from './goals';
 import type { SyncResult } from './server/google-sync';
 import type { Activity } from './streak';
 import { reconcileDiff } from './budget';
@@ -34,6 +35,8 @@ const keys = {
   // 放在 transactions 底下：記帳、改帳、刪帳讓交易重新讀時，這個也會跟著重新讀
   activity: ['transactions', 'activity'],
   google: ['google'],
+  // 存入紀錄放在 goals 底下：存入、拿出來時目標和紀錄一起重新讀
+  goals: ['goals'],
 } satisfies Record<string, QueryKey>;
 
 interface AccountRow {
@@ -456,6 +459,114 @@ export function useMarkNoSpend() {
       });
     },
     onError: () => queryClient.invalidateQueries({ queryKey: keys.activity }),
+  });
+}
+
+// ---------- 存錢目標 ----------
+// 存入只記在目標底下，不動帳戶餘額、不算支出；存了多少由 savings_goal_totals 加總
+
+interface GoalRow {
+  id: string; name: string; target: number | string; deadline: string | null; icon: string; pinned: boolean; archived: boolean;
+  created_at: string; saved: number | string;
+}
+const toGoal = (r: GoalRow): SavingsGoal => ({
+  id: r.id, name: r.name, target: Number(r.target), deadline: r.deadline, icon: r.icon, pinned: r.pinned, archived: r.archived,
+  createdAt: r.created_at, saved: Number(r.saved),
+});
+
+export function useGoals() {
+  return useQuery({
+    queryKey: keys.goals,
+    queryFn: async (): Promise<SavingsGoal[]> => {
+      if (isDemo) return demo.goals();
+      const rows = await unwrap<GoalRow[]>(createClient().from('savings_goal_totals').select('*').order('created_at'));
+      return rows.map(toGoal);
+    },
+  });
+}
+
+export type GoalInput = Pick<SavingsGoal, 'name' | 'target' | 'deadline' | 'icon' | 'archived'> & { id?: string };
+
+/** 新增或修改目標；回傳 id */
+export function useSaveGoal() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (g: GoalInput): Promise<string> => {
+      if (isDemo) return demo.saveGoal(g);
+      const row = { name: g.name, target: g.target, deadline: g.deadline, icon: g.icon, archived: g.archived };
+      const supabase = createClient();
+      if (g.id) {
+        const rows = await unwrap<{ id: string }[]>(supabase.from('savings_goals').update(row).eq('id', g.id).select('id'));
+        if (!rows.length) throw new Error('找不到這個目標，可能已經刪除');
+        return g.id;
+      }
+      return (await unwrap<{ id: string }>(supabase.from('savings_goals').insert(row).select('id').single())).id;
+    },
+    onSuccess: () => invalidate(keys.goals),
+  });
+}
+
+/** 釘選在首頁（一次一個）；null 是都不釘 */
+export function usePinGoal() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string | null) => {
+      if (isDemo) return demo.pinGoal(id);
+      await rpc('savings_pin', { p_goal: id });
+    },
+    onSuccess: () => invalidate(keys.goals),
+  });
+}
+
+/** 刪掉目標，存入紀錄一起刪 */
+export function useDeleteGoal() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemo) return demo.deleteGoal(id);
+      const rows = await unwrap<{ id: string }[]>(createClient().from('savings_goals').delete().eq('id', id).select('id'));
+      if (!rows.length) throw new Error('找不到這個目標，可能已經刪除');
+    },
+    onSuccess: () => invalidate(keys.goals),
+  });
+}
+
+/** 一個目標的存入紀錄，新的在前 */
+export function useGoalDeposits(goalId: string | null) {
+  return useQuery({
+    queryKey: [...keys.goals, 'deposits', goalId],
+    enabled: Boolean(goalId),
+    queryFn: async (): Promise<SavingsDeposit[]> => {
+      if (isDemo) return demo.goalDeposits(goalId!);
+      const rows = await unwrap<{ id: string; goal_id: string; amount: number | string; date: string; note: string | null; created_at: string }[]>(
+        createClient().from('savings_deposits').select('id, goal_id, amount, date, note, created_at').eq('goal_id', goalId!)
+          .order('date', { ascending: false }).order('created_at', { ascending: false }),
+      );
+      return rows.map((r) => ({ id: r.id, goalId: r.goal_id, amount: Number(r.amount), date: r.date, note: r.note, createdAt: r.created_at }));
+    },
+  });
+}
+
+/** 存入（amount 正的）或拿出來（負的） */
+export function useAddDeposit() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (d: Pick<SavingsDeposit, 'goalId' | 'amount' | 'date' | 'note'>) => {
+      if (isDemo) return demo.addDeposit(d);
+      await unwrap(createClient().from('savings_deposits').insert({ goal_id: d.goalId, amount: d.amount, date: d.date, note: d.note }));
+    },
+    onSuccess: () => invalidate(keys.goals),
+  });
+}
+
+export function useDeleteDeposit() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemo) return demo.deleteDeposit(id);
+      await unwrap(createClient().from('savings_deposits').delete().eq('id', id));
+    },
+    onSuccess: () => invalidate(keys.goals),
   });
 }
 

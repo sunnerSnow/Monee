@@ -2,6 +2,8 @@
 // 用途：還沒建 Supabase 專案時先試用、截圖檢查畫面。重新整理頁面就會回到初始資料。
 import { reconcileDiff } from './budget';
 import type { RecurringRule } from './recurring';
+import type { GoalInput } from './data';
+import type { SavingsDeposit, SavingsGoal } from './goals';
 import type { Activity } from './streak';
 import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, type CategoryRow, type ManagedType } from './categories';
@@ -94,7 +96,25 @@ function seed() {
   ];
   // 無消費日：前 7 天、前 9 天按了「今天沒花錢」，連同上面的帳和旅程的花費連續 12 天
   const noSpend = [day(7), day(9)];
-  return { accounts, txs, budgets, categories, recurring, noSpend, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
+  // 存錢目標：日本旅行（五個月後，存了一部分）、緊急預備金（沒有日期）、新耳機（已經存到了）
+  const goals: Omit<SavingsGoal, 'saved'>[] = [
+    { id: 'goal-japan', name: '明年日本賞櫻', target: 60000, deadline: `${shiftMonth(current, 5)}-01`, icon: 'plane', pinned: false, archived: false, createdAt: `${shiftMonth(current, -2)}-03T00:00:00Z` },
+    { id: 'goal-fund', name: '緊急預備金', target: 100000, deadline: null, icon: 'shield', pinned: false, archived: false, createdAt: `${shiftMonth(current, -4)}-01T00:00:00Z` },
+    { id: 'goal-phones', name: '新耳機', target: 8990, deadline: null, icon: 'headphones', pinned: false, archived: false, createdAt: `${shiftMonth(current, -1)}-10T00:00:00Z` },
+  ];
+  const dep = (goalId: string, amount: number, date: string, note: string | null = null): SavingsDeposit =>
+    ({ id: id('d'), goalId, amount, date, note, createdAt: `${date}T12:00:00Z` });
+  const deposits: SavingsDeposit[] = [
+    dep('goal-japan', 10000, `${shiftMonth(current, -2)}-05`, '薪水先存'),
+    dep('goal-japan', 8000, `${shiftMonth(current, -1)}-05`, '薪水先存'),
+    dep('goal-japan', -1500, `${shiftMonth(current, -1)}-20`, '先拿去繳費'),
+    dep('goal-japan', 7000, day(17), '薪水先存'),
+    dep('goal-fund', 20000, `${shiftMonth(current, -4)}-05`),
+    dep('goal-fund', 20000, `${shiftMonth(current, -2)}-05`),
+    dep('goal-phones', 5000, `${shiftMonth(current, -1)}-12`),
+    dep('goal-phones', 3990, day(4), '年終獎金'),
+  ];
+  return { accounts, txs, budgets, categories, recurring, noSpend, goals, deposits, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
 }
 
 type Store = ReturnType<typeof seed>;
@@ -155,6 +175,47 @@ export const demo = {
     }));
     r.nextDate = next;
     return true;
+  },
+  async goals(): Promise<SavingsGoal[]> {
+    await pause();
+    const s = db();
+    return s.goals.map((g) => ({ ...g, saved: s.deposits.filter((d) => d.goalId === g.id).reduce((n, d) => n + d.amount, 0) }));
+  },
+  async saveGoal(g: GoalInput) {
+    await pause();
+    const s = db();
+    const existing = s.goals.find((x) => x.id === g.id);
+    if (existing) {
+      Object.assign(existing, { name: g.name, target: g.target, deadline: g.deadline, icon: g.icon, archived: g.archived });
+      return existing.id;
+    }
+    const goal = { id: id('goal'), name: g.name, target: g.target, deadline: g.deadline, icon: g.icon, pinned: false, archived: g.archived, createdAt: new Date().toISOString() };
+    s.goals.push(goal);
+    return goal.id;
+  },
+  async pinGoal(goalId: string | null) {
+    await pause();
+    db().goals.forEach((g) => { g.pinned = g.id === goalId; });
+  },
+  async deleteGoal(goalId: string) {
+    await pause();
+    const s = db();
+    s.goals = s.goals.filter((g) => g.id !== goalId);
+    s.deposits = s.deposits.filter((d) => d.goalId !== goalId);
+  },
+  async goalDeposits(goalId: string): Promise<SavingsDeposit[]> {
+    await pause();
+    return db().deposits.filter((d) => d.goalId === goalId)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)).map((d) => ({ ...d }));
+  },
+  async addDeposit(d: Pick<SavingsDeposit, 'goalId' | 'amount' | 'date' | 'note'>) {
+    await pause();
+    db().deposits.push({ ...d, id: id('d'), createdAt: new Date().toISOString() });
+  },
+  async deleteDeposit(depositId: string) {
+    await pause();
+    const s = db();
+    s.deposits = s.deposits.filter((d) => d.id !== depositId);
   },
   async activity(): Promise<Activity> {
     await pause();

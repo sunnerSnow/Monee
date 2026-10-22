@@ -7,11 +7,11 @@ export const BACKUP_VERSION = 1;
 
 /** 備份檔裡的資料表 */
 export const BACKUP_TABLES = [
-  'categories', 'accounts', 'recurring_rules', 'budget_history', 'no_spend_days', 'split_groups', 'split_members', 'split_rounds',
+  'categories', 'accounts', 'recurring_rules', 'budget_history', 'no_spend_days', 'savings_goals', 'savings_deposits', 'split_groups', 'split_members', 'split_rounds',
   'split_expenses', 'split_settlements', 'split_claims', 'split_proposals', 'transactions',
 ] as const;
-/** 舊版的備份檔沒有這些表（分類管理、固定收支、無消費日之前備份的） */
-const OPTIONAL_TABLES = new Set<string>(['categories', 'recurring_rules', 'no_spend_days']);
+/** 舊版的備份檔沒有這些表（分類管理、固定收支、無消費日、存錢目標之前備份的） */
+const OPTIONAL_TABLES = new Set<string>(['categories', 'recurring_rules', 'no_spend_days', 'savings_goals', 'savings_deposits']);
 /** id 是每個人自己的（分類 id 像 food、c_xxx，預算紀錄用月份，無消費日用日期），換帳號還原時不用換 */
 const OWN_KEY_TABLES = new Set<string>(['categories', 'budget_history', 'no_spend_days']);
 /** 沒有 id 欄位的表 */

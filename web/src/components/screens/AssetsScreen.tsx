@@ -9,6 +9,7 @@ import { formatMoney, money, signedBalance } from '@/lib/money';
 import { ACCOUNT_COLORS } from '@/lib/palette';
 import type { Account, PnlColor, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
+import { GoalsSection } from '../Goals';
 import { Avatars, OweText, kindLabel } from '../split/parts';
 import { BigMoney, EmptyBox, ErrorBox, LoadingBlocks, PageHeader, useHidden } from '../ui';
 
@@ -107,6 +108,7 @@ export function AssetsScreen() {
           </div>
         </div>
       </section>
+      <GoalsSection />
       {group('g-liquid', '現金與銀行', s.liquid, s.liquidSum)}
       {group('g-cards', '信用卡待繳', s.cards, s.cardSum)}
       {group('g-invest', '投資帳戶', s.investments, s.investSum)}

@@ -9,6 +9,8 @@ const ME = 'cccccccc-0000-4000-8000-000000000001';
 const MING = 'cccccccc-0000-4000-8000-000000000002';
 const EXPENSE = 'dddddddd-0000-4000-8000-000000000001';
 const RULE = 'ffffffff-0000-4000-8000-000000000001';
+const GOAL = 'eeeeeeee-0000-4000-8000-000000000001';
+const DEPOSIT = 'eeeeeeee-0000-4000-8000-000000000002';
 
 const backup = (): Backup => ({
   format: 'monee-backup',
@@ -24,6 +26,8 @@ const backup = (): Backup => ({
   ],
   budget_history: [{ effective_month: '2026-10', amount: 24000 }],
   no_spend_days: [{ date: '2026-10-20' }],
+  savings_goals: [{ id: GOAL, name: '日本旅行', target: 60000, deadline: null, icon: 'plane', pinned: false, archived: false }],
+  savings_deposits: [{ id: DEPOSIT, goal_id: GOAL, amount: 5000, date: '2026-10-01', note: null }],
   split_groups: [{ id: GROUP, name: '東京', kind: 'trip', share_token: '1520ca1d360661688f6fff7c' }],
   split_members: [
     { id: ME, group_id: GROUP, name: '我', is_me: true },
@@ -67,6 +71,12 @@ describe('parseBackup', () => {
 
   it('固定收支之前的備份檔沒有固定收支，當成沒有', () => {
     expect(parseBackup(JSON.stringify({ ...backup(), recurring_rules: undefined })).recurring_rules).toEqual([]);
+  });
+
+  it('存錢目標之前的備份檔沒有存錢目標，當成沒有', () => {
+    const b = parseBackup(JSON.stringify({ ...backup(), savings_goals: undefined, savings_deposits: undefined }));
+    expect(b.savings_goals).toEqual([]);
+    expect(b.savings_deposits).toEqual([]);
   });
 
   it('無消費日之前的備份檔沒有無消費日，當成沒有', () => {
@@ -116,6 +126,12 @@ describe('prepareRestore', () => {
     expect(expense).toMatchObject({ payer_id: me, account_id: cash, weights: { [me]: 1, [ming]: 1 }, amounts: { [me]: 450, [ming]: 450 } });
     expect(out.transactions[0]).toMatchObject({ source_account_id: cash, split_expense_id: expense.id });
     expect(out.owner).toBe('other-user');
+  });
+
+  it('別的帳號：存錢目標的 id 換掉，存入紀錄跟著換', () => {
+    const out = prepareRestore(backup(), 'other-user', newId);
+    expect(out.savings_goals[0].id).not.toBe(GOAL);
+    expect(out.savings_deposits[0].goal_id).toBe(out.savings_goals[0].id);
   });
 
   it('別的帳號：固定收支的 id、帳戶，和交易記著的 recurring_id 一起換', () => {
