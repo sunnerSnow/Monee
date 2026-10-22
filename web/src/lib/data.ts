@@ -474,6 +474,8 @@ export interface GoogleStatus {
   failed: number;
   /** Drive 上的 Monee 資料夾；還沒同步過是 null */
   rootFolderId: string | null;
+  /** 建好的年度帳本，新的年份在前 */
+  workbooks: { year: number; id: string }[];
 }
 
 /** 沒連結是 null */
@@ -487,13 +489,15 @@ export function useGoogleStatus() {
         google_email: string | null; connected_at: string; needs_reconnect: boolean; last_synced_at: string | null; last_error: string | null;
       } | null>(supabase.from('google_integrations').select('google_email, connected_at, needs_reconnect, last_synced_at, last_error').maybeSingle());
       if (!row) return null;
-      const [months, root] = await Promise.all([
+      const [months, root, books] = await Promise.all([
         unwrap<{ attempts: number }[]>(supabase.from('google_sync_months').select('attempts')),
         unwrap<{ folder_id: string } | null>(supabase.from('drive_folders').select('folder_id').eq('path', '').maybeSingle()),
+        unwrap<{ year: number; spreadsheet_id: string }[]>(supabase.from('annual_workbooks').select('year, spreadsheet_id').order('year', { ascending: false })),
       ]);
       return {
         email: row.google_email, connectedAt: row.connected_at, needsReconnect: row.needs_reconnect, lastSyncedAt: row.last_synced_at,
         lastError: row.last_error, pending: months.length, failed: months.filter((m) => m.attempts > 0).length, rootFolderId: root?.folder_id ?? null,
+        workbooks: books.map((b) => ({ year: b.year, id: b.spreadsheet_id })),
       };
     },
   });

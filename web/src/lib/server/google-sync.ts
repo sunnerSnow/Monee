@@ -1,10 +1,16 @@
-// Google 雲端同步（只在伺服器用）：把待同步的月份一個一個做完。目前做收據（放進 Drive 的 Monee/年/月）；年度帳本在下一階段接上。
+// Google 雲端同步（只在伺服器用）：把待同步的月份一個一個做完——收據放進 Drive 的 Monee/年/月，再把那個月整個重寫進年度帳本。
 // 一次最多跑 BUDGET_MS，做不完的月份留著下次接著做（已經上傳的有記錄，不會重複）；某個月失敗就記下原因，其他月份照做。
 // 自動同步不再碰失敗 5 次以上的月份，按「立即同步」（force）才再試。
+import {
+  ALL_SHEETS, categoryWriteRequests, monthRows, monthSheet, monthWriteRequests, newWorkbookRequests, repairRequests, SHEET_IDS, workbookName,
+  type LedgerTx,
+} from '@/lib/annual-ledger';
 import { mergeCategories, type CategoryRow } from '@/lib/categories';
 import { MIME, extensionOf, monthFolder, planMonthReceipts, receiptFileName, type DriveReceipt, type ReceiptRef } from '@/lib/drive-receipts';
 import type { createClient } from '@/lib/supabase/server';
-import { createFolder, driveAlive, GoogleApiError, GoogleNotFound, trashFile, updateFile, uploadFile } from './google-api';
+import {
+  createFolder, createSpreadsheet, driveAlive, GoogleApiError, GoogleNotFound, sheetProps, sheetsBatch, trashFile, updateFile, uploadFile,
+} from './google-api';
 import { accessToken, googleConfig, GoogleReconnectError } from './google-oauth';
 import { decryptToken } from './token-crypto';
 
@@ -37,11 +43,30 @@ const nextMonth = (month: string) => {
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 };
 
+interface Workbook {
+  id: string;
+  /** 工作表 id → 目前有幾列（不夠時要先加列） */
+  rowCounts: Map<number, number>;
+}
+
 class Run {
-  /** 這次已經確認過還在的資料夾 */
+  /** 這次已經確認過還在的資料夾、年度帳本 */
   readonly folders = new Map<string, string>();
+  readonly workbooks = new Map<number, Workbook>();
+  accounts: Map<string, string> | null = null;
   readonly started = Date.now();
-  constructor(readonly db: Db, readonly userId: string, readonly token: string, readonly names: Map<string, string>) {}
+  /** 帳本「最後更新時間」欄：台灣時間 2026-10-22 11:05 */
+  readonly syncedAt = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date());
+  readonly names: Map<string, string>;
+  readonly expenseNames: string[];
+  readonly incomeNames: string[];
+  constructor(readonly db: Db, readonly userId: string, readonly token: string, categories: ReturnType<typeof mergeCategories>) {
+    this.names = new Map(categories.map((c) => [c.id, c.name]));
+    this.expenseNames = categories.filter((c) => c.type === 'EXPENSE').map((c) => c.name);
+    this.incomeNames = categories.filter((c) => c.type === 'INCOME').map((c) => c.name);
+  }
   get overBudget() {
     return Date.now() - this.started > BUDGET_MS;
   }
@@ -78,7 +103,7 @@ export async function runSync(db: Db, userId: string, opts: { force?: boolean } 
     const categories = (await rows<(Omit<CategoryRow, 'sortOrder'> & { sort_order: number })[]>(
       db.from('categories').select('id, type, name, icon, sort_order, hidden'),
     )).map(({ sort_order, ...c }) => ({ ...c, sortOrder: sort_order }));
-    const run = new Run(db, userId, token, new Map(mergeCategories(categories).map((c) => [c.id, c.name])));
+    const run = new Run(db, userId, token, mergeCategories(categories));
 
     for (const m of months) {
       if (run.overBudget) {
@@ -107,7 +132,7 @@ export async function runSync(db: Db, userId: string, opts: { force?: boolean } 
   return { status: more ? 'more' : 'done', months: done };
 }
 
-/** 一個月：收據（第 3 階段再加上重寫帳本）。時間不夠做完就回傳 false */
+/** 一個月：收據放進 Drive，再重寫年度帳本裡的這個月。時間不夠做完就回傳 false（下次接著做） */
 async function syncMonth(run: Run, month: string): Promise<boolean> {
   const from = `${month}-01`;
   const to = `${nextMonth(month)}-01`;
@@ -160,7 +185,99 @@ async function syncMonth(run: Run, month: string): Promise<boolean> {
       await run.db.from('drive_receipts').delete().eq('source_path', orphan.sourcePath);
     }
   }
+  if (run.overBudget) return false;
+  await writeLedgerMonth(run, month, from, to);
   return true;
+}
+
+// ---------- 年度帳本 ----------
+
+interface LedgerDbRow {
+  id: string; date: string; time: string | null; type: 'EXPENSE' | 'INCOME'; amount: number | string; category_id: string;
+  source_account_id: string; note: string | null; created_at: string; currency: string | null; original_amount: number | string | null;
+  receipt_image_url: string | null;
+  split_expense: { receipt_path: string | null; group: { name: string; kind: string } | null } | null;
+}
+
+/** 把這個月的收入、支出整個寫進帳本（轉帳不寫）；收據欄連到 Drive 上的那張 */
+async function writeLedgerMonth(run: Run, month: string, from: string, to: string) {
+  const year = Number(month.slice(0, 4));
+  const txs = await rows<LedgerDbRow[]>(run.db.from('transactions')
+    .select('id, date, time, type, amount, category_id, source_account_id, note, created_at, currency, original_amount, receipt_image_url, split_expense:split_expenses(receipt_path, group:split_groups(name, kind))')
+    .gte('date', from).lt('date', to).in('type', ['EXPENSE', 'INCOME']));
+  // 這一年還沒有帳本、這個月也沒有收支（例如只有轉帳）：不用為了它建帳本
+  if (!txs.length && !(await savedWorkbook(run, year))) return;
+  const book = await ensureWorkbook(run, year);
+
+  run.accounts ??= new Map((await rows<{ id: string; name: string }[]>(run.db.from('accounts').select('id, name'))).map((a) => [a.id, a.name]));
+  const receiptOf = (t: LedgerDbRow) => t.receipt_image_url ?? t.split_expense?.receipt_path ?? null;
+  const paths = txs.map(receiptOf).filter((p): p is string => Boolean(p));
+  const links = new Map((paths.length
+    ? await rows<{ source_path: string; drive_file_id: string; web_view_link: string | null }[]>(
+      run.db.from('drive_receipts').select('source_path, drive_file_id, web_view_link').in('source_path', paths),
+    )
+    : []).map((r) => [r.source_path, r.web_view_link ?? `https://drive.google.com/file/d/${r.drive_file_id}/view`]));
+
+  const ledger: LedgerTx[] = txs.map((t) => {
+    const group = t.split_expense?.group ?? null;
+    const receipt = receiptOf(t);
+    return {
+      id: t.id, date: t.date, time: t.time ? t.time.slice(0, 5) : null, type: t.type, amount: Number(t.amount),
+      categoryName: run.names.get(t.category_id) ?? t.category_id, accountName: run.accounts!.get(t.source_account_id) ?? null, note: t.note,
+      groupName: group?.name ?? null, groupKind: group ? (group.kind === 'trip' ? 'trip' : 'split') : null,
+      currency: t.currency, originalAmount: t.original_amount != null ? Number(t.original_amount) : null,
+      receiptLink: receipt ? links.get(receipt) ?? null : null, createdAt: t.created_at,
+    };
+  });
+  const sheetId = SHEET_IDS[monthSheet(Number(month.slice(5, 7)))];
+  const out = monthRows(ledger, run.syncedAt);
+  const rowCount = book.rowCounts.get(sheetId) ?? 1000;
+  await sheetsBatch(run.token, book.id, [
+    ...monthWriteRequests(sheetId, out, rowCount),
+    ...categoryWriteRequests(run.expenseNames, run.incomeNames),
+  ]);
+  if (out.length + 1 > rowCount) book.rowCounts.set(sheetId, out.length + 101);
+}
+
+async function savedWorkbook(run: Run, year: number) {
+  return rows<{ spreadsheet_id: string } | null>(run.db.from('annual_workbooks').select('spreadsheet_id').eq('year', year).maybeSingle());
+}
+
+/**
+ * 找到或建立這一年的帳本（放在 Monee/2026 資料夾）。每次同步只確認一次：
+ * - 整份不見了（被刪、丟垃圾桶、換了 Google 帳號）：建一份新的，全部重新同步
+ * - 有工作表被刪：補回來（被改名的改回來），全部重新同步，補回來的月份才有資料
+ */
+async function ensureWorkbook(run: Run, year: number): Promise<Workbook> {
+  const cached = run.workbooks.get(year);
+  if (cached) return cached;
+  const saved = await savedWorkbook(run, year);
+  let book: Workbook;
+  if (saved && (await driveAlive(run.token, saved.spreadsheet_id))) {
+    const props = await sheetProps(run.token, saved.spreadsheet_id);
+    const titles = new Set(props.map((p) => p.title));
+    const ids = new Set(props.map((p) => p.sheetId));
+    const gone = ALL_SHEETS.filter((t) => !titles.has(t));
+    if (gone.length) {
+      const renamed = gone.filter((t) => ids.has(SHEET_IDS[t]));
+      await sheetsBatch(run.token, saved.spreadsheet_id, [
+        ...renamed.map((title) => ({ updateSheetProperties: { properties: { sheetId: SHEET_IDS[title], title }, fields: 'title' } })),
+        ...repairRequests(year, gone.filter((t) => !renamed.includes(t))),
+      ]);
+      await run.db.rpc('google_mark_all');
+    }
+    book = { id: saved.spreadsheet_id, rowCounts: new Map(props.map((p) => [p.sheetId, p.gridProperties?.rowCount ?? 1000])) };
+  } else {
+    const { id } = await createSpreadsheet(run.token, workbookName(year), await ensureFolder(run, String(year)));
+    const [first] = await sheetProps(run.token, id);
+    await sheetsBatch(run.token, id, newWorkbookRequests(year, first.sheetId));
+    await rows(run.db.from('annual_workbooks').upsert({ user_id: run.userId, year, spreadsheet_id: id }, { onConflict: 'user_id,year' }));
+    // 原本那份不見了：今年其他月份也要寫進新的這份
+    if (saved) await run.db.rpc('google_mark_all');
+    book = { id, rowCounts: new Map() };
+  }
+  run.workbooks.set(year, book);
+  return book;
 }
 
 async function mappingsFor(run: Run, folder: string, paths: string[]): Promise<DriveReceipt[]> {

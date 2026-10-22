@@ -60,11 +60,37 @@ export async function driveAlive(token: string, id: string) {
   }
 }
 
-/** 沒給 parentId 就建在「我的雲端硬碟」最上層 */
-export async function createFolder(token: string, name: string, parentId?: string) {
+/** 建一個空的 Google 檔案（資料夾、試算表）；沒給 parentId 就建在「我的雲端硬碟」最上層 */
+async function createFile(token: string, name: string, mimeType: string, parentId?: string) {
   return googleFetch<DriveFile>(token, `${DRIVE}?fields=id`, {
-    method: 'POST', ...json({ name, mimeType: FOLDER_MIME, ...(parentId ? { parents: [parentId] } : {}) }),
+    method: 'POST', ...json({ name, mimeType, ...(parentId ? { parents: [parentId] } : {}) }),
   });
+}
+
+export const createFolder = (token: string, name: string, parentId?: string) => createFile(token, name, FOLDER_MIME, parentId);
+export const createSpreadsheet = (token: string, name: string, parentId: string) =>
+  createFile(token, name, 'application/vnd.google-apps.spreadsheet', parentId);
+
+// ---------- Sheets ----------
+const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+export interface SheetProps {
+  sheetId: number;
+  title: string;
+  gridProperties?: { rowCount?: number };
+}
+
+export async function sheetProps(token: string, spreadsheetId: string) {
+  const res = await googleFetch<{ sheets?: { properties: SheetProps }[] }>(
+    token, `${SHEETS}/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties(sheetId,title,gridProperties.rowCount)`,
+  );
+  return (res.sheets ?? []).map((s) => s.properties);
+}
+
+/** 一次送出很多個修改；Google 照順序做，中間有一個失敗就全部不做 */
+export async function sheetsBatch(token: string, spreadsheetId: string, requests: object[]) {
+  if (!requests.length) return;
+  await googleFetch(token, `${SHEETS}/${encodeURIComponent(spreadsheetId)}:batchUpdate`, { method: 'POST', ...json({ requests }) });
 }
 
 /** Drive 的 multipart 上傳：第一段是檔名等資料（JSON），第二段是檔案本身 */

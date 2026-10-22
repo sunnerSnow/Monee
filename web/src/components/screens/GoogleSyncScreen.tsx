@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, CircleAlert, ExternalLink, Receipt, RefreshCw, Sheet as SheetIcon, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, CircleAlert, ExternalLink, FolderOpen, Receipt, RefreshCw, Sheet as SheetIcon, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useDisconnectGoogle, useGoogleStatus, useSyncGoogle } from '@/lib/data';
@@ -106,6 +106,23 @@ function NotConnected() {
   );
 }
 
+/** 在新分頁打開 Google 上的資料夾或試算表 */
+function fileLink(href: string, Icon: typeof FolderOpen, color: string, title: string, sub: string) {
+  return (
+    <li key={href} className="border-t border-line first:border-t-0">
+      <a href={href} target="_blank" rel="noopener noreferrer" className="press flex min-h-14 items-center gap-3.5 px-5 py-2">
+        <span aria-hidden className="ico sm" style={{ background: color }}><Icon size={16} strokeWidth={1.5} /></span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-body">{title}</span>
+          <span className="caption">{sub}</span>
+        </span>
+        <ExternalLink size={16} strokeWidth={1.5} aria-hidden className="text-muted" />
+        <span className="sr-only">（在新分頁打開）</span>
+      </a>
+    </li>
+  );
+}
+
 function Connected({ status }: { status: NonNullable<ReturnType<typeof useGoogleStatus>['data']> }) {
   const disconnect = useDisconnectGoogle();
   const sync = useSyncGoogle();
@@ -154,11 +171,17 @@ function Connected({ status }: { status: NonNullable<ReturnType<typeof useGoogle
           <p className="caption px-1 leading-[1.7]">平常記帳、改帳後會自動同步；失敗很多次的月份要按這裡才會再試。</p>
         </div>
       )}
-      {status.rootFolderId && (
-        <a href={`https://drive.google.com/drive/folders/${status.rootFolderId}`} target="_blank" rel="noopener noreferrer" className="btn-secondary press w-full">
-          <ExternalLink size={16} strokeWidth={1.5} aria-hidden />打開 Drive 的 Monee 資料夾
-        </a>
-      )}
+      <section aria-labelledby="files-title" className="flex flex-col gap-2">
+        <h2 id="files-title" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">Google 上的檔案</h2>
+        {status.rootFolderId || status.workbooks.length ? (
+          <ul className="card">
+            {status.rootFolderId && fileLink(`https://drive.google.com/drive/folders/${status.rootFolderId}`, FolderOpen, 'var(--orange)', 'Monee 資料夾', '收據照記帳日期放在「年／月」')}
+            {status.workbooks.map((b) => fileLink(`https://docs.google.com/spreadsheets/d/${b.id}`, SheetIcon, 'var(--green)', `Monee_${b.year}_年度帳本`, '12 個月的明細、年度總覽和圖表'))}
+          </ul>
+        ) : (
+          <p className="caption px-1 leading-[1.7]">第一次同步時會建立 Monee 資料夾和今年的年度帳本。</p>
+        )}
+      </section>
 
       {confirming ? (
         <div role="alertdialog" aria-labelledby="unlink-title" className="card flex flex-col gap-3 p-5">
