@@ -2,10 +2,10 @@
 
 /* eslint-disable @next/next/no-img-element -- 照片是簽名網址或本機的 blob 網址，不經過 next/image 的最佳化 */
 
-import { ImageOff, ImagePlus, X } from 'lucide-react';
+import { ExternalLink, ImageOff, ImagePlus, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { shrinkImage } from '@/lib/ai-client';
-import { useReceiptUrl } from '@/lib/data';
+import { useDriveReceiptLink, useReceiptUrl } from '@/lib/data';
 import type { ReceiptDraft } from '@/lib/use-receipt-draft';
 
 /** 全螢幕看照片；可以用兩指放大（整頁縮放），按關閉或 Esc 回到表單 */
@@ -72,11 +72,23 @@ function Thumb({ src, missing, className, label }: { src: string | null | undefi
   );
 }
 
+/** 有同步到 Google Drive 的收據：在 Drive 打開（新分頁） */
+function DriveLink({ path }: { path: string | null | undefined }) {
+  const { data: link } = useDriveReceiptLink(path);
+  if (!link) return null;
+  return (
+    <a href={link} target="_blank" rel="noopener noreferrer" className="press inline-flex min-h-11 items-center gap-1.5 self-start px-1 text-body-s underline underline-offset-4">
+      <ExternalLink size={14} strokeWidth={1.5} aria-hidden />在 Google Drive 打開<span className="sr-only">（新分頁）</span>
+    </a>
+  );
+}
+
 /** 表單裡的收據照片：附上、換一張、拿掉；按記下時才上傳 */
 export function ReceiptField({ draft }: { draft: ReceiptDraft }) {
   const input = useRef<HTMLInputElement>(null);
   const saved = useReceiptUrl(draft.blob ? null : draft.path);
   const missing = !draft.blob && saved.isError;
+  const syncedPath = draft.has && !draft.blob && !missing ? draft.path : null;
 
   const pick = async (file: File | undefined) => {
     if (input.current) input.current.value = '';
@@ -84,23 +96,26 @@ export function ReceiptField({ draft }: { draft: ReceiptDraft }) {
   };
 
   return (
-    <div className="flex min-h-11 items-center gap-3">
-      {draft.has ? (
-        <>
-          <Thumb src={draft.preview ?? saved.data} missing={missing} label="看收據照片" className="h-14 w-11" />
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-body-s">收據照片</span>
-            <span className="caption">{missing ? '照片已經不在了' : draft.blob ? '按記下時一起存' : '點小圖看大圖'}</span>
-          </span>
-          <button type="button" onClick={() => input.current?.click()} className="press min-h-11 flex-none px-1 text-body-s underline underline-offset-4">換一張</button>
-          <button type="button" onClick={draft.clear} className="press min-h-11 flex-none px-1 text-body-s text-muted underline underline-offset-4">拿掉</button>
-        </>
-      ) : (
-        <button type="button" onClick={() => input.current?.click()} className="pill press">
-          <ImagePlus size={16} strokeWidth={1.5} aria-hidden />附上收據照片
-        </button>
-      )}
-      <input ref={input} type="file" accept="image/*" onChange={(e) => pick(e.target.files?.[0])} className="hidden" />
+    <div className="flex flex-col">
+      <div className="flex min-h-11 items-center gap-3">
+        {draft.has ? (
+          <>
+            <Thumb src={draft.preview ?? saved.data} missing={missing} label="看收據照片" className="h-14 w-11" />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-body-s">收據照片</span>
+              <span className="caption">{missing ? '照片已經不在了' : draft.blob ? '按記下時一起存' : '點小圖看大圖'}</span>
+            </span>
+            <button type="button" onClick={() => input.current?.click()} className="press min-h-11 flex-none px-1 text-body-s underline underline-offset-4">換一張</button>
+            <button type="button" onClick={draft.clear} className="press min-h-11 flex-none px-1 text-body-s text-muted underline underline-offset-4">拿掉</button>
+          </>
+        ) : (
+          <button type="button" onClick={() => input.current?.click()} className="pill press">
+            <ImagePlus size={16} strokeWidth={1.5} aria-hidden />附上收據照片
+          </button>
+        )}
+        <input ref={input} type="file" accept="image/*" onChange={(e) => pick(e.target.files?.[0])} className="hidden" />
+      </div>
+      <DriveLink path={syncedPath} />
     </div>
   );
 }
@@ -111,7 +126,10 @@ export function ReceiptView({ path }: { path: string }) {
   return (
     <div className="flex items-center gap-3">
       <Thumb src={data} missing={isError} label="看收據照片" className="h-20 w-16" />
-      <span className="caption">{isError ? '照片已經不在了' : '點小圖看大圖'}</span>
+      <span className="flex flex-col">
+        <span className="caption">{isError ? '照片已經不在了' : '點小圖看大圖'}</span>
+        {!isError && <DriveLink path={path} />}
+      </span>
     </div>
   );
 }

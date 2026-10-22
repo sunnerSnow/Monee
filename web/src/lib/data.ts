@@ -611,6 +611,21 @@ export function useReceiptUrl(path: string | null | undefined) {
   });
 }
 
+/** 這張收據在 Google Drive 上的連結；沒連結 Google、還沒同步到是 null。同步完會跟著狀態重新讀 */
+export function useDriveReceiptLink(path: string | null | undefined) {
+  return useQuery({
+    queryKey: [...keys.google, 'receipt', path],
+    enabled: Boolean(path) && !isDemo,
+    retry: false,
+    queryFn: async () => {
+      const row = await unwrap<{ drive_file_id: string; web_view_link: string | null } | null>(
+        createClient().from('drive_receipts').select('drive_file_id, web_view_link').eq('source_path', path!).maybeSingle(),
+      );
+      return row ? row.web_view_link ?? `https://drive.google.com/file/d/${row.drive_file_id}/view` : null;
+    },
+  });
+}
+
 /** 分帳花費的照片另外存：花費由 split_save_expense 寫入，照片路徑接著補上 */
 export function useSetSplitReceipt() {
   const invalidate = useInvalidate();

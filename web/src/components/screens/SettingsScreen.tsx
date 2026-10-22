@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { budgetFor, planBudget, type BudgetScope } from '@/lib/budget';
 import { setCategoryRows } from '@/lib/categories';
-import { useBudgets, useProfile, useSetBudget, useUpdateProfile, useUser } from '@/lib/data';
+import { useBudgets, useGoogleStatus, useProfile, useSetBudget, useUpdateProfile, useUser } from '@/lib/data';
 import { monthKeyOf, monthLabel, monthTitle, shiftMonth } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
 import { forgetGoogleToken } from '@/lib/google-sheets';
@@ -40,6 +40,17 @@ function span(start: string, next?: string) {
 function upcoming(entries: BudgetEntry[], month: string): BudgetEntry[] {
   const later = entries.filter((e) => e.month > month).sort((a, b) => a.month.localeCompare(b.month));
   return [{ month, amount: budgetFor(entries, month) }, ...later];
+}
+
+/** 「Google 雲端同步」那列的小字：沒連結時是說明，連結後是同步狀態 */
+function GoogleSyncCaption() {
+  const { data: s } = useGoogleStatus();
+  if (!s) return <span className="caption">收據、年度帳本自動存到你的 Google Drive</span>;
+  const [text, alert] = s.needsReconnect ? ['授權失效了，點這裡重新連結', true]
+    : s.failed || s.lastError ? ['同步有問題，點進來看看', true]
+      : s.pending ? [`${s.pending} 個月等著同步`, false]
+        : ['已連結・都同步好了', false];
+  return <span className={`caption ${alert ? 'text-alert' : ''}`}>{text}</span>;
 }
 
 export function SettingsScreen() {
@@ -249,7 +260,7 @@ export function SettingsScreen() {
               <span aria-hidden className="ico sm" style={{ background: 'var(--blue)' }}><Cloud size={16} strokeWidth={1.5} /></span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-body">Google 雲端同步</span>
-                <span className="caption">收據、年度帳本自動存到你的 Google Drive</span>
+                <GoogleSyncCaption />
               </span>
               <ChevronRight size={18} strokeWidth={1.5} aria-hidden className="text-muted" />
             </Link>
