@@ -4,7 +4,8 @@ import { mergeCategories, MAX_CATEGORY_NAME } from './categories';
 import { CURRENCIES, getCurrency } from './currency';
 import type { Account, AccountType, TransactionType } from './types';
 
-export type DraftSource = 'voice' | 'receipt' | 'text';
+/** text：打字，或用手機鍵盤的語音輸入轉成的字（Monee 不錄音）；receipt：收據照片 */
+export type DraftSource = 'receipt' | 'text';
 
 /** 送給 AI 當參考的帳戶（只需要這些欄位） */
 export type DraftAccount = Pick<Account, 'id' | 'name' | 'type'>;
@@ -29,12 +30,12 @@ export interface DraftContext {
 
 /** 對應 monee_ux.md 的 AiDraftTransaction；使用者確認後才會寫入 */
 export interface AiDraftTransaction {
-  /** 語音逐字稿，或收據上的重點文字（外文收據翻成中文） */
+  /** 使用者寫的那句話，或收據上的重點文字（外文收據翻成中文） */
   rawInput: string;
   /** 0 ~ 1 */
   confidence: number;
   suggestedType: TransactionType;
-  /** suggestedCurrency 那個幣別的金額，沒有換算；0 代表沒聽到金額，讓使用者自己輸入 */
+  /** suggestedCurrency 那個幣別的金額，沒有換算；0 代表沒有金額，讓使用者自己輸入 */
   suggestedAmount: number;
   suggestedCurrency: string;
   suggestedCategoryId: string;
@@ -87,8 +88,8 @@ export function draftInstruction(accounts: DraftAccount[], today: string, contex
     ? accounts.map((a) => `- ${a.id}：${a.name}（${TYPE_LABEL[a.type]}）`).join('\n')
     : '- （還沒有帳戶，accountId 一律填 none）';
   const fallback = getCurrency(context?.currency ?? 'TWD');
-  return `你是 Monee 記帳 App 的助理，負責把使用者的語音、文字或收據照片整理成「一筆」交易草稿；使用者確認後才會寫入。
-今天是 ${today}（週${weekday(today)}，台灣時間）。語音或文字沒提到幣別時，金額是${fallback.name}（${fallback.code}）。
+  return `你是 Monee 記帳 App 的助理，負責把使用者的一句話或收據照片整理成「一筆」交易草稿；使用者確認後才會寫入。
+今天是 ${today}（週${weekday(today)}，台灣時間）。文字沒提到幣別時，金額是${fallback.name}（${fallback.code}）。
 使用者在台灣，說的是台灣國語、用台灣用語（例如說「儲值」不說「充值」），「塊」「元」「塊錢」都是指金額。常常只講「品項＋金額」，例如「蛋 45」「咖啡 60」，這也是一筆記帳。
 
 帳戶（accountId、targetAccountId 只能用這些 id，判斷不出來就填 ${NONE}）：
@@ -101,23 +102,19 @@ ${accountLines}
 
 規則：
 1. type：花錢是 EXPENSE，收到錢是 INCOME；在自己的帳戶之間移動錢（提款、繳卡費、轉到證券戶）是 TRANSFER，categoryId 填 transfer，並填 targetAccountId（轉入的帳戶）。不是轉帳時 targetAccountId 填 ${NONE}。
-2. currency 與 amount：currency 是金額的幣別代碼，只能用 ${CURRENCIES.map((c) => `${c.code} ${c.name}`).join('、')}。收據一定要依店家所在的國家判斷，不能套用預設：台灣的收據（繁體中文、統一編號、電子發票、NT$）是 TWD，日本的收據（日文、¥、令和）是 JPY，其他國家依此類推。語音或文字說「日圓」「美金」就是 JPY、USD，沒提到才用 ${fallback.code}。amount 是那個幣別的金額，正數，不要換算成台幣；美元、歐元這類有小數的幣別保留兩位小數。收據取「總計／合計」的實付金額，不是單品價格。完全聽不到或看不到金額就填 0。
+2. currency 與 amount：currency 是金額的幣別代碼，只能用 ${CURRENCIES.map((c) => `${c.code} ${c.name}`).join('、')}。收據一定要依店家所在的國家判斷，不能套用預設：台灣的收據（繁體中文、統一編號、電子發票、NT$）是 TWD，日本的收據（日文、¥、令和）是 JPY，其他國家依此類推。文字說「日圓」「美金」就是 JPY、USD，沒提到才用 ${fallback.code}。amount 是那個幣別的金額，正數，不要換算成台幣；美元、歐元這類有小數的幣別保留兩位小數。收據取「總計／合計」的實付金額，不是單品價格。完全看不到金額就填 0。
 3. accountId：錢從哪個帳戶出去（收入則是存入哪個帳戶）。有提到付款方式才填：刷卡選名稱最接近的信用卡、付現選現金；收據印有信用卡末四碼時選最可能的信用卡帳戶。判斷不出來填 ${NONE}。
 4. date：YYYY-MM-DD。「昨天」「上週五」依今天推算；收據用上面印的交易日期，民國年加 1911、日本的令和年加 2018 換成西元年。沒提到就用今天，不能晚於今天。
 5. note：${MAX_NOTE} 字以內的繁體中文，格式「店名或場合・品項」，例如「全聯・衛生紙、洗衣精」「午餐・拉麵」。外文收據要把品項翻成中文，店名有常見的中文名稱就用中文，例如「羅森・飯糰、綠茶」。
-6. rawInput：先寫這一欄，其他欄位都照它整理。語音要逐字寫出錄音裡實際聽到的話（繁體中文），聽不清楚的字寫「…」，不要猜、不要改寫，也不要套用上面舉的例子；收據則用繁體中文寫出店名、日期、品項與總計，外文的要翻譯。
+6. rawInput：先寫這一欄，其他欄位都照它整理。文字照使用者寫的原樣抄下（語音輸入的同音錯字也照抄，不要改寫，也不要套用上面舉的例子）；收據則用繁體中文寫出店名、日期、品項與總計，外文的要翻譯。
 7. confidence：0 到 1，你對金額與分類有多確定。
-8. isTransaction：內容跟記帳無關、照片不是收據、或錄音裡沒有清楚的人聲時填 false，這時 rawInput 照實寫聽到的或留空，不要自己編一句；聽得到金額就填 true，品項聽不清楚也照你聽到的寫進 note。${context ? splitRules(context) : ''}`;
+8. isTransaction：內容跟記帳無關、或照片不是收據時填 false，這時 rawInput 照實寫或留空，不要自己編一句；看得到金額就填 true，品項看不懂也照原樣寫進 note。${context ? splitRules(context) : ''}`;
 }
 
 export const SOURCE_PROMPT: Record<DraftSource, string> = {
-  voice: '這是一段記帳語音，請整理成交易草稿。',
   receipt: '這是一張收據或發票的照片，請整理成交易草稿。',
-  text: '使用者輸入的記帳文字如下，請整理成交易草稿：',
+  text: '使用者用打字或手機鍵盤的語音輸入記帳（語音輸入可能有同音字轉錯，請照記帳的常理判斷），內容如下，請整理成交易草稿：',
 };
-
-/** 說一句、但手機已經邊說邊轉成字（瀏覽器的語音辨識）：送字不送錄音，提醒 AI 可能有同音字轉錯 */
-export const SPOKEN_TEXT_PROMPT = '使用者用說的記帳，手機已經轉成下面的文字（可能有同音字轉錯，請照記帳的常理判斷），請整理成交易草稿：';
 
 /** Gemini responseSchema（OpenAPI 子集）；分類、帳戶、幣別、付款人用 enum 限定，避免 AI 自己編 */
 export function draftSchema(accounts: DraftAccount[], context?: DraftContext, categories = DEFAULT_DRAFT_CATEGORIES) {
@@ -129,7 +126,7 @@ export function draftSchema(accounts: DraftAccount[], context?: DraftContext, ca
   ];
   return {
     type: 'OBJECT',
-    // 先寫逐字稿再整理其他欄位：照聽到的整理，不會先決定好答案再編一句逐字稿
+    // 先抄原句再整理其他欄位：照原句整理，不會先決定好答案再編一句
     propertyOrdering: fields,
     properties: {
       rawInput: { type: 'STRING' },
@@ -153,7 +150,6 @@ export class NotATransactionError extends Error {
   constructor(source: DraftSource) {
     super({
       receipt: '看不出這是收據，換個角度再拍一次，或改用手動輸入',
-      voice: '聽不出要記什麼，再說一次試試，例如「午餐拉麵 260 刷國泰」',
       text: '看不出要記什麼，寫出品項和金額試試，例如「午餐拉麵 260 刷國泰」',
     }[source]);
   }
@@ -177,7 +173,7 @@ export function sanitizeDraft(raw: unknown, { accounts, today, source, context, 
   const currency = typeof r.currency === 'string' && CODES.has(r.currency) ? r.currency : context?.currency ?? 'TWD';
   const scale = 10 ** getCurrency(currency).decimals;
   const amount = typeof r.amount === 'number' && Number.isFinite(r.amount) && r.amount > 0 ? Math.min(Math.round(r.amount * scale) / scale, 99_999_999) : 0;
-  // 很短的一句（「蔥 19 塊」）AI 常聽不準品項，就判成不是記帳；有聽到金額就照樣給草稿，讓使用者改品項就好。
+  // 很短的一句（「蔥 19 塊」，語音輸入還可能有同音錯字）AI 常看不懂品項，就判成不是記帳；有金額就照樣給草稿，讓使用者改品項就好。
   // 收據不一樣：照片不是收據時直接說，比給一張亂填的草稿好
   const doubtful = r.isTransaction === false;
   if (doubtful && (source === 'receipt' || !amount)) throw new NotATransactionError(source);

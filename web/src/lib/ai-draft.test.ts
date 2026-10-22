@@ -10,7 +10,7 @@ const accounts: DraftAccount[] = [
   { id: 'esun', name: '玉山銀行', type: 'BANK' },
   { id: 'invest', name: '證券戶', type: 'INVESTMENT_MIRROR' },
 ];
-const ctx = { accounts, today: '2026-10-07', source: 'voice' as const };
+const ctx = { accounts, today: '2026-10-07', source: 'text' as const };
 const base = {
   isTransaction: true, rawInput: '昨天晚餐火鍋 580 刷國泰', type: 'EXPENSE', amount: 580, categoryId: 'food',
   accountId: 'cathay', targetAccountId: 'none', date: '2026-10-06', note: '晚餐・火鍋', confidence: 0.92,
@@ -50,7 +50,7 @@ describe('sanitizeDraft', () => {
     expect(() => sanitizeDraft({ ...base, isTransaction: false }, { ...ctx, source: 'receipt' })).toThrow(/收據/);
   });
 
-  it('語音很短、AI 聽不準品項而判成不是記帳時，有金額就照樣給草稿，信心壓低讓畫面提醒檢查', () => {
+  it('很短的一句（語音輸入有同音錯字）、AI 看不懂品項而判成不是記帳時，有金額就照樣給草稿，信心壓低讓畫面提醒檢查', () => {
     const d = sanitizeDraft({ ...base, isTransaction: false, rawInput: '從 19 塊', amount: 19, note: '從', confidence: 0.8 }, ctx);
     expect(d).toMatchObject({ suggestedAmount: 19, suggestedNote: '從', rawInput: '從 19 塊' });
     expect(d.confidence).toBeLessThanOrEqual(0.4);
@@ -65,7 +65,7 @@ describe('sanitizeDraft', () => {
   it('指示裡說明是台灣用語，「品項＋金額」的短句也算記帳', () => {
     const text = draftInstruction([], '2026-10-07');
     expect(text).toContain('台灣用語');
-    expect(text).toContain('聽得到金額就填 true');
+    expect(text).toContain('看得到金額就填 true');
   });
 
   it('金額取整數；沒有、負數或不是數字就是 0', () => {
