@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { prepareRestore, type Backup } from './backup';
 import type { Frequency, RecurringRule } from './recurring';
+import type { Activity } from './streak';
 import { reconcileDiff } from './budget';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, toRows, type Category, type CategoryRow, type ManagedType } from './categories';
 import { monthKeyOf, monthStart, shiftMonth, toISODate, toTime } from './dates';
@@ -28,6 +29,8 @@ const keys = {
   backupSnapshot: ['backupSnapshot'],
   categories: ['categories'],
   recurring: ['recurring'],
+  // 放在 transactions 底下：記帳、改帳、刪帳讓交易重新讀時，這個也會跟著重新讀
+  activity: ['transactions', 'activity'],
 } satisfies Record<string, QueryKey>;
 
 interface AccountRow {
@@ -413,6 +416,43 @@ export function usePostRecurring() {
       return rpc<boolean>('recurring_post', { p_rule: rule.id, p_dates: dates, p_next: next, p_expected: rule.nextDate, p_amount: amount ?? null });
     },
     onSuccess: () => invalidate(keys.recurring, keys.transactions, keys.accounts),
+  });
+}
+
+// ---------- 連續記帳、無消費日 ----------
+// activity_days 只回傳日期（有記帳、有支出、無消費），不受首頁只讀 6 個月的限制，365 天徽章也算得出來
+
+export function useActivity() {
+  return useQuery({
+    queryKey: keys.activity,
+    queryFn: async (): Promise<Activity> => {
+      if (isDemo) return demo.activity();
+      const r = await rpc<{ logged: string[]; spent: string[]; no_spend: string[] }>('activity_days', {});
+      return { logged: r.logged, spent: r.spent, noSpend: r.no_spend };
+    },
+  });
+}
+
+/** 蓋上或拿掉無消費章。畫面先改，失敗再讀回來；連按時照順序送，最後的狀態才不會錯 */
+export function useMarkNoSpend() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    scope: { id: 'no-spend' },
+    mutationFn: async ({ date, on }: { date: string; on: boolean }) => {
+      if (isDemo) return demo.markNoSpend(date, on);
+      const table = createClient().from('no_spend_days');
+      if (!on) return void (await unwrap(table.delete().eq('date', date)));
+      // 已經蓋過了（別的裝置蓋的）也算成功
+      const { error } = await table.insert({ date });
+      if (error && error.code !== '23505') throw new Error(error.message);
+    },
+    onMutate: async ({ date, on }) => {
+      await queryClient.cancelQueries({ queryKey: keys.activity });
+      queryClient.setQueryData<Activity>(keys.activity, (a) => a && {
+        ...a, noSpend: [...a.noSpend.filter((d) => d !== date), ...(on ? [date] : [])],
+      });
+    },
+    onError: () => queryClient.invalidateQueries({ queryKey: keys.activity }),
   });
 }
 

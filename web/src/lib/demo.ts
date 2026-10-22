@@ -2,6 +2,7 @@
 // 用途：還沒建 Supabase 專案時先試用、截圖檢查畫面。重新整理頁面就會回到初始資料。
 import { reconcileDiff } from './budget';
 import type { RecurringRule } from './recurring';
+import type { Activity } from './streak';
 import { SAMPLE_RATES, toTwd, twdPerUnit } from './currency';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, type CategoryRow, type ManagedType } from './categories';
 import { monthKeyOf, shiftMonth, toISODate, toTime } from './dates';
@@ -54,6 +55,9 @@ function seed() {
     t(4, '08:40', '捷運', 'transit', 'flygo', 35),
     t(5, '12:30', '午餐・便當', 'food', 'cash', 150),
     t(5, '08:40', '捷運', 'transit', 'flygo', 35),
+    t(8, '15:10', '咖啡', 'food', 'cathay', 85),
+    t(10, '08:40', '捷運', 'transit', 'flygo', 35),
+    t(11, '12:10', '午餐・便當', 'food', 'cash', 120),
   ];
   // 前 5 個月的支出，讓報表的每月趨勢有資料。記在玉山銀行，並把同樣金額加回期初餘額，目前餘額才合理
   const current = monthKeyOf(now);
@@ -88,7 +92,9 @@ function seed() {
     rc({ id: 'rc-phone', type: 'EXPENSE', amount: 599, categoryId: 'other', sourceAccountId: 'flygo', note: '電信費', auto: false, nextDate: day(-5) }),
     rc({ id: 'rc-salary', type: 'INCOME', amount: 48000, categoryId: 'salary', sourceAccountId: 'esun', note: '薪資', auto: true, nextDate: `${shiftMonth(current, 1)}-05` }),
   ];
-  return { accounts, txs, budgets, categories, recurring, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
+  // 無消費日：前 7 天、前 9 天按了「今天沒花錢」，連同上面的帳和旅程的花費連續 12 天
+  const noSpend = [day(7), day(9)];
+  return { accounts, txs, budgets, categories, recurring, noSpend, profile: { pnlColor: 'red_up', displayName: 'Yuki', payBank: '國泰世華 013・0123-4567-8901', payLine: 'monee-yuki', sheetsId: null, sheetsExportedAt: null } as Profile, split: seedSplit(day) };
 }
 
 type Store = ReturnType<typeof seed>;
@@ -149,6 +155,18 @@ export const demo = {
     }));
     r.nextDate = next;
     return true;
+  },
+  async activity(): Promise<Activity> {
+    await pause();
+    const s = db();
+    const mine = s.txs.filter((t) => !t.recurringId);
+    const dates = (list: Transaction[]) => [...new Set(list.map((t) => t.date))].sort();
+    return { logged: dates(mine), spent: dates(mine.filter((t) => t.type === 'EXPENSE')), noSpend: [...s.noSpend].sort() };
+  },
+  async markNoSpend(date: string, on: boolean) {
+    await pause();
+    const s = db();
+    s.noSpend = [...s.noSpend.filter((d) => d !== date), ...(on ? [date] : [])];
   },
   async categoryRows(): Promise<CategoryRow[]> {
     await pause();

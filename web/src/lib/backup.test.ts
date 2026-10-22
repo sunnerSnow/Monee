@@ -23,6 +23,7 @@ const backup = (): Backup => ({
     { id: FRIENDS, name: '朋友往來', type: 'FRIENDS', opening_balance: 0 },
   ],
   budget_history: [{ effective_month: '2026-10', amount: 24000 }],
+  no_spend_days: [{ date: '2026-10-20' }],
   split_groups: [{ id: GROUP, name: '東京', kind: 'trip', share_token: '1520ca1d360661688f6fff7c' }],
   split_members: [
     { id: ME, group_id: GROUP, name: '我', is_me: true },
@@ -66,6 +67,10 @@ describe('parseBackup', () => {
 
   it('固定收支之前的備份檔沒有固定收支，當成沒有', () => {
     expect(parseBackup(JSON.stringify({ ...backup(), recurring_rules: undefined })).recurring_rules).toEqual([]);
+  });
+
+  it('無消費日之前的備份檔沒有無消費日，當成沒有', () => {
+    expect(parseBackup(JSON.stringify({ ...backup(), no_spend_days: undefined })).no_spend_days).toEqual([]);
   });
 
   it('預算紀錄沒有 id 也可以', () => {
@@ -136,6 +141,7 @@ describe('prepareRestore', () => {
     expect(out.transactions[1].note).toBe(CASH.slice(0, 8));
     expect(out.profile).toEqual(backup().profile);
     expect(out.budget_history).toEqual(backup().budget_history);
+    expect(out.no_spend_days).toEqual(backup().no_spend_days);
   });
 
   it('不改到傳進來的備份', () => {

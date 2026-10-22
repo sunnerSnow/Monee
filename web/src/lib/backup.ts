@@ -7,13 +7,15 @@ export const BACKUP_VERSION = 1;
 
 /** 備份檔裡的資料表 */
 export const BACKUP_TABLES = [
-  'categories', 'accounts', 'recurring_rules', 'budget_history', 'split_groups', 'split_members', 'split_rounds',
+  'categories', 'accounts', 'recurring_rules', 'budget_history', 'no_spend_days', 'split_groups', 'split_members', 'split_rounds',
   'split_expenses', 'split_settlements', 'split_claims', 'split_proposals', 'transactions',
 ] as const;
-/** 舊版的備份檔沒有這些表（分類管理之前備份的） */
-const OPTIONAL_TABLES = new Set<string>(['categories', 'recurring_rules']);
-/** id 是每個人自己的（分類 id 像 food、c_xxx，預算紀錄用月份），換帳號還原時不用換 */
-const OWN_KEY_TABLES = new Set<string>(['categories', 'budget_history']);
+/** 舊版的備份檔沒有這些表（分類管理、固定收支、無消費日之前備份的） */
+const OPTIONAL_TABLES = new Set<string>(['categories', 'recurring_rules', 'no_spend_days']);
+/** id 是每個人自己的（分類 id 像 food、c_xxx，預算紀錄用月份，無消費日用日期），換帳號還原時不用換 */
+const OWN_KEY_TABLES = new Set<string>(['categories', 'budget_history', 'no_spend_days']);
+/** 沒有 id 欄位的表 */
+const NO_ID_TABLES = new Set<string>(['budget_history', 'no_spend_days']);
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 export type BackupRow = Record<string, unknown>;
 
@@ -50,8 +52,8 @@ export function parseBackup(text: string): Backup {
     if (data[table] === undefined && OPTIONAL_TABLES.has(table)) data[table] = [];
     const rows = data[table];
     if (!Array.isArray(rows) || !rows.every(isObject)) throw new Error(BROKEN);
-    // 預算紀錄用月份當 key，其他表都要有 id，換帳號時才換得掉
-    if (table !== 'budget_history' && !rows.every((r) => typeof r.id === 'string')) throw new Error(BROKEN);
+    // 預算紀錄用月份、無消費日用日期當 key，其他表都要有 id，換帳號時才換得掉
+    if (!NO_ID_TABLES.has(table) && !rows.every((r) => typeof r.id === 'string')) throw new Error(BROKEN);
   }
   return data as Backup;
 }

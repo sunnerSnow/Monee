@@ -12,6 +12,7 @@ import type { Account, Transaction } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { useNow } from '@/lib/use-now';
 import { RecurringHome } from '../Recurring';
+import { StreakCard } from '../Streak';
 import { TxGroups } from '../TxList';
 import { InboxBanner } from '../split/parts';
 import type { Mood } from '../Mascot';
@@ -118,6 +119,8 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
           <Link href="/settings" className="btn-secondary press self-start">設定每月預算<ArrowRight size={16} strokeWidth={1.5} aria-hidden /></Link>
         )}
       />
+
+      <StreakCard today={today} />
 
       <SplitInbox />
 
