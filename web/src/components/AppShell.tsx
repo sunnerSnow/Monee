@@ -6,6 +6,7 @@ import { useCategoryRows } from '@/lib/data';
 import { isDemo } from '@/lib/demo';
 import { applyTheme, useUi } from '@/lib/ui-store';
 import { BottomNav } from './BottomNav';
+import { GoogleAutoSync } from './GoogleAutoSync';
 import { RecurringAuto } from './Recurring';
 import { Toast } from './Toast';
 import { AccountSheet } from './sheets/AccountSheet';
@@ -58,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <BottomNav inert={sheetOpen} />
       <Toast />
       <RecurringAuto />
+      {!isDemo && <GoogleAutoSync />}
       <EntrySheet />
       <AccountSheet />
       <ReconcileSheet />

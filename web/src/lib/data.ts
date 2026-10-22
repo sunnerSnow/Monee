@@ -1,8 +1,10 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { prepareRestore, type Backup } from './backup';
 import type { Frequency, RecurringRule } from './recurring';
+import type { SyncResult } from './server/google-sync';
 import type { Activity } from './streak';
 import { reconcileDiff } from './budget';
 import { RECONCILE_EXPENSE_CATEGORY, RECONCILE_INCOME_CATEGORY, toRows, type Category, type CategoryRow, type ManagedType } from './categories';
@@ -470,6 +472,8 @@ export interface GoogleStatus {
   /** 待同步的月份數；failed 是其中失敗過、等著重試的 */
   pending: number;
   failed: number;
+  /** Drive 上的 Monee 資料夾；還沒同步過是 null */
+  rootFolderId: string | null;
 }
 
 /** 沒連結是 null */
@@ -483,13 +487,66 @@ export function useGoogleStatus() {
         google_email: string | null; connected_at: string; needs_reconnect: boolean; last_synced_at: string | null; last_error: string | null;
       } | null>(supabase.from('google_integrations').select('google_email, connected_at, needs_reconnect, last_synced_at, last_error').maybeSingle());
       if (!row) return null;
-      const months = await unwrap<{ attempts: number }[]>(supabase.from('google_sync_months').select('attempts'));
+      const [months, root] = await Promise.all([
+        unwrap<{ attempts: number }[]>(supabase.from('google_sync_months').select('attempts')),
+        unwrap<{ folder_id: string } | null>(supabase.from('drive_folders').select('folder_id').eq('path', '').maybeSingle()),
+      ]);
       return {
         email: row.google_email, connectedAt: row.connected_at, needsReconnect: row.needs_reconnect, lastSyncedAt: row.last_synced_at,
-        lastError: row.last_error, pending: months.length, failed: months.filter((m) => m.attempts > 0).length,
+        lastError: row.last_error, pending: months.length, failed: months.filter((m) => m.attempts > 0).length, rootFolderId: root?.folder_id ?? null,
       };
     },
   });
+}
+
+async function requestGoogleSync(force: boolean): Promise<SyncResult> {
+  try {
+    const res = await fetch('/api/google/sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force }), keepalive: !force,
+    });
+    return ((await res.json().catch(() => null)) as SyncResult | null) ?? { status: 'error', message: '同步失敗，等一下再試' };
+  } catch {
+    return { status: 'error', message: '連不上網路，等一下再試' };
+  }
+}
+
+/** 一次做不完（more）就接著叫，最多幾輪；後面的留給下次 */
+async function syncRounds(force: boolean, rounds: number) {
+  let result = await requestGoogleSync(force);
+  for (let i = 1; i < rounds && result.status === 'more'; i++) result = await requestGoogleSync(force);
+  return result;
+}
+
+/** 「立即同步」：連失敗多次的月份一起再試 */
+export function useSyncGoogle() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: () => syncRounds(true, 5),
+    onSettled: () => invalidate(keys.google),
+  });
+}
+
+/**
+ * 自動同步：打開 App、記帳改帳之後（交易重新讀到時）等 3 秒，有待同步的月份才叫伺服器同步，不等結果。
+ * 沒連結、授權失效、示範模式都不做
+ */
+export function useGoogleAutoSync() {
+  const { data: status, refetch } = useGoogleStatus();
+  const { dataUpdatedAt } = useTransactions();
+  const invalidate = useInvalidate();
+  const connected = Boolean(status && !status.needsReconnect);
+  useEffect(() => {
+    if (!connected || !dataUpdatedAt) return;
+    const timer = setTimeout(async () => {
+      const { data } = await refetch();
+      if (!data || data.needsReconnect || !data.pending) return;
+      await syncRounds(false, 3);
+      void invalidate(keys.google);
+    }, 3000);
+    return () => clearTimeout(timer);
+    // invalidate 每次都是新的函式，不放進來
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, dataUpdatedAt, refetch]);
 }
 
 /** 解除連結：Drive 裡的收據和年度帳本都留著 */

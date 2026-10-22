@@ -1,11 +1,12 @@
 'use client';
 
-import { ChevronLeft, CircleAlert, Receipt, Sheet as SheetIcon, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, CircleAlert, ExternalLink, Receipt, RefreshCw, Sheet as SheetIcon, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useDisconnectGoogle, useGoogleStatus } from '@/lib/data';
+import { useDisconnectGoogle, useGoogleStatus, useSyncGoogle } from '@/lib/data';
 import { shortDateTime } from '@/lib/dates';
 import { isDemo } from '@/lib/demo';
+import type { SyncResult } from '@/lib/server/google-sync';
 import { useUi } from '@/lib/ui-store';
 import { ErrorBox } from '../ui';
 
@@ -23,7 +24,19 @@ const ERRORS: Record<string, string> = {
   demo: '示範模式不能連結 Google。',
 };
 
-/** 我的 → Google 雲端同步：連結 Google、看同步狀態、解除連結 */
+/** 「立即同步」做完的提示 */
+function syncMessage(r: SyncResult) {
+  switch (r.status) {
+    case 'done': return r.months ? `同步好了（${r.months} 個月）` : '都是最新的，不用同步';
+    case 'more': return `同步了 ${r.months ?? 0} 個月，還有一些會在背景接著做`;
+    case 'busy': return '正在同步中（可能是另一支手機），等一下再看';
+    case 'reconnect': return 'Google 的授權失效了，請重新連結';
+    case 'not-connected': return '還沒連結 Google';
+    default: return r.message ?? '同步失敗，等一下再試';
+  }
+}
+
+/** 我的 → Google 雲端同步：連結 Google、看同步狀態、立即同步、解除連結 */
 export function GoogleSyncScreen() {
   const router = useRouter();
   const showToast = useUi((s) => s.showToast);
@@ -95,8 +108,11 @@ function NotConnected() {
 
 function Connected({ status }: { status: NonNullable<ReturnType<typeof useGoogleStatus>['data']> }) {
   const disconnect = useDisconnectGoogle();
+  const sync = useSyncGoogle();
   const showToast = useUi((s) => s.showToast);
   const [confirming, setConfirming] = useState(false);
+
+  const syncNow = () => sync.mutate(undefined, { onSuccess: (r) => showToast(syncMessage(r)) });
 
   const unlink = () => disconnect.mutate(undefined, {
     onSuccess: () => showToast('已解除連結；Drive 裡的收據和年度帳本都還在'),
@@ -128,6 +144,21 @@ function Connected({ status }: { status: NonNullable<ReturnType<typeof useGoogle
           {status.lastError && row('上次的問題', status.lastError)}
         </dl>
       </section>
+
+      {!status.needsReconnect && (
+        <div className="flex flex-col gap-2">
+          <button type="button" onClick={syncNow} disabled={sync.isPending} className="btn-primary press w-full">
+            <RefreshCw size={18} strokeWidth={1.5} aria-hidden className={sync.isPending ? 'motion-safe:animate-spin' : ''} />
+            {sync.isPending ? '同步中…' : '立即同步'}
+          </button>
+          <p className="caption px-1 leading-[1.7]">平常記帳、改帳後會自動同步；失敗很多次的月份要按這裡才會再試。</p>
+        </div>
+      )}
+      {status.rootFolderId && (
+        <a href={`https://drive.google.com/drive/folders/${status.rootFolderId}`} target="_blank" rel="noopener noreferrer" className="btn-secondary press w-full">
+          <ExternalLink size={16} strokeWidth={1.5} aria-hidden />打開 Drive 的 Monee 資料夾
+        </a>
+      )}
 
       {confirming ? (
         <div role="alertdialog" aria-labelledby="unlink-title" className="card flex flex-col gap-3 p-5">
