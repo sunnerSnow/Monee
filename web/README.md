@@ -93,9 +93,10 @@ npm run dev:demo
 2. 同一個 client 的 **Client secrets** → **Add secret**，複製下來，在 `.env.local` 和 Vercel 加上 `GOOGLE_CLIENT_SECRET=…`。**不要**加 `NEXT_PUBLIC_` 前綴，它只能在伺服器。
 3. 產生加密授權用的金鑰：`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`，在 `.env.local` 和 Vercel 加上 `GOOGLE_TOKEN_KEY=…`。設定後不要再換：換了之前存的授權就解不開，要重新連結。
 4. **Data Access** 再加 `openid` 和 `.../auth/userinfo.email`（顯示連的是哪個帳號），都是非敏感權限。
-5. **Audience** 按 **Publish app**（狀態改成 In production）。維持 Testing 的話，Google 給的長期授權 7 天就失效，每週都要重新連結。只用非敏感權限，不用等 Google 審核。
-6. 到 Supabase 的 SQL Editor 執行 `supabase/migrations/20261022000000_google_sync.sql`（確認是 Monee 的專案，整段執行）。最後一列應該是 tables = 5、policies = 20、triggers = 6、functions = 3。
-7. Vercel 加完變數後重新部署。
+5. **Branding** 填好「應用程式首頁」`https://正式網址`、「隱私權政策連結」`https://正式網址/privacy`（Monee 內建，不用登入就看得到），「授權網域」加上正式網址的網域（例如 `monee-xxx.vercel.app`）。沒填的話下一步的發布按鈕可能按不了。
+6. **Audience** 按 **Publish app**（狀態改成 In production）。維持 Testing 的話，Google 給的長期授權 7 天就失效，每週都要重新連結。只用非敏感權限，不用等 Google 審核。
+7. 到 Supabase 的 SQL Editor 執行 `supabase/migrations/20261022000000_google_sync.sql`（確認是 Monee 的專案，整段執行）。最後一列應該是 tables = 5、policies = 20、triggers = 6、functions = 3。
+8. Vercel 加完變數後重新部署。
 
 > Supabase 免費專案一週沒有任何存取會自動暫停，到後台按一下就能恢復。內建寄信服務（註冊確認信、重設密碼信）只寄給 Supabase 專案成員的 Email，而且每小時只能寄 2 封；要給別人用前，請在 Authentication → SMTP 換成自己的寄信服務。
 

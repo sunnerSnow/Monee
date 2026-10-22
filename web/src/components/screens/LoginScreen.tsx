@@ -1,13 +1,14 @@
 'use client';
 
 import { ArrowLeft, ArrowRight, MailCheck } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { authErrorMessage } from '@/lib/auth-errors';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { PasswordInput } from '../PasswordInput';
-
+
 import { Mascot } from '../Mascot';
 import { BubbleLogo } from '../ui';
 type Mode = 'login' | 'signup' | 'forgot';
@@ -166,6 +167,7 @@ export function LoginScreen({ linkError }: { linkError: boolean }) {
           )}
         </form>
       )}
+      <Link href="/privacy" className="press self-center min-h-11 px-2 py-3 text-caption tracking-[.08em] text-muted underline underline-offset-4">隱私權政策</Link>
     </main>
   );
 }

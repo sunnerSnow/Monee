@@ -276,7 +276,9 @@ export function SettingsScreen() {
           <LogOut size={16} strokeWidth={1.5} aria-hidden />{signingOut ? '登出中…' : '登出'}
         </button>
       )}
-      <p className="caption text-center">Monee 0.1.0・Phase 2</p>
+      <p className="caption text-center">
+        Monee 0.1.0・Phase 2・<Link href="/privacy" className="underline underline-offset-4">隱私權政策</Link>
+      </p>
     </>
   );
 }

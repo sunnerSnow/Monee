@@ -2,8 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './env';
 
-// /s/<token>：朋友點分帳分享連結，不用登入
-const PUBLIC_PATHS = ['/login', '/auth', '/s'];
+// /s/<token>：朋友點分帳分享連結，不用登入；/privacy：隱私權政策（Google 授權畫面會連過來）
+const PUBLIC_PATHS = ['/login', '/auth', '/s', '/privacy'];
 // 朋友在分享頁記外幣花費要參考匯率；匯率是公開資料，不含任何人的帳
 const PUBLIC_APIS = ['/api/fx'];
 
