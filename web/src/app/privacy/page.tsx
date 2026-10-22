@@ -56,10 +56,10 @@ export default function PrivacyPage() {
       <Section id="p-third" title="會用到的其他服務">
         <List>
           <li>
-            <b>Google Gemini（AI 記帳）</b>：用「說一句」「拍收據」時，那句話或照片會連同你的帳戶名稱、分類名稱（分帳時還有成員名字）送到 Google Gemini API，整理成記帳草稿。
+            <b>Google Gemini（AI 記帳）</b>：用「說一句」「拍收據」或打一句話時，錄音、照片或文字會連同你的帳戶名稱、分類名稱（分帳時還有成員名字）送到 Google Gemini API，整理成記帳草稿。Monee 不保存錄音：錄音只在你的手機上留到關掉記帳畫面為止（方便重聽），送去辨識後不會存進資料庫。
             Monee 目前使用 Gemini API 的免費額度；依 Google 的條款，免費額度送出的內容可能被 Google 用來改善服務，也可能經人工審閱（審閱前會和帳號資訊分開）。不想這樣的話，請改用手動輸入。
           </li>
-          <li><b>手機鍵盤的語音輸入</b>：「說一句」用的是你手機鍵盤內建的語音輸入，聲音由手機鍵盤（Apple、Google 等）轉成文字，Monee 不會錄音，也收不到聲音。</li>
+          <li><b>麥克風</b>：只有按「說一句」時才會使用，說完或取消就關掉。</li>
           <li><b>匯率</b>：向 open.er-api.com 查詢匯率，不會送出任何個人資料。</li>
         </List>
       </Section>
