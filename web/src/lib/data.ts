@@ -31,6 +31,7 @@ const keys = {
   recurring: ['recurring'],
   // 放在 transactions 底下：記帳、改帳、刪帳讓交易重新讀時，這個也會跟著重新讀
   activity: ['transactions', 'activity'],
+  google: ['google'],
 } satisfies Record<string, QueryKey>;
 
 interface AccountRow {
@@ -453,6 +454,53 @@ export function useMarkNoSpend() {
       });
     },
     onError: () => queryClient.invalidateQueries({ queryKey: keys.activity }),
+  });
+}
+
+// ---------- Google 雲端同步 ----------
+// 連結、同步都在伺服器（/api/google/*），前端只讀狀態；授權（refresh token）的欄位前端不讀
+
+export interface GoogleStatus {
+  email: string | null;
+  connectedAt: string;
+  /** 授權失效，要重新連結 */
+  needsReconnect: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  /** 待同步的月份數；failed 是其中失敗過、等著重試的 */
+  pending: number;
+  failed: number;
+}
+
+/** 沒連結是 null */
+export function useGoogleStatus() {
+  return useQuery({
+    queryKey: keys.google,
+    queryFn: async (): Promise<GoogleStatus | null> => {
+      if (isDemo) return null;
+      const supabase = createClient();
+      const row = await unwrap<{
+        google_email: string | null; connected_at: string; needs_reconnect: boolean; last_synced_at: string | null; last_error: string | null;
+      } | null>(supabase.from('google_integrations').select('google_email, connected_at, needs_reconnect, last_synced_at, last_error').maybeSingle());
+      if (!row) return null;
+      const months = await unwrap<{ attempts: number }[]>(supabase.from('google_sync_months').select('attempts'));
+      return {
+        email: row.google_email, connectedAt: row.connected_at, needsReconnect: row.needs_reconnect, lastSyncedAt: row.last_synced_at,
+        lastError: row.last_error, pending: months.length, failed: months.filter((m) => m.attempts > 0).length,
+      };
+    },
+  });
+}
+
+/** 解除連結：Drive 裡的收據和年度帳本都留著 */
+export function useDisconnectGoogle() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/google/disconnect', { method: 'POST' });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? '解除失敗，請再試一次');
+    },
+    onSuccess: () => invalidate(keys.google),
   });
 }
 

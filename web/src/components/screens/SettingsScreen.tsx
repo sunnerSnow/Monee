@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, KeyRound, LogOut, Repeat, Tags } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Cloud, KeyRound, LogOut, Repeat, Tags } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -244,6 +244,16 @@ export function SettingsScreen() {
       <section aria-labelledby="s-data" className="flex flex-col gap-2">
         <h2 id="s-data" className="px-1 text-body-s font-normal tracking-[.1em] text-muted">資料</h2>
         <ul className="card">
+          <li>
+            <Link href="/settings/google" className="press flex min-h-14 items-center gap-3.5 px-5 py-2">
+              <span aria-hidden className="ico sm" style={{ background: 'var(--blue)' }}><Cloud size={16} strokeWidth={1.5} /></span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-body">Google 雲端同步</span>
+                <span className="caption">收據、年度帳本自動存到你的 Google Drive</span>
+              </span>
+              <ChevronRight size={18} strokeWidth={1.5} aria-hidden className="text-muted" />
+            </Link>
+          </li>
           <SheetsExportRow />
           <CsvExportRow />
           <BackupRow />

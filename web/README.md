@@ -59,7 +59,7 @@ npm run dev:demo
    - **Audience**：User type 選 External。狀態維持 Testing，在 **Test users** 加上你要用來匯出的 Gmail（只有加進去的帳號能授權）。
    - **Data Access**：Add or remove scopes，勾 `.../auth/drive.file`（只能存取 Monee 自己建立的檔案）。
 4. **Clients → Create client**：Application type 選 **Web application**，**Authorized JavaScript origins** 加上 `http://localhost:3000` 和正式網址（例如 `https://monee-xxx.vercel.app`，不要加結尾的 `/`）。Redirect URIs 不用填。
-5. 複製 **Client ID**（`….apps.googleusercontent.com`），在 `.env.local` 加上 `NEXT_PUBLIC_GOOGLE_CLIENT_ID=…`；Vercel 也加同一個變數再重新部署。Client secret 用不到，不要放進任何地方。
+5. 複製 **Client ID**（`….apps.googleusercontent.com`），在 `.env.local` 加上 `NEXT_PUBLIC_GOOGLE_CLIENT_ID=…`；Vercel 也加同一個變數再重新部署。匯出用不到 Client secret（「Google 雲端同步」才要，而且只放在伺服器）。
 6. 到 Supabase 的 SQL Editor 執行 `supabase/migrations/20261014000000_sheets_export.sql`（記住匯出到哪一份試算表）。
 
 - 狀態是 Testing 時，Google 授權畫面會先顯示「Google 尚未驗證這個應用程式」，按「繼續」就好。要給別人用的話，到 Audience 按 **Publish app**；只用 `drive.file` 這種非敏感權限，通常不用等 Google 審核。
@@ -84,6 +84,18 @@ npm run dev:demo
 ### 連續記帳與無消費日
 
 到 Supabase 的 SQL Editor 執行 `supabase/migrations/20261021000004_no_spend_days.sql`，**先執行再部署**（確認右上角是 Monee 的專案，不要反白，整段執行）。最後一列應該是 has_table = true、policies = 3、has_activity = true、backup_has_no_spend = true。沒執行的話首頁不會出現連續記帳的卡片，其他功能照常。
+
+### Google 雲端同步（收據、年度帳本）
+
+「我的 → Google 雲端同步」連結一次 Google 帳號後，伺服器會自動把收據放進 Drive，並維護每年一份的年度帳本。跟上面的「匯出到 Google Sheets」共用同一個 OAuth 用戶端，先照那一節做好，再多做這幾步：
+
+1. **Clients** → 點原本那個 Web client → **Authorized redirect URIs** 加上 `http://localhost:3000/api/google/callback` 和 `https://正式網址/api/google/callback`（跟 JavaScript origins 一樣，不要結尾的 `/`）。
+2. 同一個 client 的 **Client secrets** → **Add secret**，複製下來，在 `.env.local` 和 Vercel 加上 `GOOGLE_CLIENT_SECRET=…`。**不要**加 `NEXT_PUBLIC_` 前綴，它只能在伺服器。
+3. 產生加密授權用的金鑰：`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`，在 `.env.local` 和 Vercel 加上 `GOOGLE_TOKEN_KEY=…`。設定後不要再換：換了之前存的授權就解不開，要重新連結。
+4. **Data Access** 再加 `openid` 和 `.../auth/userinfo.email`（顯示連的是哪個帳號），都是非敏感權限。
+5. **Audience** 按 **Publish app**（狀態改成 In production）。維持 Testing 的話，Google 給的長期授權 7 天就失效，每週都要重新連結。只用非敏感權限，不用等 Google 審核。
+6. 到 Supabase 的 SQL Editor 執行 `supabase/migrations/20261022000000_google_sync.sql`（確認是 Monee 的專案，整段執行）。最後一列應該是 tables = 5、policies = 20、triggers = 6、functions = 3。
+7. Vercel 加完變數後重新部署。
 
 > Supabase 免費專案一週沒有任何存取會自動暫停，到後台按一下就能恢復。內建寄信服務（註冊確認信、重設密碼信）只寄給 Supabase 專案成員的 Email，而且每小時只能寄 2 封；要給別人用前，請在 Authentication → SMTP 換成自己的寄信服務。
 
