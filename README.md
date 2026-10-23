@@ -23,7 +23,7 @@ Monee 是給自己用的手機記帳網頁：說一句話或拍張收據就能�
 
 ## 主題公仔：記帳戰隊 MONEE KEEPERS
 
-參考 [kumaweb-coding.jp](https://kumaweb-coding.jp/) 的「除蟲戰隊」風格設計的主題公仔：白色頭盔加紅色 M 記號是戰隊制服，一起對抗偷偷吃掉錢的亂花錢蟲。完整的設計稿（主視覺、隊員介紹、表情、敵人與 App 應用）在 [`monee-keepers.html`](monee-keepers.html)，下載後直接用瀏覽器打開。
+白色頭盔加紅色 M 記號是戰隊制服，一起對抗偷偷吃掉錢的亂花錢蟲。完整的設計稿（主視覺、隊員介紹、表情、敵人與 App 應用）在 [`monee-keepers.html`](monee-keepers.html)，下載後直接用瀏覽器打開。
 
 <table>
   <tr>
