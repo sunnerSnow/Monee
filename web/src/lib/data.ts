@@ -199,25 +199,18 @@ type ExportTransactionRow = TransactionRow & {
 export async function fetchExportData(): Promise<ExportData> {
   if (isDemo) return demo.exportData();
   const supabase = createClient();
-  const transactions: ExportTransaction[] = [];
-  // Supabase 一次最多回傳 1000 筆（看專案設定），一頁一頁拿到沒有為止
-  for (let from = 0; ; ) {
-    const rows = await unwrap<ExportTransactionRow[]>(
-      supabase
-        .from('transactions')
-        .select('*, split_expense:split_expenses(group:split_groups(name)), split_settlement:split_settlements(group:split_groups(name))')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .order('id')
-        .range(from, from + 999),
-    );
-    if (!rows.length) break;
-    transactions.push(...rows.map((r) => ({
-      ...toTransaction(r),
-      groupName: r.split_expense?.group?.name ?? r.split_settlement?.group?.name ?? null,
-    })));
-    from += rows.length;
-  }
+  const rows = await allPages<ExportTransactionRow>((from, to) =>
+    supabase
+      .from('transactions')
+      .select('*, split_expense:split_expenses(group:split_groups(name)), split_settlement:split_settlements(group:split_groups(name))')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to));
+  const transactions: ExportTransaction[] = rows.map((r) => ({
+    ...toTransaction(r),
+    groupName: r.split_expense?.group?.name ?? r.split_settlement?.group?.name ?? null,
+  }));
   const [accounts, budgets] = await Promise.all([
     unwrap<(AccountRow & { archived: boolean })[]>(supabase.from('account_balances').select('*').order('sort_order').order('created_at')),
     unwrap<{ effective_month: string; amount: number | string | null }[]>(supabase.from('budget_history').select('effective_month, amount')),
@@ -567,6 +560,49 @@ export function useDeleteDeposit() {
       await unwrap(createClient().from('savings_deposits').delete().eq('id', id));
     },
     onSuccess: () => invalidate(keys.goals),
+  });
+}
+
+// ---------- 年度回顧 ----------
+// 首頁只讀最近 6 個月，回顧要整年；放在 transactions、goals 底下，改帳、存入之後跟著重新讀
+
+/** Supabase 一次最多回傳 1000 筆（看專案設定），一頁一頁拿到沒有為止；page 要排好固定的順序 */
+async function allPages<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>) {
+  const out: T[] = [];
+  for (let from = 0; ; ) {
+    const rows = await unwrap<T[]>(page(from, from + 999));
+    if (!rows.length) return out;
+    out.push(...rows);
+    from += rows.length;
+  }
+}
+
+export function useYearTransactions(year: number) {
+  return useQuery({
+    queryKey: [...keys.transactions, 'year', year],
+    enabled: year > 0,
+    queryFn: async (): Promise<Transaction[]> => {
+      if (isDemo) return demo.yearTransactions(year);
+      const supabase = createClient();
+      const rows = await allPages<TransactionRow>((from, to) =>
+        supabase.from('transactions').select('*').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`).order('date').order('id').range(from, to));
+      return rows.map(toTransaction);
+    },
+  });
+}
+
+/** 到這一年年底為止的存入紀錄：算這一年存了多少、哪個目標在這一年存到 */
+export function useDepositsUntil(year: number) {
+  return useQuery({
+    queryKey: [...keys.goals, 'until', year],
+    enabled: year > 0,
+    queryFn: async (): Promise<SavingsDeposit[]> => {
+      if (isDemo) return demo.depositsUntil(year);
+      const supabase = createClient();
+      const rows = await allPages<{ id: string; goal_id: string; amount: number | string; date: string; note: string | null; created_at: string }>((from, to) =>
+        supabase.from('savings_deposits').select('id, goal_id, amount, date, note, created_at').lte('date', `${year}-12-31`).order('date').order('id').range(from, to));
+      return rows.map((r) => ({ id: r.id, goalId: r.goal_id, amount: Number(r.amount), date: r.date, note: r.note, createdAt: r.created_at }));
+    },
   });
 }
 

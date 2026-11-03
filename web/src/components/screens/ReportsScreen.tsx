@@ -1,16 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { budgetFor, expenseByCategory, monthTotals, monthlyExpenses } from '@/lib/budget';
 import { getCategory, useCategories } from '@/lib/categories';
-import { HISTORY_MONTHS, useBudgets, useTransactions } from '@/lib/data';
+import { HISTORY_MONTHS, useActivity, useBudgets, useTransactions } from '@/lib/data';
 import { monthLabel, monthKeyOf, shiftMonth } from '@/lib/dates';
 import { MASK, formatMoney, money } from '@/lib/money';
 import { useNow } from '@/lib/use-now';
 import { MonthlyChart } from '../MonthlyChart';
-import { EmptyBox, ErrorBox, LoadingBlocks, MonthSwitch, PageHeader, useHidden } from '../ui';
-
 import { Mascot } from '../Mascot';
+import { EmptyBox, ErrorBox, LoadingBlocks, MonthSwitch, PageHeader, useHidden } from '../ui';
+
 export function ReportsScreen() {
   useCategories(); // 分類改名、隱藏時重畫
   const now = useNow();
@@ -130,12 +131,30 @@ export function ReportsScreen() {
         )}
       </section>
 
-      <section aria-labelledby="wrapped-title" className="sticker panel relative min-h-[140px] rotate-1 overflow-hidden bg-brand py-5 pr-[132px] pl-5 text-ink">
-        <span className="en text-[16px]">{now.getFullYear()} Wrapped</span>
-        <h2 id="wrapped-title" className="my-1.5 font-display text-title-m tracking-[.1em] text-balance">你的年度金錢故事</h2>
-        <p className="text-body-s leading-[1.8]">12 月 31 日解鎖：一年花最多的地方、最省的月份，還有 Monee 給你的小結語。</p>
-        <Mascot mood="yay" className="absolute right-1 bottom-1 w-[118px] rotate-6" />
-      </section>
+      <WrappedCard now={now} />
     </>
+  );
+}
+
+/** 年度回顧的入口：12 月解鎖今年的；之前可以先偷看今年，去年有記帳的話也能看去年的 */
+function WrappedCard({ now }: { now: Date }) {
+  const { data: activity } = useActivity();
+  const year = now.getFullYear();
+  const unlocked = now.getMonth() === 11;
+  const lastYear = `${year - 1}-`;
+  const hasLastYear = !unlocked && Boolean(activity && [...activity.logged, ...activity.noSpend].some((d) => d.startsWith(lastYear)));
+  return (
+    <section aria-labelledby="wrapped-title" className="sticker panel relative min-h-[140px] rotate-1 overflow-hidden bg-brand py-5 pr-[132px] pl-5 text-ink">
+      <span className="en text-[16px]">{year} Wrapped</span>
+      <h2 id="wrapped-title" className="my-1.5 font-display text-title-m tracking-[.1em] text-balance">你的年度金錢故事</h2>
+      <p className="text-body-s leading-[1.8]">
+        {unlocked ? '解鎖了！' : '12 月 1 日解鎖：'}一年花最多的地方、最省的月份，還有 Monee 給你的小結語。
+      </p>
+      <div className="relative mt-3 flex flex-wrap gap-2">
+        {hasLastYear && <Link href={`/wrapped?year=${year - 1}`} className="btn-secondary press">看 {year - 1} 年回顧</Link>}
+        <Link href={unlocked ? '/wrapped' : `/wrapped?year=${year}`} className="btn-secondary press">{unlocked ? '打開回顧' : '先偷看今年'}</Link>
+      </div>
+      <Mascot mood="yay" className="pointer-events-none absolute right-1 bottom-1 w-[118px] rotate-6" />
+    </section>
   );
 }

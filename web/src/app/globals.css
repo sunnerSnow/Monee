@@ -225,9 +225,17 @@
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes wiggle { 0%, 100% { rotate: 0deg; } 50% { rotate: -6deg; } }
+/* 年度回顧：換一張時內容從下面浮上來，大數字彈一下 */
+@keyframes story-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes story-pop { from { opacity: 0; transform: scale(.6) rotate(-4deg); } to { opacity: 1; transform: none; } }
+@keyframes story-grow { from { transform: scaleY(0); } to { transform: none; } }
+.story-in { animation: story-in .4s var(--ease-out) both; }
+/* 只管動畫；放在一行字裡的要另外加 inline-block，transform 才有作用 */
+.story-pop { animation: story-pop .5s var(--ease-bounce) .15s both; }
+.story-grow { transform-origin: bottom; animation: story-grow .6s var(--ease-out) .1s both; }
 
 @media (prefers-reduced-motion: reduce) {
   .press:active:not(:disabled) { transform: none; }
-  .row.flash, .skeleton { animation: none; }
+  .row.flash, .skeleton, .story-in, .story-pop, .story-grow { animation: none; }
   .switch, .switch::after { transition: none; }
 }

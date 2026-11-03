@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { setCategoryRows } from '@/lib/categories';
 import { useCategoryRows } from '@/lib/data';
@@ -17,6 +18,8 @@ import { SplitSheets } from './split/SplitSheets';
 export function AppShell({ children }: { children: ReactNode }) {
   const sheetOpen = useUi((s) => s.sheet !== null);
   const theme = useUi((s) => s.theme);
+  // 年度回顧是整個畫面的限時動態，不放底部導覽
+  const fullscreen = usePathname() === '/wrapped';
   const { data: categoryRows } = useCategoryRows();
 
   useEffect(() => {
@@ -56,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         {children}
       </main>
-      <BottomNav inert={sheetOpen} />
+      {!fullscreen && <BottomNav inert={sheetOpen} />}
       <Toast />
       <RecurringAuto />
       {!isDemo && <GoogleAutoSync />}

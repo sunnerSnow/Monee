@@ -3,6 +3,7 @@
 import type { AiDraftTransaction, DraftAccount, DraftContext, DraftSource } from './ai-draft';
 import { allCategories } from './categories';
 import { toISODate } from './dates';
+import type { WrappedStats, WrappedSummary } from './wrapped-ai';
 
 /** 把錄音、收據照片或一句話送到 /api/ai/draft，拿回整理好的交易草稿 */
 export async function requestDraft(input: {
@@ -35,6 +36,16 @@ export async function requestDraft(input: {
   const json = (await res.json().catch(() => null)) as { draft?: AiDraftTransaction; error?: string } | null;
   if (!res.ok || !json?.draft) throw new Error(json?.error ?? 'AI 辨識失敗，請再試一次');
   return json.draft;
+}
+
+/** 年度回顧的小結語：只送統計數字；失敗時丟出錯誤，畫面改用自己組的那段 */
+export async function requestWrappedSummary(stats: WrappedStats, signal?: AbortSignal): Promise<WrappedSummary> {
+  const res = await fetch('/api/ai/wrapped', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stats), signal,
+  });
+  const json = (await res.json().catch(() => null)) as { summary?: WrappedSummary; error?: string } | null;
+  if (!res.ok || !json?.summary) throw new Error(json?.error ?? 'AI 暫時寫不出來');
+  return json.summary;
 }
 
 /**

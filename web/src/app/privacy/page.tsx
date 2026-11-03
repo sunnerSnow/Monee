@@ -6,7 +6,7 @@ import { BubbleLogo } from '@/components/ui';
 export const metadata: Metadata = { title: '隱私權政策' };
 
 const CONTACT = 'lovepeace.yuki@gmail.com';
-const UPDATED = '2026 年 10 月 22 日';
+const UPDATED = '2026 年 11 月 3 日';
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -58,6 +58,9 @@ export default function PrivacyPage() {
           <li>
             <b>Google Gemini（AI 記帳）</b>：用「說一句」「拍收據」或打一句話時，錄音、照片或文字會連同你的帳戶名稱、分類名稱（分帳時還有成員名字）送到 Google Gemini API，整理成記帳草稿。Monee 不保存錄音：錄音只在你的手機上留到關掉記帳畫面為止（方便重聽），送去辨識後不會存進資料庫。
             Monee 目前使用 Gemini API 的免費額度；依 Google 的條款，免費額度送出的內容可能被 Google 用來改善服務，也可能經人工審閱（審閱前會和帳號資訊分開）。不想這樣的話，請改用手動輸入。
+          </li>
+          <li>
+            <b>Google Gemini（年度回顧的小結語）</b>：打開年度回顧時，會把那一年的統計數字送給 Gemini 寫一段小結語，例如總支出和收入、花最多的三個分類、最常買和最大一筆的品項、記帳天數、旅程和存到的目標名稱；不送每一筆明細、帳戶名稱和分帳成員的名字。同樣適用上面免費額度的說明。
           </li>
           <li><b>麥克風</b>：只有按「說一句」時才會使用，說完或取消就關掉。</li>
           <li><b>匯率</b>：向 open.er-api.com 查詢匯率，不會送出任何個人資料。</li>

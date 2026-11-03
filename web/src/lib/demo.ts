@@ -142,6 +142,14 @@ export const demo = {
     await pause();
     return db().txs.filter(recent);
   },
+  async yearTransactions(year: number): Promise<Transaction[]> {
+    await pause();
+    return db().txs.filter((t) => t.date.startsWith(`${year}-`));
+  },
+  async depositsUntil(year: number): Promise<SavingsDeposit[]> {
+    await pause();
+    return db().deposits.filter((d) => d.date <= `${year}-12-31`).map((d) => ({ ...d }));
+  },
   async profile(): Promise<Profile> {
     await pause();
     return { ...db().profile };
