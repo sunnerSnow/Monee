@@ -1,5 +1,6 @@
 // 示範模式：NEXT_PUBLIC_MONEE_DEMO=1 時改用記憶體裡的範例資料，不連 Supabase。
 // 用途：還沒建 Supabase 專案時先試用、截圖檢查畫面。重新整理頁面就會回到初始資料。
+import type { AccountUsage } from './accounts';
 import { reconcileDiff } from './budget';
 import type { RecurringRule } from './recurring';
 import type { GoalInput } from './data';
@@ -26,15 +27,17 @@ function seed() {
   const now = new Date();
   const day = (offset: number) => toISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset));
   const accounts: DemoAccount[] = [
-    { id: 'cash', name: '現金', type: 'CASH', openingBalance: 4596, investmentSnapshot: null, lastReconciledAt: null },
-    { id: 'esun', name: '玉山銀行', type: 'BANK', openingBalance: 148700, investmentSnapshot: null, lastReconciledAt: null },
-    { id: 'taishin', name: '台新銀行', type: 'BANK', openingBalance: 56000, investmentSnapshot: null, lastReconciledAt: null },
-    { id: 'cathay', name: '國泰信用卡', type: 'CREDIT_CARD', openingBalance: -6474, investmentSnapshot: null, lastReconciledAt: null },
-    { id: 'flygo', name: '台新 FlyGo', type: 'CREDIT_CARD', openingBalance: -1997, investmentSnapshot: null, lastReconciledAt: null },
+    { id: 'cash', name: '現金', type: 'CASH', openingBalance: 4596, investmentSnapshot: null, lastReconciledAt: null, archived: false },
+    { id: 'esun', name: '玉山銀行', type: 'BANK', openingBalance: 148700, investmentSnapshot: null, lastReconciledAt: null, archived: false },
+    { id: 'taishin', name: '台新銀行', type: 'BANK', openingBalance: 56000, investmentSnapshot: null, lastReconciledAt: null, archived: false },
+    { id: 'cathay', name: '國泰信用卡', type: 'CREDIT_CARD', openingBalance: -6474, investmentSnapshot: null, lastReconciledAt: null, archived: false },
+    { id: 'flygo', name: '台新 FlyGo', type: 'CREDIT_CARD', openingBalance: -1997, investmentSnapshot: null, lastReconciledAt: null, archived: false },
     {
-      id: 'invest', name: '證券戶', type: 'INVESTMENT_MIRROR', openingBalance: 143000, lastReconciledAt: null,
+      id: 'invest', name: '證券戶', type: 'INVESTMENT_MIRROR', openingBalance: 143000, lastReconciledAt: null, archived: false,
       investmentSnapshot: { unrealizedPnl: 11800, pnlPercentage: 8.4, lastSyncedAt: now.toISOString(), deepLinkUrl: '#' },
     },
+    // 已經不用、封存起來的帳戶（餘額 0、沒有帳，可以取消封存或刪掉）
+    { id: 'post', name: '郵局（舊）', type: 'BANK', openingBalance: 0, investmentSnapshot: null, lastReconciledAt: null, archived: true },
   ];
   const t = (offset: number, time: string, note: string, categoryId: string, source: string, amount: number, extra: Partial<Transaction> = {}): Transaction => ({
     id: id('t'), date: day(offset), time, type: 'EXPENSE', amount, categoryId, sourceAccountId: source, targetAccountId: null, note,
@@ -285,9 +288,33 @@ export const demo = {
   },
   async addAccount(a: NewAccount) {
     await pause();
-    const row: DemoAccount = { id: id('a'), name: a.name, type: a.type, openingBalance: a.openingBalance, investmentSnapshot: null, lastReconciledAt: null };
+    const row: DemoAccount = { id: id('a'), name: a.name, type: a.type, openingBalance: a.openingBalance, investmentSnapshot: null, lastReconciledAt: null, archived: false };
     db().accounts.push(row);
     return row.id;
+  },
+  async updateAccount(accountId: string, patch: { name: string; openingBalance: number }) {
+    await pause();
+    Object.assign(account(accountId), patch);
+  },
+  async archiveAccount(accountId: string, archived: boolean) {
+    await pause();
+    account(accountId).archived = archived;
+  },
+  async accountUsage(accountId: string): Promise<AccountUsage> {
+    await pause();
+    const s = db();
+    return {
+      transactions: s.txs.filter((t) => t.sourceAccountId === accountId || t.targetAccountId === accountId).length,
+      splits: s.split.flatMap((g) => [...g.expenses, ...g.settlements]).filter((x) => x.accountId === accountId).length,
+    };
+  },
+  /** 跟資料庫一樣：有帳就刪不掉；用到它的固定收支一起刪 */
+  async deleteAccount(accountId: string) {
+    const usage = await demo.accountUsage(accountId);
+    if (usage.transactions || usage.splits) throw new Error('這個帳戶還有帳，不能刪除；不用了可以封存');
+    const s = db();
+    s.accounts = s.accounts.filter((a) => a.id !== accountId);
+    s.recurring = s.recurring.filter((r) => r.sourceAccountId !== accountId && r.targetAccountId !== accountId);
   },
   async reconcile(account: Account, input: number) {
     await pause();
@@ -325,7 +352,7 @@ export const demo = {
     split.forEach((g) => [...g.expenses, ...g.settlements].forEach((x) => groupOf.set(x.id, g.name)));
     return {
       transactions: txs.map((t) => ({ ...t, groupName: groupOf.get(t.splitExpenseId ?? t.splitSettlementId ?? '') ?? null })),
-      accounts: accounts.map((a) => ({ ...a, currency: 'TWD', icon: null, currentBalance: balanceOf(a, txs), archived: false })),
+      accounts: accounts.map((a) => ({ ...a, currency: 'TWD', icon: null, currentBalance: balanceOf(a, txs) })),
       budgets: budgets.map((b) => ({ ...b })),
     };
   },
@@ -564,6 +591,12 @@ export const demo = {
   },
 };
 
+function account(accountId: string) {
+  const a = db().accounts.find((x) => x.id === accountId);
+  if (!a) throw new Error('找不到這個帳戶，可能已經刪除');
+  return a;
+}
+
 // ---------- 分帳的示範資料與個人帳交易 ----------
 function group(groupId: string) {
   const g = db().split.find((x) => x.id === groupId);
@@ -574,7 +607,7 @@ function group(groupId: string) {
 function friendsAccount(s: Store) {
   let a = s.accounts.find((x) => x.type === 'FRIENDS');
   if (!a) {
-    a = { id: 'friends', name: '朋友往來', type: 'FRIENDS', openingBalance: 0, investmentSnapshot: null, lastReconciledAt: null };
+    a = { id: 'friends', name: '朋友往來', type: 'FRIENDS', openingBalance: 0, investmentSnapshot: null, lastReconciledAt: null, archived: false };
     s.accounts.push(a);
   }
   return a.id;

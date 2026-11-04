@@ -3,6 +3,7 @@
 import { ChevronLeft, Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { selectable } from '@/lib/accounts';
 import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { useAccounts, useDeleteRecurring, useRecurringRules, useSaveRecurring } from '@/lib/data';
 import { toISODate } from '@/lib/dates';
@@ -92,7 +93,7 @@ function RecurringForm({ rule, onClose }: { rule?: RecurringRule; onClose: () =>
   const [amount, setAmount] = useState(rule ? String(rule.amount) : '');
   const [note, setNote] = useState(rule?.note ?? '');
   const [categoryId, setCategoryId] = useState(rule && rule.type !== 'TRANSFER' ? rule.categoryId : defaultCategory('EXPENSE'));
-  const usable = accounts.filter((a) => a.type !== 'FRIENDS');
+  const usable = selectable(accounts, [rule?.sourceAccountId, rule?.targetAccountId]).filter((a) => a.type !== 'FRIENDS');
   const payable = usable.filter((a) => a.type !== 'INVESTMENT_MIRROR' || a.id === rule?.sourceAccountId);
   const [source, setSource] = useState(rule?.sourceAccountId ?? '');
   const [target, setTarget] = useState(rule?.targetAccountId ?? '');

@@ -2,6 +2,7 @@
 
 import { Inbox } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { selectable } from '@/lib/accounts';
 import { getCategory } from '@/lib/categories';
 import { getCurrency } from '@/lib/currency';
 import { formatMoney, money } from '@/lib/money';
@@ -30,10 +31,11 @@ export function OweText({ value, hidden, prefix = '你', empty = false }: { valu
   );
 }
 
-/** 付款用的帳戶：朋友往來由系統管理、投資帳戶只能轉入，都不能拿來付錢 */
-export const payableAccounts = (accounts: Account[]) => accounts.filter((a) => a.type !== 'FRIENDS' && a.type !== 'INVESTMENT_MIRROR');
-/** 收朋友還的錢：存進現金或銀行 */
-export const receivingAccounts = (accounts: Account[]) => accounts.filter((a) => a.type === 'CASH' || a.type === 'BANK');
+/** 付款用的帳戶：朋友往來由系統管理、投資帳戶只能轉入，都不能拿來付錢；封存的不列（keep 是編輯時原本用的帳戶） */
+export const payableAccounts = (accounts: Account[], keep?: string | null) =>
+  selectable(accounts, [keep]).filter((a) => a.type !== 'FRIENDS' && a.type !== 'INVESTMENT_MIRROR');
+/** 收朋友還的錢：存進現金或銀行（封存的不列） */
+export const receivingAccounts = (accounts: Account[]) => selectable(accounts).filter((a) => a.type === 'CASH' || a.type === 'BANK');
 
 /** 這筆花費怎麼記進你的個人帳（跟資料庫 split_save_expense 的規則一致）；original 是外幣原額，例如「¥3,000」 */
 export function effectLines(

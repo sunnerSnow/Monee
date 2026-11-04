@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import type { AccountUsage } from './accounts';
 import { prepareRestore, type Backup } from './backup';
 import type { Frequency, RecurringRule } from './recurring';
 import type { SavingsDeposit, SavingsGoal } from './goals';
@@ -49,6 +50,7 @@ interface AccountRow {
   icon: string | null;
   investment_snapshot: Account['investmentSnapshot'];
   last_reconciled_at: string | null;
+  archived: boolean;
 }
 
 interface TransactionRow {
@@ -81,6 +83,7 @@ const toAccount = (r: AccountRow): Account => ({
   icon: r.icon,
   investmentSnapshot: r.investment_snapshot,
   lastReconciledAt: r.last_reconciled_at,
+  archived: Boolean(r.archived),
 });
 
 const toTransaction = (r: TransactionRow): Transaction => ({
@@ -112,13 +115,14 @@ async function unwrap<T>(query: PromiseLike<{ data: unknown; error: { message: s
 
 // ---------- 讀取 ----------
 
+/** 全部帳戶，封存的也在（舊帳上才看得到帳戶名稱）；要選帳戶的地方用 lib/accounts.ts 的 selectable 濾掉 */
 export function useAccounts() {
   return useQuery({
     queryKey: keys.accounts,
     queryFn: async () => {
       if (isDemo) return demo.accounts();
       const rows = await unwrap<AccountRow[]>(
-        createClient().from('account_balances').select('*').eq('archived', false).order('sort_order').order('created_at'),
+        createClient().from('account_balances').select('*').order('sort_order').order('created_at'),
       );
       return rows.map(toAccount);
     },
@@ -212,12 +216,12 @@ export async function fetchExportData(): Promise<ExportData> {
     groupName: r.split_expense?.group?.name ?? r.split_settlement?.group?.name ?? null,
   }));
   const [accounts, budgets] = await Promise.all([
-    unwrap<(AccountRow & { archived: boolean })[]>(supabase.from('account_balances').select('*').order('sort_order').order('created_at')),
+    unwrap<AccountRow[]>(supabase.from('account_balances').select('*').order('sort_order').order('created_at')),
     unwrap<{ effective_month: string; amount: number | string | null }[]>(supabase.from('budget_history').select('effective_month, amount')),
   ]);
   return {
     transactions,
-    accounts: accounts.map((r) => ({ ...toAccount(r), archived: r.archived })),
+    accounts: accounts.map(toAccount),
     budgets: budgets.map((r) => ({ month: r.effective_month, amount: r.amount != null ? Number(r.amount) : null })),
   };
 }
@@ -865,6 +869,78 @@ export function useAddAccount() {
       return row.id;
     },
     onSuccess: () => invalidate(keys.accounts),
+  });
+}
+
+/**
+ * 改名、改期初餘額（建立時填錯了）。改了名字而且有連結 Google 的話，年度帳本上的帳戶名稱要重寫：
+ * 有帳的月份全部記成待同步（資料庫的 trigger 只看交易和分類），接著叫一次同步
+ */
+export function useUpdateAccount() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ account, name, openingBalance }: { account: Account; name: string; openingBalance: number }) => {
+      if (isDemo) return demo.updateAccount(account.id, { name, openingBalance });
+      const supabase = createClient();
+      const rows = await unwrap<{ id: string }[]>(
+        supabase.from('accounts').update({ name, opening_balance: openingBalance }).eq('id', account.id).select('id'),
+      );
+      if (!rows.length) throw new Error('找不到這個帳戶，可能已經刪除');
+      if (name === account.name) return;
+      // 名字已經存好了；這裡失敗（例如網路瞬斷）不算存失敗，下次同步或重新連結時會補
+      try {
+        const google = await unwrap<{ needs_reconnect: boolean } | null>(supabase.from('google_integrations').select('needs_reconnect').maybeSingle());
+        if (!google || google.needs_reconnect) return;
+        await rpc('google_mark_all', {});
+        void syncRounds(false, 3).then(() => invalidate(keys.google));
+      } catch {
+        // 忽略
+      }
+    },
+    onSuccess: () => invalidate(keys.accounts, keys.google),
+  });
+}
+
+/** 封存或取消封存：以前的帳都在，只是從資產和記帳的選項收起來 */
+export function useArchiveAccount() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      if (isDemo) return demo.archiveAccount(id, archived);
+      const rows = await unwrap<{ id: string }[]>(createClient().from('accounts').update({ archived }).eq('id', id).select('id'));
+      if (!rows.length) throw new Error('找不到這個帳戶，可能已經刪除');
+    },
+    onSuccess: () => invalidate(keys.accounts),
+  });
+}
+
+/** 有幾筆交易、分帳花費和還款用到這個帳戶（刪除前檢查） */
+export async function fetchAccountUsage(id: string): Promise<AccountUsage> {
+  if (isDemo) return demo.accountUsage(id);
+  const supabase = createClient();
+  const count = async (table: 'transactions' | 'split_expenses' | 'split_settlements', column: string) => {
+    const { count: n, error } = await supabase.from(table).select('id', { count: 'exact', head: true }).eq(column, id);
+    if (error) throw new Error(error.message);
+    return n ?? 0;
+  };
+  const [source, target, expenses, settlements] = await Promise.all([
+    count('transactions', 'source_account_id'), count('transactions', 'target_account_id'),
+    count('split_expenses', 'account_id'), count('split_settlements', 'account_id'),
+  ]);
+  return { transactions: source + target, splits: expenses + settlements };
+}
+
+/** 刪掉沒有帳的帳戶；用到它的固定收支跟著刪（資料庫 on delete cascade）。有帳的資料庫會擋 */
+export function useDeleteAccount() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (isDemo) return demo.deleteAccount(id);
+      const { data, error } = await createClient().from('accounts').delete().eq('id', id).select('id');
+      if (error) throw new Error(error.code === '23503' ? '這個帳戶還有帳，不能刪除；不用了可以封存' : error.message);
+      if (!data?.length) throw new Error('找不到這個帳戶，可能已經刪除');
+    },
+    onSuccess: () => invalidate(keys.accounts, keys.recurring),
   });
 }
 

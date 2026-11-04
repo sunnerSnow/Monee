@@ -9,7 +9,8 @@ export const MASCOTS: MascotKind[] = ['coin', 'wallet', 'piggy'];
 export type SheetState =
   | { kind: 'entry' }
   | { kind: 'transaction'; id: string }
-  | { kind: 'account' }
+  // 沒有 accountId 是新增帳戶；有的話是那個帳戶的設定（改名、期初餘額、封存、刪除）
+  | { kind: 'account'; accountId?: string }
   | { kind: 'reconcile'; accountId: string }
   // 分帳
   | { kind: 'splitExpense'; groupId: string; expenseId?: string }

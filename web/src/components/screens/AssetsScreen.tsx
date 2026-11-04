@@ -1,7 +1,8 @@
 'use client';
 
-import { ArrowRight, CreditCard, Info, Landmark, Plus, TrendingUp, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowRight, ChevronRight, CreditCard, Info, Landmark, Plus, TrendingUp, Users, Wallet, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
+import { activeAccounts } from '@/lib/accounts';
 import { accountSummary } from '@/lib/budget';
 import { useAccounts, useProfile, useSplitGroups } from '@/lib/data';
 import { isEmptyGroup, isSettled, myNet } from '@/lib/split';
@@ -43,43 +44,39 @@ export function AssetsScreen() {
   if (accountsQ.isPending) return <>{header}<LoadingBlocks /></>;
   if (accountsQ.error) return <>{header}<ErrorBox message={accountsQ.error.message} onRetry={() => accountsQ.refetch()} /></>;
 
-  const accounts = accountsQ.data ?? [];
-  if (!accounts.length) {
+  const all = accountsQ.data ?? [];
+  const accounts = activeAccounts(all);
+  const archived = all.filter((a) => a.archived && a.type !== 'FRIENDS');
+  if (!accounts.length && !archived.length) {
     return <>{header}<EmptyBox title="還沒有帳戶">新增現金、銀行或信用卡，Monee 就能幫你算出淨資產。</EmptyBox>{addButton}</>;
   }
 
   const s = accountSummary(accounts);
   const pnlColor: PnlColor = profileQ.data?.pnlColor ?? 'red_up';
 
+  // 點帳戶打開帳戶設定：校準、改名、期初餘額、封存、刪除
   const row = (a: Account) => {
     const Icon = ICONS[a.type];
-    const body = (
-      <>
-        <span aria-hidden className="ico" style={{ background: ACCOUNT_COLORS[a.type] }}><Icon size={20} strokeWidth={1.5} /></span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-body">{a.name}</span>
-          <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">
-            {a.type === 'INVESTMENT_MIRROR' ? (a.investmentSnapshot ? 'Monee Invest 同步' : '手動填寫・之後由 Monee Invest 同步') : `${a.type === 'CREDIT_CARD' ? '本期待繳・' : ''}${reconciledLabel(a)}`}
+    return (
+      <li key={a.id}>
+        <button type="button" onClick={() => openSheet({ kind: 'account', accountId: a.id })} className="row press">
+          <span aria-hidden className="ico" style={{ background: ACCOUNT_COLORS[a.type] }}><Icon size={20} strokeWidth={1.5} /></span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-body">{a.name}</span>
+            <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">
+              {a.archived ? '已封存' : a.type === 'INVESTMENT_MIRROR' ? (a.investmentSnapshot ? 'Monee Invest 同步' : '手動填寫・之後由 Monee Invest 同步') : `${a.type === 'CREDIT_CARD' ? '本期待繳・' : ''}${reconciledLabel(a)}`}
+            </span>
           </span>
-        </span>
-        <span className="flex flex-none flex-col items-end gap-1">
-          <span className="num text-body">{signedBalance(a.currentBalance, hidden)}</span>
-          {a.type === 'INVESTMENT_MIRROR'
-            ? a.investmentSnapshot && (
+          <span className="flex flex-none flex-col items-end gap-1">
+            <span className="num text-body">{signedBalance(a.currentBalance, hidden)}</span>
+            {a.type === 'INVESTMENT_MIRROR' && a.investmentSnapshot && !a.archived && (
               <span className={`pnl ${pnlColor}`}>
                 {hidden ? '▲ ••••' : `${a.investmentSnapshot.unrealizedPnl >= 0 ? '▲' : '▼'} ${formatMoney(a.investmentSnapshot.unrealizedPnl)} (${a.investmentSnapshot.pnlPercentage}%)`}
               </span>
-            )
-            : <span className="caption">校準餘額</span>}
-        </span>
-      </>
-    );
-    // 投資帳戶的市值變動不是收入或支出，不提供校準，避免汙染生活報表
-    return (
-      <li key={a.id}>
-        {a.type === 'INVESTMENT_MIRROR'
-          ? <div className="row">{body}</div>
-          : <button type="button" onClick={() => openSheet({ kind: 'reconcile', accountId: a.id })} className="row press">{body}</button>}
+            )}
+          </span>
+          <ChevronRight size={18} strokeWidth={1.5} aria-hidden className="-mr-1 flex-none text-muted" />
+        </button>
       </li>
     );
   };
@@ -113,9 +110,17 @@ export function AssetsScreen() {
       {group('g-cards', '信用卡待繳', s.cards, s.cardSum)}
       {group('g-invest', '投資帳戶', s.investments, s.investSum)}
       <FriendsSection groups={splitQ.data ?? []} balance={s.friendsSum} hidden={hidden} />
+      {archived.length > 0 && (
+        <details className="group flex flex-col gap-2">
+          <summary className="press inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-1 text-body-s tracking-[.1em] text-muted [&::-webkit-details-marker]:hidden">
+            已封存的帳戶（{archived.length}）<span aria-hidden className="group-open:hidden">＋</span><span aria-hidden className="hidden group-open:inline">－</span>
+          </summary>
+          <ul className="card mt-2 py-1 opacity-80">{archived.map(row)}</ul>
+        </details>
+      )}
       <p className="flex items-start gap-2 px-1 text-caption leading-[1.7] text-muted">
         <Info size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 flex-none" />
-        <span>點帳戶可以校準餘額。轉進投資帳戶的錢會記成「轉帳」，不會算進生活支出。</span>
+        <span>點帳戶可以校準餘額、改名、封存或刪除。轉進投資帳戶的錢會記成「轉帳」，不會算進生活支出。</span>
       </p>
       {addButton}
     </>

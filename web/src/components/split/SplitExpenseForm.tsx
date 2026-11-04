@@ -59,7 +59,7 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
   const photo = useReceiptDraft(editing?.receiptPath ?? null, initial?.receipt ?? null);
   const [uploading, setUploading] = useState(false);
   const me = meOf(group)!;
-  const payable = payableAccounts(accounts);
+  const payable = payableAccounts(accounts, editing?.accountId);
   const ids = group.members.map((m) => m.id);
   const friends = group.members.filter((m) => !m.isMe);
 

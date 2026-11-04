@@ -3,6 +3,7 @@
 import { Delete, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
+import { selectable } from '@/lib/accounts';
 import { frequentEntries } from '@/lib/budget';
 import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { formatForeign, getCurrency, toTwd, twdPerUnit } from '@/lib/currency';
@@ -91,8 +92,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     setSplitOff(!on);
   };
 
-  // 朋友往來由分帳管理；投資帳戶由 Monee Invest 同步，只能當轉入對象；編輯舊交易時保留它原本的帳戶
-  const usable = accounts.filter((a) => a.type !== 'FRIENDS');
+  // 朋友往來由分帳管理；投資帳戶由 Monee Invest 同步，只能當轉入對象；封存的不列；編輯舊交易時保留它原本的帳戶
+  const usable = selectable(accounts, [editing?.sourceAccountId, editing?.targetAccountId]).filter((a) => a.type !== 'FRIENDS');
   const payable = usable.filter((a) => a.type !== 'INVESTMENT_MIRROR' || a.id === editing?.sourceAccountId);
   const sourceId = source || payable[0]?.id || '';
   const targets = usable.filter((a) => a.id !== sourceId);

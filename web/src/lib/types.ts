@@ -23,6 +23,8 @@ export interface Account {
   icon: string | null;
   investmentSnapshot: InvestmentSnapshot | null;
   lastReconciledAt: string | null;
+  /** 封存：從資產和記帳的選項收起來，以前的帳都還在 */
+  archived: boolean;
 }
 
 export interface Transaction {

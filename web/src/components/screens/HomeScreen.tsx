@@ -2,6 +2,7 @@
 
 import { ArrowLeftRight, ArrowRight, Check, ChevronRight, CircleCheck, CreditCard, Eye, EyeOff, Info, Landmark, Plane, TrendingUp, Users } from 'lucide-react';
 import Link from 'next/link';
+import { activeAccounts } from '@/lib/accounts';
 import { accountSummary, budgetFor, budgetPace, countsForBudget, dailyBudget, monthTotals, sortNewestFirst } from '@/lib/budget';
 import { useAccounts, useBudgets, useSplitGroups, useTransactions } from '@/lib/data';
 import { daysInMonth, greeting, longDate, monthKeyOf, toISODate } from '@/lib/dates';
@@ -38,8 +39,8 @@ export function HomeScreen() {
   // 本月的預算（預算紀錄是「從某月起生效」）
   const budget = budgetFor(budgetsQ.data ?? [], monthKeyOf(now));
   // 「開始設定」只在帳戶或預算還沒設好、也還沒記過帳時出現；設定完就收起來，直接顯示首頁
-  const setupDone = accounts.length > 0 && budget !== null;
-  if (!txs.length && !setupDone) return <Onboarding now={now} accounts={accounts} budget={budget} />;
+  const setupDone = activeAccounts(accounts).length > 0 && budget !== null;
+  if (!txs.length && !setupDone) return <Onboarding now={now} accounts={activeAccounts(accounts)} budget={budget} />;
   return <Dashboard now={now} accounts={accounts} txs={txs} budget={budget} />;
 }
 
@@ -77,7 +78,8 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
   const calendar = { day: now.getDate(), daysInMonth: daysInMonth(now) };
   const daily = budget ? dailyBudget({ budget, monthExpense: totals.budgetExpense, todaySpent, ...calendar }) : null;
   const pace = budget ? budgetPace({ budget, monthExpense: totals.budgetExpense, ...calendar }) : null;
-  const assets = accountSummary(accounts);
+  // 名稱用全部的帳戶（舊帳可能記在封存的帳戶），淨資產只算還在用的
+  const assets = accountSummary(activeAccounts(accounts));
   const monthName = new Intl.DateTimeFormat('en', { month: 'long' }).format(now);
 
   const mood = !daily
@@ -189,7 +191,7 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
           : <EmptyBox title="還沒有交易">點下方 ＋ 記下第一筆，這裡就會列出最近的花費。</EmptyBox>}
       </section>
 
-      {accounts.length > 0 && (
+      {activeAccounts(accounts).length > 0 && (
         <section aria-labelledby="assets-title" className="flex flex-col gap-2.5">
           <SectionHeader id="assets-title" title="資產" en="Assets" action={
             <Link href="/assets" className={MORE}>全部資產<ArrowRight size={16} strokeWidth={1.5} aria-hidden /></Link>

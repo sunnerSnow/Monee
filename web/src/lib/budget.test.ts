@@ -22,7 +22,7 @@ const tx = (p: Partial<Transaction>): Transaction => ({
 
 const account = (p: Partial<Account>): Account => ({
   id: 'a', name: 'A', type: 'BANK', currency: 'TWD', currentBalance: 0, openingBalance: 0,
-  icon: null, investmentSnapshot: null, lastReconciledAt: null, ...p,
+  icon: null, investmentSnapshot: null, lastReconciledAt: null, archived: false, ...p,
 });
 
 describe('budgetFor', () => {
