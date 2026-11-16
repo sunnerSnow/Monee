@@ -1,10 +1,11 @@
 'use client';
 
-import { Delete, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
 import { selectable } from '@/lib/accounts';
 import { frequentEntries } from '@/lib/budget';
+import { amountHint, amountOf, collapse, pressKey, type CalcKey } from '@/lib/calc';
 import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
 import { formatForeign, getCurrency, toTwd, twdPerUnit } from '@/lib/currency';
 import { useAccounts, useAddTransaction, useDeleteTransaction, useFxRates, useSaveRecurring, useSplitGroups, useTransactions, useUpdateTransaction } from '@/lib/data';
@@ -20,9 +21,9 @@ import { Sheet, SheetHeader } from '../Sheet';
 import { SplitEntryPanel, SplitLinkedNotice, SplitSwitch } from '../split/SplitInEntry';
 import { EmptyBox, SwitchRow } from '../ui';
 import { AiEntryBar } from './AiEntryBar';
+import { AmountDisplay, AmountPad } from './AmountPad';
 
 const TYPES: [TransactionType, string][] = [['EXPENSE', '支出'], ['INCOME', '收入'], ['TRANSFER', '轉帳']];
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0', 'del'] as const;
 
 /** 記一筆（新增）與點交易列打開的編輯共用同一個表單 */
 export function EntrySheet() {
@@ -97,7 +98,8 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
   const payable = usable.filter((a) => a.type !== 'INVESTMENT_MIRROR' || a.id === editing?.sourceAccountId);
   const sourceId = source || payable[0]?.id || '';
   const targets = usable.filter((a) => a.id !== sourceId);
-  const value = Number(amount) || 0;
+  // amount 是鍵盤打出來的算式（例如 1200+350×2），value 是算出來可以記下的金額
+  const value = amountOf(amount);
   const quick = editing ? [] : frequentEntries(txs);
   const saving = uploading || add.isPending || update.isPending;
   const busy = saving || remove.isPending;
@@ -109,11 +111,12 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
     setError('');
   };
 
-  const press = (key: (typeof KEYS)[number]) => {
+  const press = (key: CalcKey) => {
     setError('');
-    if (key === 'del') return setAmount((a) => a.slice(0, -1));
-    setAmount((a) => (a.length >= 8 || (a === '' && key.startsWith('0')) ? a : a + key));
+    setAmount((a) => pressKey(a, key));
   };
+  // 按 =（或實體鍵盤的 Enter）：把算式收成結果，可以接著算
+  const equals = () => setAmount(collapse);
 
   // AI 草稿只是先幫忙填欄位；沒提到的帳戶沿用目前選的，使用者檢查後按「記下」才寫入
   const applyDraft = (d: AiDraftTransaction) => {
@@ -249,7 +252,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
       <>
         {header}
         <SplitSwitch on onChange={toggleSplit} trip={trip?.name} />
-        <SplitEntryPanel initial={{ amount, title: note, categoryId, date, receipt: photo.blob }} onDone={onClose} defaultGroupId={trip?.id} />
+        <SplitEntryPanel initial={{ amount: value ? String(value) : '', title: note, categoryId, date, receipt: photo.blob }} onDone={onClose} defaultGroupId={trip?.id} />
       </>
     );
   }
@@ -262,9 +265,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
 
       {chips(TYPES.map(([id, label]) => ({ id, label })), type, (id) => switchType(id as TransactionType), '類型')}
 
-      <p aria-live="polite" className={`display m-0 flex min-h-[60px] items-baseline justify-center gap-1.5 text-[44px] ${value ? '' : 'text-muted'}`}>
-        <small className="!m-0 !align-baseline text-[20px]">$</small>{value ? value.toLocaleString('en-US') : '0'}
-      </p>
+      <AmountDisplay expr={amount} value={value} hint={amountHint(amount)} />
 
       {type === 'EXPENSE' && quick.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -328,19 +329,7 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
         </div>
       )}
 
-      <div role="group" aria-label="數字鍵盤" className="grid grid-cols-3 gap-2">
-        {KEYS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => press(k)}
-            aria-label={k === 'del' ? '刪除一位' : undefined}
-            className="press num flex h-[52px] items-center justify-center rounded-sm border border-line bg-surface text-[20px] font-light"
-          >
-            {k === 'del' ? <Delete size={22} strokeWidth={1.5} aria-hidden /> : k}
-          </button>
-        ))}
-      </div>
+      <AmountPad onKey={press} onEquals={equals} />
 
       {error && <p role="alert" className="-my-2 text-caption text-alert">{error}</p>}
 
