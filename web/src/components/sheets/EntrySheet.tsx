@@ -368,8 +368,9 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
         {/* 金額和品項在同一張卡：打完金額，品項就在正下方 */}
         <div className="flex flex-col rounded-lg border-[2.5px] border-ink bg-surface shadow-[var(--pop-sm)]">
           <AmountDisplay expr={amount} value={value} hint={amountHint(amount)} />
-          <div className="mx-4 flex items-center gap-2 border-t-2 border-dashed border-line">
-            <PenLine size={18} strokeWidth={1.5} aria-hidden className="flex-none text-muted" />
+          {/* 打品項時：虛線變藍色實線、筆變藍色（不用全站的藍色外框，那個方框會壓到上面的虛線和下面的提示） */}
+          <div className="group mx-4 flex items-center gap-2 border-t-2 border-dashed border-line focus-within:border-solid focus-within:border-blue">
+            <PenLine size={18} strokeWidth={1.5} aria-hidden className="flex-none text-muted group-focus-within:text-blue" />
             <label className="sr-only" htmlFor="entry-note">品項或備註</label>
             <input
               id="entry-note"
@@ -381,13 +382,14 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
               maxLength={100}
               placeholder="品項或備註（選填）"
               autoComplete="off"
-              className="h-12 min-w-0 flex-1 bg-transparent text-[16px]"
+              className="h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none"
             />
           </div>
           {suggestions.length > 0 && (
-            <div className="flex items-center gap-2.5 px-4 pb-3">
+            // 右邊不留白：捲動範圍接到卡片邊框，按鈕滑出去時是消失在邊框下，不會在卡片中間被切一半
+            <div className="flex items-center gap-2.5 pb-3 pl-4">
               <span aria-hidden className="caption flex-none">{note.trim() ? '符合' : '常用'}</span>
-              <div role="group" aria-label={note.trim() ? '符合的品項' : '最近常用'} className="pills min-w-0 flex-1">
+              <div role="group" aria-label={note.trim() ? '符合的品項' : '最近常用'} className="pills mr-0 min-w-0 flex-1 pr-4">
                 {suggestions.map((t) => (
                   <button key={t.id} type="button" onClick={() => applySuggestion(t)} className="pill press">
                     {t.note} <span className="num">{formatMoney(t.amount)}</span>
