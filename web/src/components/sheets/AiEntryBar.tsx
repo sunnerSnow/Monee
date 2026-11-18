@@ -1,7 +1,7 @@
 'use client';
 
 import { Camera, Keyboard, Mic, Play, Sparkles, Square, X } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { requestDraft, shrinkImage } from '@/lib/ai-client';
 import type { AiDraftTransaction, DraftContext, DraftSource } from '@/lib/ai-draft';
@@ -86,9 +86,12 @@ function Playback({ src }: { src: string }) {
  * 辨識結果交給 onDraft 填進下面的表單，使用者檢查後按「記下」才會寫入。
  * onDraft 可以回傳一句補充說明（例如外幣換算），顯示在草稿說明裡。
  * 分帳、旅程帶 context（成員與幣別），AI 才認得「小明付的」和當地貨幣。
+ * compact：放在一列 flex-wrap 裡（記一筆的類型那一列），平常只有兩顆圖示按鈕靠右；
+ * 收音、整理中、草稿說明這些卡片佔滿一整行，排到下一行。
  */
-export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「午餐拉麵 260 刷國泰」「昨天全聯 389 付現」' }: {
+export function AiEntryBar({ accounts, onDraft, onPhoto, context, compact = false, example = '「午餐拉麵 260 刷國泰」「昨天全聯 389 付現」' }: {
   accounts: Account[];
+  compact?: boolean;
   onDraft: (draft: AiDraftTransaction) => string | void;
   /** 拍了收據：縮好的照片交給表單附上（AI 認不出來也留著，手動輸入時一樣用得到） */
   onPhoto?: (photo: Blob) => void;
@@ -208,12 +211,15 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
     />
   );
 
+  // compact 時卡片換到下一行、佔滿整行
+  const full = (node: ReactNode) => (compact ? <div className="basis-full">{node}</div> : node);
+
   if (voice.state !== 'idle') {
     const listening = voice.state === 'listening';
     const finishing = voice.state === 'finishing';
     const left = MAX_SECONDS - voice.seconds;
     const status = finishing ? '收尾中…' : listening ? (voice.speaking ? '有聽到，繼續說' : '聆聽中，請說') : '準備麥克風…';
-    return (
+    return full(
       <div className="card flex flex-col gap-3 rounded-sm p-4">
         <div className="flex items-center gap-2.5 text-body">
           <span aria-hidden className={`size-2.5 rounded-full ${listening ? 'bg-alert animate-[pulse_1.2s_ease-in-out_infinite] motion-reduce:animate-none' : 'bg-dash'}`} />
@@ -238,7 +244,7 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
   }
 
   if (phase.kind === 'working') {
-    return (
+    return full(
       <div role="status" aria-live="polite" className="card flex items-center gap-3 rounded-sm py-3 pr-2 pl-4">
         <Mascot className="w-11 flex-none motion-safe:animate-[wiggle_1s_ease-in-out_infinite]" />
         <span className="line-clamp-2 min-w-0 text-body-s">
@@ -253,7 +259,7 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
   }
 
   if (phase.kind === 'typing') {
-    return (
+    return full(
       <form onSubmit={submitText} className="flex flex-col gap-2">
         <label htmlFor="ai-text" className="caption">用一句話描述，Monee 幫你填好下面的欄位</label>
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
@@ -277,7 +283,24 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
     );
   }
 
-  const buttons = (
+  // compact：只有圖示的按鈕（aria-label 和 title 給名字），靠右
+  const buttons = compact ? (
+    <div className="ml-auto flex flex-none gap-2">
+      {voiceOk ? (
+        <button type="button" onClick={startVoice} aria-label="說一句" title="說一句" className="icon-btn press">
+          <Mic size={20} strokeWidth={2} aria-hidden />
+        </button>
+      ) : (
+        <button type="button" onClick={openTyping} aria-label="打一句" title="打一句" className="icon-btn press">
+          <Keyboard size={20} strokeWidth={2} aria-hidden />
+        </button>
+      )}
+      <button type="button" onClick={pickReceipt} aria-label="拍收據" title="拍收據" className="icon-btn press">
+        <Camera size={20} strokeWidth={2} aria-hidden />
+      </button>
+      {hiddenInput}
+    </div>
+  ) : (
     <div className="grid grid-cols-2 gap-2">
       {voiceOk ? (
         <button type="button" onClick={startVoice} className="btn-secondary press">
@@ -296,7 +319,7 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
   );
 
   if (phase.kind === 'error') {
-    return (
+    return full(
       <div className="flex flex-col gap-2.5">
         <div role="alert" className="flex flex-col gap-2.5 rounded-sm bg-alert-tint p-4">
           <p className="text-body-s leading-[1.8] text-alert">{phase.message}</p>
@@ -318,26 +341,30 @@ export function AiEntryBar({ accounts, onDraft, onPhoto, context, example = '「
 
   if (phase.kind === 'done') {
     const { draft } = phase;
+    const card = (
+      <div ref={draftCard} tabIndex={-1} role="status" className="flex flex-col gap-1.5 rounded-sm bg-fill p-4 outline-none">
+        <span className="caption flex items-center gap-1.5">
+          <Sparkles size={14} strokeWidth={1.5} aria-hidden />AI 已填好下面的欄位，確認後按「記下」
+        </span>
+        {draft.rawInput && <p className="text-body-s leading-[1.8]">「{draft.rawInput}」</p>}
+        {phase.note && <p className="caption leading-[1.8]">{phase.note}</p>}
+        {(draft.confidence < LOW_CONFIDENCE || !draft.suggestedAmount) && (
+          <p className="caption text-warn-fg">
+            {draft.suggestedAmount ? '有些地方不太確定，請檢查品項、金額、分類和帳戶。' : '沒有聽到金額，請用下面的鍵盤輸入。'}
+          </p>
+        )}
+        {phase.source === 'voice' && audioUrl && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1">
+            <Playback src={audioUrl} />
+            <span className="caption">AI 聽錯的話，聽聽看錄得清不清楚</span>
+          </div>
+        )}
+      </div>
+    );
+    if (compact) return <>{buttons}<div className="basis-full">{card}</div></>;
     return (
       <div className="flex flex-col gap-2.5">
-        <div ref={draftCard} tabIndex={-1} role="status" className="flex flex-col gap-1.5 rounded-sm bg-fill p-4 outline-none">
-          <span className="caption flex items-center gap-1.5">
-            <Sparkles size={14} strokeWidth={1.5} aria-hidden />AI 已填好下面的欄位，確認後按「記下」
-          </span>
-          {draft.rawInput && <p className="text-body-s leading-[1.8]">「{draft.rawInput}」</p>}
-          {phase.note && <p className="caption leading-[1.8]">{phase.note}</p>}
-          {(draft.confidence < LOW_CONFIDENCE || !draft.suggestedAmount) && (
-            <p className="caption text-warn-fg">
-              {draft.suggestedAmount ? '有些地方不太確定，請檢查品項、金額、分類和帳戶。' : '沒有聽到金額，請用下面的鍵盤輸入。'}
-            </p>
-          )}
-          {phase.source === 'voice' && audioUrl && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1">
-              <Playback src={audioUrl} />
-              <span className="caption">AI 聽錯的話，聽聽看錄得清不清楚</span>
-            </div>
-          )}
-        </div>
+        {card}
         {buttons}
       </div>
     );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   accountSummary, budgetFor, budgetPace, dailyBudget, expenseByCategory, frequentEntries, groupByDay, monthTotals, visibleTransactions,
-  monthlyExpenses, planBudget, reconcileDiff,
+  monthlyExpenses, planBudget, reconcileDiff, suggestEntries,
 } from './budget';
 import type { Account, BudgetEntry, Transaction } from './types';
 
@@ -272,5 +272,38 @@ describe('frequentEntries', () => {
       tx({ note: null, amount: 999 }),
     ];
     expect(frequentEntries(txs).map((t) => t.note)).toEqual(['捷運', '早餐']);
+  });
+});
+
+describe('suggestEntries', () => {
+  const txs = [
+    tx({ note: '午餐・便當', amount: 150, date: '2026-11-01' }),
+    tx({ note: '午餐・便當', amount: 150, date: '2026-11-03' }),
+    tx({ note: '午餐・拉麵', amount: 260, date: '2026-11-10' }),
+    tx({ note: '週末午餐', amount: 500, date: '2026-11-08' }),
+    tx({ note: '捷運', amount: 35, categoryId: 'transit', date: '2026-11-02' }),
+    tx({ note: '薪水', amount: 48000, type: 'INCOME', categoryId: 'salary' }),
+    tx({ note: '午餐・分帳', amount: 120, splitExpenseId: 'e1' }),
+    tx({ note: null, amount: 999 }),
+  ];
+
+  it('沒打字時是最常記的，只看同一類型，分帳產生的和沒有品項的不算', () => {
+    const notes = suggestEntries(txs, 'EXPENSE', '').map((t) => t.note);
+    expect(notes[0]).toBe('午餐・便當');
+    expect(notes).not.toContain('薪水');
+    expect(notes).not.toContain('午餐・分帳');
+    expect(suggestEntries(txs, 'INCOME', '  ').map((t) => t.note)).toEqual(['薪水']);
+  });
+
+  it('打字時找含有這些字的，開頭符合的排前面，回傳那一種最近的一筆', () => {
+    const found = suggestEntries(txs, 'EXPENSE', '午餐');
+    expect(found.map((t) => t.note)).toEqual(['午餐・便當', '午餐・拉麵', '週末午餐']);
+    expect(found[0].date).toBe('2026-11-03');
+  });
+
+  it('同一個品項只留最常用的那一種，跟打的字完全一樣的不列', () => {
+    const more = [...txs, tx({ note: '捷運', amount: 40, categoryId: 'transit' }), tx({ note: '捷運', amount: 40, categoryId: 'transit' })];
+    expect(suggestEntries(more, 'EXPENSE', '捷').map((t) => [t.note, t.amount])).toEqual([['捷運', 40]]);
+    expect(suggestEntries(more, 'EXPENSE', '捷運')).toEqual([]);
   });
 });

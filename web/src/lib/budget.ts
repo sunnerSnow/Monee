@@ -198,3 +198,40 @@ export function frequentEntries(txs: Transaction[], limit = 3) {
     });
   return [...counts.values()].sort((a, b) => b.n - a.n).slice(0, limit).map((x) => x.t);
 }
+
+/**
+ * 記一筆的品項提示（支出或收入）：
+ * - 還沒打字：最常記的幾筆（品項＋金額＋分類＋帳戶一樣的算同一種，次數多的在前，一樣多看最近用的）
+ * - 打字時：品項含有打的字的，開頭就符合的排前面；同一個品項只留最常用的那一種；跟打的字完全一樣的不列
+ * 分帳自動產生的不算（金額是你分到的那份，帳戶是朋友往來）。回傳每一種最近的那一筆。
+ */
+export function suggestEntries(txs: Transaction[], type: 'EXPENSE' | 'INCOME', query: string, limit = 4) {
+  const groups = new Map<string, { t: Transaction; note: string; n: number; last: string }>();
+  for (const t of txs) {
+    if (t.type !== type || !t.note || t.splitExpenseId || t.splitSettlementId) continue;
+    const k = `${t.note}|${t.amount}|${t.categoryId}|${t.sourceAccountId}`;
+    const when = `${t.date} ${t.time ?? ''}`;
+    const hit = groups.get(k);
+    if (!hit) groups.set(k, { t, note: t.note, n: 1, last: when });
+    else {
+      hit.n += 1;
+      if (when > hit.last) Object.assign(hit, { t, last: when });
+    }
+  }
+  const byUse = (a: { n: number; last: string }, b: { n: number; last: string }) => b.n - a.n || b.last.localeCompare(a.last);
+  const q = query.trim().toLowerCase();
+  if (!q) return [...groups.values()].sort(byUse).slice(0, limit).map((g) => g.t);
+
+  const starts = (note: string) => (note.toLowerCase().startsWith(q) ? 1 : 0);
+  const seen = new Set<string>();
+  return [...groups.values()]
+    .filter((g) => g.note.toLowerCase().includes(q) && g.note.toLowerCase() !== q)
+    .sort((a, b) => starts(b.note) - starts(a.note) || byUse(a, b))
+    .filter((g) => {
+      if (seen.has(g.note)) return false;
+      seen.add(g.note);
+      return true;
+    })
+    .slice(0, limit)
+    .map((g) => g.t);
+}

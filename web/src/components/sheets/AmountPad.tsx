@@ -16,21 +16,20 @@ const OPS: Record<Operator, { label: string; Icon: typeof Plus }> = {
 // 實體鍵盤：* / - 換成畫面上的符號
 const FROM_KEYBOARD: Record<string, CalcKey> = { '+': '+', '-': '−', '*': '×', x: '×', X: '×', '/': '÷', '.': '.', Backspace: 'del' };
 
-/** 上方的大金額：打算式時顯示算式，下面一行是算出來的結果 */
+/** 大金額：打算式時顯示算式，下面一行是算出來的結果（放在記一筆的金額卡上半，下半是品項） */
 export function AmountDisplay({ expr, value, hint }: { expr: string; value: number; hint: string }) {
   const pending = isExpression(expr);
   const text = expr ? formatExpression(expr) : '0';
   // 算式變長就縮小字，最長會換行，不會把面板撐寬
   const size = text.length <= 9 ? 'text-[44px]' : text.length <= 15 ? 'text-[30px]' : 'text-[22px]';
   return (
-    // 鍵盤在面板最下面：金額黏在面板上緣，往下捲去按鍵盤時還看得到（-top-2.5 蓋住面板上方的留白，下面一條線跟捲過去的內容分開）
-    <div aria-live="polite" className="sticky -top-2.5 z-10 -mx-5 flex flex-col items-center gap-0.5 border-b-2 border-line bg-page px-5 pt-3.5 pb-1">
-      <p className={`display m-0 flex min-h-[60px] flex-wrap items-center justify-center gap-x-1.5 text-center leading-[1.2] ${size} ${expr ? '' : 'text-muted'}`}>
+    <div aria-live="polite" className="flex flex-col items-center gap-0.5 px-4 pt-2.5">
+      <p className={`display m-0 flex min-h-[52px] flex-wrap items-center justify-center gap-x-1.5 text-center leading-[1.2] ${size} ${expr ? '' : 'text-muted'}`}>
         {!pending && <small className="!m-0 self-center text-[20px]">$</small>}
         <span className="min-w-0 break-words">{text}</span>
       </p>
       {/* 先留一行的高度，開始打算式時下面的欄位才不會跳一下 */}
-      <p className={`num m-0 min-h-[20px] text-body-s ${hint ? 'text-alert' : 'text-muted'}`}>
+      <p className={`num m-0 min-h-[18px] text-body-s leading-[18px] ${hint ? 'text-alert' : 'text-muted'}`}>
         {hint || (pending && value ? `= $${value.toLocaleString('en-US')}` : '')}
       </p>
     </div>
@@ -60,7 +59,8 @@ export function AmountPad({ onKey, onEquals }: { onKey: (key: CalcKey) => void; 
   }, [onKey, onEquals]);
 
   return (
-    <div role="group" aria-label="數字鍵盤，可以加減乘除" className="grid grid-cols-4 gap-2">
+    // 鍵盤固定在面板底部，按鍵比一般按鈕矮一點（仍 ≥ 44px），上面才放得下金額、品項、分類；矮螢幕再縮到 44px
+    <div role="group" aria-label="數字鍵盤，可以加減乘除" className="grid grid-cols-4 gap-1.5">
       {KEYS.map((k) => {
         const op = k in OPS ? OPS[k as Operator] : null;
         return (
@@ -69,7 +69,7 @@ export function AmountPad({ onKey, onEquals }: { onKey: (key: CalcKey) => void; 
             type="button"
             onClick={() => (k === '=' ? onEquals() : onKey(k))}
             aria-label={op ? op.label : LABELS[k]}
-            className={`press num flex h-[52px] items-center justify-center rounded-sm border-2 text-[20px] ${k === 'del' ? 'col-span-2' : ''} ${op || k === '=' ? 'border-ink bg-fill' : 'border-line-strong bg-surface'}`}
+            className={`press num flex h-[46px] items-center justify-center rounded-sm border-2 text-[20px] [@media(max-height:700px)]:h-11 ${k === 'del' ? 'col-span-2' : ''} ${op || k === '=' ? 'border-ink bg-fill' : 'border-line-strong bg-surface'}`}
           >
             {op ? <op.Icon size={20} strokeWidth={2.5} aria-hidden />
               : k === '=' ? <Equal size={20} strokeWidth={2.5} aria-hidden />

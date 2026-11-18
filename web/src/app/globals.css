@@ -182,6 +182,8 @@
   .ico.in { background: var(--yellow); }
   .ico.tr { background: transparent; border-style: dashed; border-color: var(--dash); color: var(--text-2); }
   .ico.sm { width: 30px; height: 30px; border-radius: 9px; }
+  /* 膠囊裡的小圖示底（記一筆的分類） */
+  .ico.xs { width: 26px; height: 26px; border-radius: 8px; border-width: 1.5px; }
 
   .chip { padding: 5px 12px; border-radius: var(--radius-pill); border: 2px solid var(--ink); background: var(--surface); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); font-family: var(--font-num); font-size: var(--fs-body-s); font-weight: 700; white-space: nowrap; }
   .chip.tight { background: var(--warn-tint); color: var(--warn-text); }
