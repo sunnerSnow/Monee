@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { activeAccounts } from '@/lib/accounts';
 import { accountSummary } from '@/lib/budget';
 import { useAccounts, useProfile, useSplitGroups } from '@/lib/data';
-import { isEmptyGroup, isSettled, myNet } from '@/lib/split';
+import { isSettled } from '@/lib/split';
 import { formatMoney, money, signedBalance } from '@/lib/money';
 import { ACCOUNT_COLORS } from '@/lib/palette';
 import type { Account, PnlColor, SplitGroup } from '@/lib/types';
 import { useUi } from '@/lib/ui-store';
 import { GoalsSection } from '../Goals';
-import { Avatars, OweText, kindLabel } from '../split/parts';
+import { GroupRow } from '../split/parts';
 import { BigMoney, EmptyBox, ErrorBox, LoadingBlocks, PageHeader, useHidden } from '../ui';
 
 const ICONS: Record<Account['type'], LucideIcon> = {
@@ -134,21 +134,20 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
   const settled = active.length - open.length;
   return (
     <section aria-labelledby="g-friends" className="flex flex-col gap-2">
-      <h2 id="g-friends" className="flex items-baseline justify-between px-1 text-body-s font-normal tracking-[.1em] text-muted">
-        <span>朋友往來</span><span className="num">{signedBalance(balance, hidden)}</span>
-      </h2>
+      {/* 「全部分帳」放在標題列右邊（跟首頁的「全部明細」一樣），不要藏在卡片下面 */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <h2 id="g-friends" className="flex items-baseline gap-2 text-body-s font-normal tracking-[.1em] text-muted">
+          <span>朋友往來</span><span className="num">{signedBalance(balance, hidden)}</span>
+        </h2>
+        {groups.length > 0 && (
+          <Link href="/split" className="press -my-3 inline-flex min-h-11 items-center gap-1 px-1 text-body-s tracking-[.08em]">
+            全部分帳{settled ? `（已結清 ${settled}）` : ''}<ArrowRight size={16} strokeWidth={1.5} aria-hidden />
+          </Link>
+        )}
+      </div>
       <ul className="card py-1">
         {open.length ? open.map((g) => (
-          <li key={g.id}>
-            <Link href={`/split/${g.id}`} className="row press">
-              <Avatars members={g.members.filter((m) => !m.isMe)} max={3} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-body">{g.name}</span>
-                <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">{kindLabel(g)}・{g.members.length} 人</span>
-              </span>
-              <OweText value={myNet(g)} hidden={hidden} empty={isEmptyGroup(g)} />
-            </Link>
-          </li>
+          <li key={g.id}><GroupRow g={g} hidden={hidden} /></li>
         )) : (
           <li>
             <Link href="/split" className="row press">
@@ -162,11 +161,6 @@ function FriendsSection({ groups, balance, hidden }: { groups: SplitGroup[]; bal
           </li>
         )}
       </ul>
-      {groups.length > 0 && (
-        <Link href="/split" className="press inline-flex min-h-11 items-center gap-1 self-end px-1 text-body-s tracking-[.08em]">
-          {settled ? `已結清 ${settled} 個・` : ''}全部分帳<ArrowRight size={16} strokeWidth={1.5} aria-hidden />
-        </Link>
-      )}
     </section>
   );
 }

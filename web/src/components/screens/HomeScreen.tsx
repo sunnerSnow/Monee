@@ -17,6 +17,7 @@ import { RecurringHome } from '../Recurring';
 import { StreakCard } from '../Streak';
 import { TxGroups } from '../TxList';
 import { InboxBanner } from '../split/parts';
+import { SplitHomeSection, TripNowCard } from '../split/SplitHome';
 import type { Mood } from '../Mascot';
 import { Avatar, BigMoney, BubbleLogo, EmptyBox, ErrorBox, HeroCard, LoadingBlocks, SectionHeader, useHidden } from '../ui';
 
@@ -123,6 +124,9 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
         )}
       />
 
+      {/* 旅程期間：這趟旅程放在最上面，點了直接到旅程頁 */}
+      <TripNowCard today={today} />
+
       <StreakCard today={today} />
 
       <SplitInbox />
@@ -190,6 +194,8 @@ function Dashboard({ now, accounts, txs, budget }: { now: Date; accounts: Accoun
           ? <TxGroups txs={sortNewestFirst(txs).slice(0, 6)} accounts={accounts} today={now} variant="inline" />
           : <EmptyBox title="還沒有交易">點下方 ＋ 記下第一筆，這裡就會列出最近的花費。</EmptyBox>}
       </section>
+
+      <SplitHomeSection />
 
       {activeAccounts(accounts).length > 0 && (
         <section aria-labelledby="assets-title" className="flex flex-col gap-2.5">

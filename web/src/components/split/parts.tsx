@@ -1,13 +1,15 @@
 'use client';
 
-import { Inbox } from 'lucide-react';
+import { Inbox, Plane, Plus } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { selectable } from '@/lib/accounts';
 import { getCategory } from '@/lib/categories';
 import { getCurrency } from '@/lib/currency';
 import { formatMoney, money } from '@/lib/money';
-import { initialOf, meOf } from '@/lib/split';
+import { initialOf, isEmptyGroup, meOf, myNet } from '@/lib/split';
 import type { Account, SplitExpense, SplitGroup, SplitMember } from '@/lib/types';
+import { useUi } from '@/lib/ui-store';
 
 export const memberLabel = (m: SplitMember) => (m.isMe ? '我' : m.name);
 
@@ -28,6 +30,36 @@ export function OweText({ value, hidden, prefix = '你', empty = false }: { valu
       <span className="mr-1.5 font-sans text-caption tracking-[.04em] text-muted">{prefix}{value > 0 ? '應收' : '應付'}</span>
       {money(Math.abs(value), hidden)}
     </span>
+  );
+}
+
+/** 群組一列：朋友頭像、名稱、類型・人數、你應收／應付；點了到群組頁（資產頁、首頁共用） */
+export function GroupRow({ g, hidden }: { g: SplitGroup; hidden: boolean }) {
+  return (
+    <Link href={`/split/${g.id}`} className="row press">
+      <Avatars members={g.members.filter((m) => !m.isMe)} max={3} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate text-body">{g.name}</span>
+        <span className="line-clamp-2 text-caption tracking-[.06em] text-muted">{kindLabel(g)}・{g.members.length} 人</span>
+      </span>
+      <OweText value={myNet(g)} hidden={hidden} empty={isEmptyGroup(g)} />
+    </Link>
+  );
+}
+
+/** 建立群組／建立旅程兩顆按鈕（分帳頁、首頁共用） */
+export function NewGroupButtons() {
+  const openSheet = useUi((s) => s.openSheet);
+  const cls = 'press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]';
+  return (
+    <div className="grid grid-cols-2 gap-2.5">
+      <button type="button" onClick={() => openSheet({ kind: 'splitGroup' })} aria-haspopup="dialog" className={cls}>
+        <Plus size={18} strokeWidth={1.5} aria-hidden />建立群組
+      </button>
+      <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupKind: 'trip' })} aria-haspopup="dialog" className={cls}>
+        <Plane size={18} strokeWidth={1.5} aria-hidden />建立旅程
+      </button>
+    </div>
   );
 }
 

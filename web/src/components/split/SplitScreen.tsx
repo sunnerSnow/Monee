@@ -1,13 +1,13 @@
 'use client';
 
-import { ChevronLeft, Info, Plane, Plus } from 'lucide-react';
+import { ChevronLeft, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useSplitGroups } from '@/lib/data';
 import { money } from '@/lib/money';
 import { friendTotals, inboxCount, isEmptyGroup, isSettled, myNet, openExpenses } from '@/lib/split';
 import { useUi } from '@/lib/ui-store';
 import { EmptyBox, ErrorBox, LoadingBlocks, useHidden } from '../ui';
-import { Avatars, InboxBanner, OweText, kindLabel, shortDate } from './parts';
+import { Avatars, InboxBanner, NewGroupButtons, OweText, kindLabel, shortDate } from './parts';
 
 
 export function SplitScreen() {
@@ -21,16 +21,7 @@ export function SplitScreen() {
       <h1 className="h-page">分帳<span className="en">Split</span></h1>
     </header>
   );
-  const addButton = (
-    <div className="grid grid-cols-2 gap-2.5">
-      <button type="button" onClick={() => openSheet({ kind: 'splitGroup' })} className="press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]">
-        <Plus size={18} strokeWidth={1.5} aria-hidden />建立群組
-      </button>
-      <button type="button" onClick={() => openSheet({ kind: 'splitGroup', groupKind: 'trip' })} className="press flex min-h-[52px] items-center justify-center gap-2 rounded-lg border border-dashed border-dash text-body-s tracking-[.08em]">
-        <Plane size={18} strokeWidth={1.5} aria-hidden />建立旅程
-      </button>
-    </div>
-  );
+  const addButton = <NewGroupButtons />;
   if (groupsQ.isPending) return <>{header}<LoadingBlocks /></>;
   if (groupsQ.error) return <>{header}<ErrorBox message={groupsQ.error.message} onRetry={() => groupsQ.refetch()} /></>;
 

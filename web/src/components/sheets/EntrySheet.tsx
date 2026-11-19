@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, PenLine, Plane, Trash2, type LucideIcon } from 'lucide-react';
+import { ChevronDown, PenLine, Plane, Trash2, Users, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import type { AiDraftTransaction } from '@/lib/ai-draft';
@@ -409,18 +409,18 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
           />
         )}
 
-        {/* 帳戶、日期、更多：收成一列小按鈕 */}
+        {/* 帳戶、分帳、日期、更多：收成一列小按鈕。一行放不下時會換行，分帳排在日期前面，第一行就看得到（日期通常是今天，比較少改） */}
         <div className="flex flex-wrap items-center gap-2">
           {accountChip('source', sourceLabel, nameOf(sourceId) ?? '選擇帳戶')}
           {type === 'TRANSFER' && accountChip('target', '轉入', nameOf(target) ?? '請選擇')}
-          <label className="sr-only" htmlFor="entry-date">日期</label>
-          <input id="entry-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input h-11 w-[150px] px-3" />
-          {/* 旅程期間關掉了「記到旅程」：留一顆小開關在這裡，隨時可以再打開（不佔金額、品項上面的位置） */}
-          {!editing && trip && type === 'EXPENSE' && (
-            <button type="button" role="switch" aria-checked={false} data-split-switch onClick={() => toggleSplit(true)} aria-label={`記到旅程・${trip.name}`} className="pill press">
-              <Plane size={16} strokeWidth={2} aria-hidden />記到旅程
+          {/* 分帳的小開關放在這裡，不收進「更多」才看得到：旅程期間（關掉了「記到旅程」）是記到旅程，平常是跟朋友分 */}
+          {!editing && type === 'EXPENSE' && (
+            <button type="button" role="switch" aria-checked={false} data-split-switch onClick={() => toggleSplit(true)} aria-label={trip ? `記到旅程・${trip.name}` : undefined} className="pill press">
+              {trip ? <Plane size={16} strokeWidth={2} aria-hidden /> : <Users size={16} strokeWidth={2} aria-hidden />}{trip ? '記到旅程' : '分帳'}
             </button>
           )}
+          <label className="sr-only" htmlFor="entry-date">日期</label>
+          <input id="entry-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input h-11 w-[150px] px-3" />
           {!editing && (
             <button type="button" aria-expanded={moreOpen} aria-controls={moreOpen ? 'entry-more' : undefined} onClick={toggleMore} className="pill press">
               更多{moreSummary && <span className="caption">・{moreSummary}</span>}
@@ -439,7 +439,6 @@ function EntryForm({ editing, onClose }: { editing?: Transaction; onClose: () =>
 
         {!editing && moreOpen && (
           <div id="entry-more" className="flex flex-col gap-3">
-            {!trip && type === 'EXPENSE' && <SplitSwitch on={false} onChange={toggleSplit} />}
             <ReceiptField draft={photo} />
             <SwitchRow
               title="設成固定收支"
