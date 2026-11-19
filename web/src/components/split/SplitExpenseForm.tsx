@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Minus, Plus } from 'lucide-react';
+import { Check, Minus, PenLine, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ME, type AiDraftTransaction } from '@/lib/ai-draft';
 import { categoriesFor, defaultCategory, getCategory, useCategories } from '@/lib/categories';
@@ -264,9 +264,16 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
         />
       )}
 
-      <Field label="金額" htmlFor="split-amount">
-        <div className="flex items-baseline gap-1.5 border-b border-fg px-0.5 pb-2 focus-within:border-b-2 focus-within:pb-[7px]">
-          <span className="display text-[22px]">{cur.symbol.trim()}</span>
+      {currencyChoices.length > 1 && (
+        <Pills items={currencyChoices.map((c) => ({ id: c, label: `${getCurrency(c).name} ${c}` }))} value={currency} onPick={switchCurrency} label="幣別" />
+      )}
+
+      {/* 金額和品項在同一張卡（跟記一筆一樣）：打完金額，品項就在正下方。
+          焦點也跟記一筆一樣：打金額或品項時中間的虛線變藍色實線，打品項時筆也變藍色 */}
+      <div className="group/card flex flex-col rounded-lg border-[2.5px] border-ink bg-surface shadow-[var(--pop-sm)]">
+        <div className="mx-4 flex items-baseline gap-1.5 pt-3 pb-2">
+          <label className="sr-only" htmlFor="split-amount">金額</label>
+          <span aria-hidden className="display text-[22px]">{cur.symbol.trim()}</span>
           <input
             id="split-amount"
             data-autofocus
@@ -277,42 +284,41 @@ export function SplitExpenseForm({ group, editing, initial, onSaved }: {
             autoComplete="off"
             className="display min-w-0 flex-1 bg-transparent text-[36px] outline-none"
           />
+          {foreign && <span className="num flex-none text-body-s">≈ {formatMoney(total)}</span>}
         </div>
-        {foreign && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-0.5 text-caption text-muted">
-            <span className="num text-body-s text-fg">≈ {formatMoney(total)}</span>
-            <label htmlFor="split-rate" className="ml-auto">匯率 1 {currency} =</label>
-            <input
-              id="split-rate"
-              inputMode="decimal"
-              value={rateInput || (autoRate ? String(autoRate) : '')}
-              onChange={(e) => setRateInput(e.target.value.replace(/[^\d.]/g, '').slice(0, 12))}
-              placeholder={fx.isPending ? '載入中' : '輸入匯率'}
-              autoComplete="off"
-              className="num h-11 w-24 rounded-xs border border-line bg-page px-2 text-right text-[14px] text-fg"
-            />
-            <span>元</span>
-            <span className="w-full leading-[1.7]">
-              {rateInput ? '用你輸入的匯率' : autoRate ? '參考今天的匯率，可以改成刷卡的實際匯率' : fx.isError ? '匯率暫時拿不到，請自己輸入' : ''}
-            </span>
-          </div>
-        )}
-      </Field>
+        <div className="group mx-4 flex items-center gap-2 border-t-2 border-dashed border-line group-focus-within/card:border-solid group-focus-within/card:border-blue">
+          <PenLine size={18} strokeWidth={1.5} aria-hidden className="flex-none text-muted group-focus-within:text-blue" />
+          <label className="sr-only" htmlFor="split-title">品項</label>
+          <input id="split-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} placeholder="品項，例如：午餐・野菜鍋" autoComplete="off" className="h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none" />
+        </div>
+      </div>
 
-      {currencyChoices.length > 1 && (
-        <Field label="幣別">
-          <Pills items={currencyChoices.map((c) => ({ id: c, label: `${getCurrency(c).name} ${c}` }))} value={currency} onPick={switchCurrency} label="幣別" />
-        </Field>
+      {foreign && (
+        <div className="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 px-0.5 text-caption text-muted">
+          <label htmlFor="split-rate">匯率 1 {currency} =</label>
+          <input
+            id="split-rate"
+            inputMode="decimal"
+            value={rateInput || (autoRate ? String(autoRate) : '')}
+            onChange={(e) => setRateInput(e.target.value.replace(/[^\d.]/g, '').slice(0, 12))}
+            placeholder={fx.isPending ? '載入中' : '輸入匯率'}
+            autoComplete="off"
+            className="num h-11 w-24 rounded-xs border border-line bg-page px-2 text-right text-[14px] text-fg"
+          />
+          <span>元</span>
+          <span className="w-full leading-[1.7]">
+            {rateInput ? '用你輸入的匯率' : autoRate ? '參考今天的匯率，可以改成刷卡的實際匯率' : fx.isError ? '匯率暫時拿不到，請自己輸入' : ''}
+          </span>
+        </div>
       )}
 
-      <Field label="品項與日期" htmlFor="split-title">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <input id="split-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} placeholder="例如：午餐・野菜鍋" autoComplete="off" className="field-input" />
-          <label className="sr-only" htmlFor="split-date">日期</label>
-          <input id="split-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input w-[150px] px-3" />
-        </div>
+      <Field label="分類">
         <Pills items={categoriesFor('EXPENSE', categoryId).map((c) => ({ id: c.id, label: c.name }))} value={categoryId} onPick={setCategoryId} label="分類" wrap />
       </Field>
+      <div className="flex items-center gap-3">
+        <label className="caption" htmlFor="split-date">日期</label>
+        <input id="split-date" type="date" value={date} max={toISODate(new Date())} onChange={(e) => setDate(e.target.value || toISODate(new Date()))} className="field-input h-11 w-[150px] px-3" />
+      </div>
 
       {group.members.length > 1 && (
         <Field label="誰先付的">
